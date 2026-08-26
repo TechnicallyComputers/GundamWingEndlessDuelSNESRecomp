@@ -1,8 +1,9 @@
 [submodule "snesrecomp"]
 	path = snesrecomp
 	url = https://github.com/mstan/snesrecomp.git
-	branch = feat/rollback-multitap-newproject
+	branch = feat/local-codegen-sdk
+
 [submodule "recomp-ui"]
 	path = recomp-ui
 	url = https://github.com/mstan/recomp-ui.git
-	branch = master
+	branch = feat/hotfixnetplayUX
