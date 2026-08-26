@@ -64,6 +64,19 @@ target_compile_definitions(GundamWingEndlessDuelSNESRecomp PRIVATE
 )
 snesrecomp_target_sdl(GundamWingEndlessDuelSNESRecomp)
 
+# Shared Dear ImGui pre-boot launcher (ROM picker, verification, display /
+# audio / input settings). Self-contained: it brings its own ImGui, GL link and
+# staged assets, and defines RECOMP_LAUNCHER so src/main.c compiles its GUI path.
+set(RECOMP_UI_ROOT "${CMAKE_SOURCE_DIR}/recomp-ui" CACHE PATH
+    "Root directory of the recomp-ui launcher repo" FORCE)
+if(NOT EXISTS "${RECOMP_UI_ROOT}/recomp_ui.cmake")
+    message(FATAL_ERROR
+        "recomp-ui missing at ${RECOMP_UI_ROOT}.\n"
+        "Run: git submodule update --init --recursive recomp-ui")
+endif()
+include(${RECOMP_UI_ROOT}/recomp_ui.cmake)
+recomp_target_launcher_ui(GundamWingEndlessDuelSNESRecomp CONSOLE snes)
+
 # Generated C is machine output: it is not held to the runner's warning bar,
 # and treating it as such buries real warnings from hand-written host code.
 if(NOT MSVC)
