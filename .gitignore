@@ -31,3 +31,4 @@
 # from the ROM — the same reason src/gen is never committed. Regenerate them
 # locally; they are evidence, not source.
 /analysis/
+analysis/oracle/scene.csv
