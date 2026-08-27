@@ -32,3 +32,4 @@
 # locally; they are evidence, not source.
 /analysis/
 analysis/oracle/scene.csv
+snes-diag.log
