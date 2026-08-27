@@ -30,4 +30,4 @@
 # These embed VRAM/CGRAM dumps taken from a running game, i.e. data derived
 # from the ROM — the same reason src/gen is never committed. Regenerate them
 # locally; they are evidence, not source.
-analysis/
+/analysis/
