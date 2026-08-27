@@ -32,6 +32,7 @@
 #include "game_rtl.h"
 #include "snes/ppu.h"
 #include "debug_server.h"
+#include "snes_savestate_menu.h" /* Select+R save-state overlay */
 #include "cpu_trace.h"
 #include "desktop/sdl_compat.h"
 #include "host_paths.h"      /* snesrecomp_exe_dir_path */
@@ -686,6 +687,104 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
 }
 #endif /* RECOMP_LAUNCHER */
 
+/* ── Save-state overlay ───────────────────────────────────────────────────
+ *
+ * Select + R opens the framework's slot browser. Everything about the menu —
+ * which slot is selected, what the panel looks like, and the RtlSaveLoad call
+ * itself — lives in snesrecomp/runner/src/snes_savestate_menu.c. The host
+ * supplies only the two things a framework module cannot: SDL events, and
+ * pixels on the screen.
+ *
+ * The guest is frozen while the menu is open (the loop below simply stops
+ * calling RtlRunFrame), which is what psxrecomp does and the only way "save
+ * right here" refers to a definite point in time. Audio goes quiet for the
+ * duration, as it would for any paused game. */
+
+static SDL_Texture *g_overlay_tex;
+
+static void game_draw_overlay(SDL_Renderer *renderer)
+{
+    const uint32_t *px = NULL;
+    int w = 0, h = 0;
+
+    if (!snes_savestate_menu_overlay_image(&px, &w, &h))
+        return;
+    if (!g_overlay_tex) {
+        g_overlay_tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+                                          SDL_TEXTUREACCESS_STREAMING, w, h);
+        if (!g_overlay_tex)
+            return;
+        /* The panel is opaque, so this is not what makes it visible — but it
+         * is what stops a future translucent panel from hitting the same
+         * alpha trap the game texture did (see SDL_BLENDMODE_NONE below). */
+        SDL_SetTextureBlendMode(g_overlay_tex, SDL_BLENDMODE_BLEND);
+    }
+    SDL_UpdateTexture(g_overlay_tex, NULL, px, w * 4);
+    /* Same destination rect as the game texture: the panel is exactly 2x the
+     * SNES frame, so it lands on the window with no aspect correction. */
+    snesrecomp_sdl_render_texture(renderer, g_overlay_tex, NULL, NULL);
+}
+
+/* One present. redraw_game is 0 while the guest is frozen — the texture
+ * still holds the last frame, so re-presenting it costs nothing and keeps
+ * the window repainting under the overlay. */
+static void game_present(SDL_Renderer *renderer, SDL_Texture *texture,
+                         int redraw_game)
+{
+    if (redraw_game) {
+        void *pixels = NULL;
+        int pitch = 0;
+        if (snesrecomp_sdl_lock_texture(texture, NULL, &pixels, &pitch)) {
+            RtlDrawPpuFrame((uint8 *)pixels, (size_t)pitch, 0);
+            SDL_UnlockTexture(texture);
+        }
+        /* Offer the composited frame as the next save's thumbnail. Must come
+         * after RtlDrawPpuFrame — that is the call that fills renderBuffer. */
+        if (g_ppu && g_ppu->renderBuffer)
+            snes_savestate_menu_note_frame((const uint32_t *)g_ppu->renderBuffer,
+                                           GAME_WIDTH, GAME_HEIGHT);
+    }
+    SDL_RenderClear(renderer);
+    snesrecomp_sdl_render_texture(renderer, texture, NULL, NULL);
+    game_draw_overlay(renderer);
+    SDL_RenderPresent(renderer);
+}
+
+/* Modal pump: runs until the menu closes or the window does. */
+static void game_savestate_menu_loop(SDL_Renderer *renderer,
+                                     SDL_Texture *texture, int *running)
+{
+    while (snes_savestate_menu_is_open() && *running) {
+        SDL_Event event;
+
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                *running = 0;
+                snes_savestate_menu_close();
+            } else if (event.type == SDL_KEYDOWN) {
+                /* Escape closes the menu here rather than quitting the game.
+                 * The main loop's Escape-quits binding is deliberately not
+                 * reachable while the menu is up: a player backing out of a
+                 * slot browser has not asked to exit. */
+                snes_savestate_menu_handle_key(
+                    (int)SNESRECOMP_SDL_EVENT_KEY(event),
+                    event.key.repeat ? 1 : 0);
+            } else if (event.type == SDL_CONTROLLERDEVICEADDED) {
+                game_open_pads();
+            } else if (event.type == SDL_CONTROLLERDEVICEREMOVED) {
+                game_close_pads();
+                game_open_pads();
+            }
+        }
+        /* Keyboard and pad OR'd into the same word the game would have seen,
+         * so the menu answers to whichever the player is already holding. */
+        snes_savestate_menu_poll_nav(read_keyboard() | read_gamepad(0),
+                                     (uint32_t)SDL_GetTicks());
+        game_present(renderer, texture, 0);
+        SDL_Delay(8);
+    }
+}
+
 int main(int argc, char **argv)
 {
     char rom_path[1024] = "";
@@ -817,8 +916,6 @@ int main(int argc, char **argv)
 
     while (running) {
         SDL_Event event;
-        void *pixels = NULL;
-        int pitch = 0;
         uint32 inputs;
 
         while (SDL_PollEvent(&event)) {
@@ -847,6 +944,15 @@ int main(int argc, char **argv)
          * plugging a controller never takes the keyboard away. Seat 1 goes in
          * the next 12 bits. */
         inputs = read_keyboard() | read_gamepad(0);
+        /* Mask anything still held from the last time the menu closed, then
+         * test the Select+R gesture on what is left. Both take the seat-0
+         * word before the seat-1 shift, because the overlay is a player-1
+         * facility. */
+        inputs = snes_savestate_menu_filter_guest_input(inputs);
+        if (snes_savestate_menu_poll_open(inputs)) {
+            game_savestate_menu_loop(renderer, texture, &running);
+            continue;   /* guest was frozen: no frame to run or present */
+        }
         {
             /* Scripted input: SNESRECOMP_INPUT_SCRIPT="frame:hexbits,..." holds
              * the given pad bits from that frame until the next entry. Off
@@ -874,18 +980,26 @@ int main(int argc, char **argv)
             }
         }
         inputs |= (uint32)read_gamepad(1) << 12;
-        RtlRunFrame(inputs);
-
-        if (snesrecomp_sdl_lock_texture(texture, NULL, &pixels, &pitch)) {
-            RtlDrawPpuFrame((uint8 *)pixels, (size_t)pitch, 0);
-            SDL_UnlockTexture(texture);
+        /* TCP-requested save/load (debug_server's "savestate N" / "loadstate
+         * N"). The reference host consumes these; the scaffold never did, so
+         * the commands answered OK and then nothing happened. Consuming them
+         * here is also what makes the save path checkable without a human at
+         * the controller. Both are no-op inlines in a non-trace build. */
+        {
+            int ls = debug_server_consume_loadstate();
+            if (ls >= 0)
+                RtlSaveLoad(kSaveLoad_Load, ls);
+            ls = debug_server_consume_savestate();
+            if (ls >= 0)
+                RtlSaveLoad(kSaveLoad_Save, ls);
         }
-        SDL_RenderClear(renderer);
-        snesrecomp_sdl_render_texture(renderer, texture, NULL, NULL);
-        SDL_RenderPresent(renderer);
+        RtlRunFrame(inputs);
+        game_present(renderer, texture, 1);
     }
 
     game_close_pads();
+    if (g_overlay_tex)
+        SDL_DestroyTexture(g_overlay_tex);
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
