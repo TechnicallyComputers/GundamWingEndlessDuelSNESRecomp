@@ -31,6 +31,8 @@
 #include "widescreen.h"
 #include "game_rtl.h"
 #include "snes/ppu.h"
+#include "debug_server.h"
+#include "cpu_trace.h"
 #include "desktop/sdl_compat.h"
 #include "host_paths.h"      /* snesrecomp_exe_dir_path */
 #include "launcher.h"        /* snesrecomp_launcher_resolve_rom_sha256 */
@@ -50,6 +52,51 @@
 
 extern Ppu *g_ppu;
 
+/* Developer TCP debug server (opt in with -DSNESRECOMP_ENABLE_TRACE=ON).
+ * debug_server.h replaces every entry point with a no-op static inline when
+ * the build did not opt in, so these calls need no #if of their own.
+ *
+ * The server owns its own thread. The game free-runs and a client queries the
+ * always-on rings; nothing here pauses the runtime to observe it, because
+ * stopping one of two observers to look at it is how they stop agreeing. */
+#ifndef SNES_DEBUG_PORT
+#define SNES_DEBUG_PORT 4370
+#endif
+
+static void start_debug_server(void)
+{
+    int port = SNES_DEBUG_PORT;
+    const char *env = getenv("SNESRECOMP_DEBUG_PORT");
+
+    if (env && env[0]) {
+        int v = atoi(env);
+        if (v > 0 && v < 65536)
+            port = v;
+    }
+    /* Allocate the cpu_trace ring before the first frame. The server's query
+     * commands read it, and an unallocated ring means every one of them
+     * answers "nothing recorded" for a run that did in fact execute. */
+    cpu_trace_init();
+    debug_server_set_ram(g_ram, 0x20000);
+    if (debug_server_init(port) == 0) {
+#if SNESRECOMP_TRACE
+        fprintf(stderr, "[main] debug server listening on 127.0.0.1:%d\n", port);
+#endif
+    }
+#if SNESRECOMP_TRACE
+    else {
+        fprintf(stderr, "[main] debug server FAILED to bind port %d\n", port);
+    }
+#endif
+}
+
+/* The PPU composites into a host-owned buffer, not straight into the SDL
+ * texture: ppu_runLine() writes one scanline at a time across the whole frame,
+ * while the texture is only mapped for the moment of the present. PpuBeginDrawing
+ * is what points ppu->renderBuffer at this array — without that call it stays
+ * NULL and nothing is ever drawn. */
+static uint32_t g_render_pixels[GAME_WIDTH * GAME_HEIGHT];
+
 /* The framework calls this to hand the host a frame. renderBuffer is the
  * PPU's composited output in the runner's native layout. */
 void RtlDrawPpuFrame(uint8 *pixel_buffer, size_t pitch, uint32 render_flags)
@@ -57,8 +104,149 @@ void RtlDrawPpuFrame(uint8 *pixel_buffer, size_t pitch, uint32 render_flags)
     (void)render_flags;
     if (!g_ppu || !g_ppu->renderBuffer)
         return;
+    /* Render the frame before presenting it. Nothing else in a production
+     * build calls draw_ppu_frame — common_rtl.c's call is inside SNES_COSIM —
+     * so a host that omits it presents an untouched texture forever. */
+    g_rtl_game_info->draw_ppu_frame();
     RtlWidescreenPresent(pixel_buffer, pitch, g_ppu->renderBuffer,
                          GAME_WIDTH, GAME_HEIGHT);
+}
+
+
+/* ── Audio ────────────────────────────────────────────────────────────────
+ *
+ * The scaffold shipped silent: it called snesrecomp_sdl_init(SDL_INIT_VIDEO)
+ * and never opened an audio device, so RtlRenderAudio — the runner's mixer,
+ * which pulls the emulated S-DSP — had no consumer at all. host_contract.c's
+ * RtlApuLock/Unlock existed but were never load-bearing, exactly as its own
+ * comment predicted.
+ *
+ * The S-DSP produces one block of 534 samples at its true rate of 32040 Hz
+ * (1.024 MHz / 32). RtlSetAudioOutputRate() tells the consumer what rate to
+ * resample onto — it cannot infer it, and getting it wrong detunes everything
+ * (the runner's own notes record 32000 playing a constant -2.2 cents flat). */
+
+static SDL_AudioDeviceID g_audio_device;
+#if SNESRECOMP_SDL3
+static SDL_AudioStream *g_audio_stream;
+static uint8 *g_audio_scratch;
+static size_t g_audio_scratch_size;
+#endif
+static uint8 *g_audio_block;          /* one DSP block, host rate */
+static uint8 *g_audio_block_cur;
+static uint8 *g_audio_block_end;
+static int g_frames_per_block;
+static int g_audio_channels = 2;
+static unsigned long long g_audio_calls;   /* diagnostics only */
+static unsigned long long g_audio_nonzero;
+
+/* Runs on the audio thread. RtlApuLock serialises it against the guest thread,
+ * which is the whole reason that hook exists. */
+static void fill_audio(uint8 *stream, int len)
+{
+    RtlApuLock();
+    g_audio_calls++;
+    while (len > 0) {
+        int n;
+        if (g_audio_block_end == g_audio_block_cur) {
+            RtlRenderAudio((int16 *)g_audio_block, g_frames_per_block,
+                           g_audio_channels);
+            g_audio_block_cur = g_audio_block;
+            g_audio_block_end = g_audio_block +
+                (size_t)g_frames_per_block * g_audio_channels * sizeof(int16);
+            {   /* Did the DSP actually produce anything but silence? */
+                const int16 *q = (const int16 *)g_audio_block;
+                int i, total = g_frames_per_block * g_audio_channels;
+                for (i = 0; i < total; i++)
+                    if (q[i]) { g_audio_nonzero++; break; }
+            }
+        }
+        n = (int)(g_audio_block_end - g_audio_block_cur);
+        if (n > len) n = len;
+        memcpy(stream, g_audio_block_cur, (size_t)n);
+        g_audio_block_cur += n;
+        stream += n;
+        len -= n;
+    }
+    RtlApuUnlock();
+}
+
+#if SNESRECOMP_SDL3
+static void SDLCALL audio_stream_cb(void *user, SDL_AudioStream *stream,
+                                    int additional, int total)
+{
+    (void)user; (void)total;
+    if (additional <= 0) return;
+    if ((size_t)additional > g_audio_scratch_size) {
+        uint8 *grown = (uint8 *)realloc(g_audio_scratch, (size_t)additional);
+        if (!grown) return;
+        g_audio_scratch = grown;
+        g_audio_scratch_size = (size_t)additional;
+    }
+    fill_audio(g_audio_scratch, additional);
+    SDL_PutAudioStreamData(stream, g_audio_scratch, additional);
+}
+#else
+static void SDLCALL audio_cb(void *user, Uint8 *stream, int len)
+{
+    (void)user;
+    fill_audio((uint8 *)stream, len);
+}
+#endif
+
+/* Returns 0 on success. A failure here is reported and tolerated: a silent
+ * game is worth more than no game. */
+static int open_audio(void)
+{
+    SDL_AudioSpec want, have;
+
+    memset(&want, 0, sizeof(want));
+    memset(&have, 0, sizeof(have));
+    want.freq = 32040;          /* the S-DSP's true rate */
+    want.channels = 2;
+
+    /* Force the APU mutex into existence on this thread: RtlApuLock creates it
+     * lazily, and the audio thread must never be the one to race that. */
+    RtlApuLock();
+    RtlApuUnlock();
+
+#if SNESRECOMP_SDL3
+    want.format = SDL_AUDIO_S16;
+    have = want;
+    g_audio_stream = SDL_OpenAudioDeviceStream(
+        SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &want, audio_stream_cb, NULL);
+    if (g_audio_stream) {
+        g_audio_device = SDL_GetAudioStreamDevice(g_audio_stream);
+        SDL_GetAudioStreamFormat(g_audio_stream, &have, NULL);
+    }
+#else
+    want.format = AUDIO_S16;
+    want.samples = 512;
+    want.callback = &audio_cb;
+    g_audio_device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+#endif
+    if (g_audio_device == 0) {
+        fprintf(stderr, "audio: device open failed: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    g_audio_channels = have.channels ? have.channels : 2;
+    RtlSetAudioOutputRate(have.freq);
+    /* Round to nearest so a non-multiple host rate does not undersize the
+     * block: 32040->534, 48000->800, 44100->735. */
+    g_frames_per_block = (534 * have.freq + 32040 / 2) / 32040;
+    g_audio_block = (uint8 *)calloc(
+        (size_t)g_frames_per_block * g_audio_channels * sizeof(int16), 1);
+    if (!g_audio_block) {
+        fprintf(stderr, "audio: out of memory for mix block\n");
+        return 1;
+    }
+    g_audio_block_cur = g_audio_block_end = g_audio_block;
+
+    snesrecomp_sdl_pause_audio_device(g_audio_device, false);
+    fprintf(stderr, "audio: %d Hz, %d ch, %d frames/block\n",
+            have.freq, g_audio_channels, g_frames_per_block);
+    return 0;
 }
 
 /* Runner input word: 12 button bits per seat.
@@ -326,9 +514,20 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /* Give the PPU somewhere to composite into. Must happen after SnesInit
+     * (which creates g_ppu) and before the first frame is drawn. */
+    /* kPpuRenderFlags_NewRenderer selects the priority-buffer compositor. The
+     * legacy pixel-at-a-time path documents ignoring several features
+     * (ppu.h: "the legacy renderer ignores these"), and colour math only
+     * started being exercised at all once the raster-IRQ deadlock was fixed
+     * and CGADSUB went from $00 to $3F. */
+    PpuBeginDrawing(g_ppu, (uint8_t *)g_render_pixels, GAME_WIDTH * 4,
+                    kPpuRenderFlags_NewRenderer);
+    start_debug_server();
+
     /* snesrecomp_sdl_* wrap the SDL2/SDL3 API differences, so this host
      * builds against either backend (-DSNESRECOMP_SDL_BACKEND=SDL2|SDL3). */
-    if (!snesrecomp_sdl_init(SDL_INIT_VIDEO)) {
+    if (!snesrecomp_sdl_init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
         return 1;
     }
@@ -345,6 +544,19 @@ int main(int argc, char **argv)
         fprintf(stderr, "SDL setup failed: %s\n", SDL_GetError());
         return 1;
     }
+    /* The PPU composites XRGB: it fills R, G and B and leaves the top byte 0.
+     * Measured — every one of the 256x224 pixels comes out with alpha 0. A
+     * texture left on the default blend mode therefore draws the whole frame
+     * fully transparent over RenderClear's black, which looks exactly like a
+     * game that never rendered: correct pixels in the texture, no SDL error,
+     * and an identically black window on both the opengl and software
+     * renderers. Say that the frame is opaque. */
+    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
+
+    /* Sound. Must come after snesrecomp_sdl_init() — SDL_OpenAudioDeviceStream
+     * fails with "Audio subsystem is not initialized" otherwise — and after
+     * SnesInit, so the APU exists before the audio thread can pull from it. */
+    open_audio();
 
     while (running) {
         SDL_Event event;

@@ -26,13 +26,18 @@
 #include "game_rtl.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "common_cpu_infra.h"
+#include "common_rtl.h"
 #include "cpu_state.h"
 #include "snes/interp_bridge.h"
+#include "snes/dma.h"
 #include "snes/ppu.h"
 #include "snes/snes.h"
+
+extern int snes_frame_counter;
 
 extern CpuState g_cpu;
 extern Ppu *g_ppu;
@@ -40,6 +45,7 @@ extern Ppu *g_ppu;
 /* One NTSC frame: 262 scanlines x 1364 master clocks. Bounds a productive
  * MMIO loop so it cannot run across several vblanks atomically. */
 #define GAME_MASTER_CYCLES_PER_FRAME 357368ull
+#define GAME_MASTER_CYCLES_PER_LINE  1364ull
 
 /* 0 until the first frame has booted from the reset vector. */
 static uint32_t g_resume_pc;
@@ -53,22 +59,248 @@ static uint32_t reset_vector(void)
     return (hi << 8) | lo;
 }
 
+/* SnesInit hands the engine's 128 KiB WRAM to the SNES core (snes_init(g_ram))
+ * but leaves CpuState pointing at nothing: g_cpu.ram is a host pointer, not
+ * simulation state, so no reset path sets it. Wire it here, on the initialize
+ * hook SnesInit calls before snes_reset(). Without this the first guest stack
+ * push — interp816_pushByte -> cpu_write8 -> cpu->ram[off] — dereferences NULL
+ * and the process dies on frame 1 before anything reaches the screen.
+ * MetalWarriorsSNESRecomp's src/mw_rtl.c wires it the same way. */
+static void GameInitialize(void)
+{
+    cpu_state_init(&g_cpu, g_ram);
+}
+
+/* Read a 16-bit CPU vector out of bank $00 through the guest bus. The
+ * argument is the VECTOR ADDRESS ($FFEA, $FFEE, ...); the return value is the
+ * handler entry PC, which is what interp_bridge_run_interrupt() wants. Passing
+ * the vector address straight through instead runs the vector TABLE as code. */
+static uint32_t read_vector_pc24(uint16_t vec_addr)
+{
+    uint32_t lo = snes_read(g_snes, 0x000000u | vec_addr);
+    uint32_t hi = snes_read(g_snes, 0x000000u | (uint16_t)(vec_addr + 1));
+    return (hi << 8) | lo;   /* bank $00 */
+}
+
+/* Native ($FFEA) vs emulation ($FFFA) NMI vector. */
+static uint32_t nmi_vector(void)
+{
+    return read_vector_pc24(g_cpu.emulation ? 0xFFFAu : 0xFFEAu);
+}
+
+/* Native ($FFEE) vs emulation ($FFFE) IRQ vector. */
+static uint32_t irq_vector(void)
+{
+    return read_vector_pc24(g_cpu.emulation ? 0xFFFEu : 0xFFEEu);
+}
+
+/* 0 until the reset vector has been entered once. */
+static int g_booted;
+
 void GameRunOneFrame(void)
 {
-    uint32_t entry = g_resume_pc ? g_resume_pc : reset_vector();
+    const uint64_t frame_end =
+        g_cpu.master_cycles + GAME_MASTER_CYCLES_PER_FRAME;
+    int slices = 0;
 
-    interp_bridge_set_master_deadline(
-        g_cpu.master_cycles + GAME_MASTER_CYCLES_PER_FRAME);
-    interp_bridge_run_until_quiescent(&g_cpu, entry);
-    g_resume_pc = interp_bridge_lle_resume_pc();
+    int booting = !g_booted;
+    if (booting) {
+        g_resume_pc = reset_vector();
+        g_booted = 1;
+    } else {
+        /* Vblank edge hardware work. FRAME_MODEL_HOSTS.md puts this on the
+         * host: a frame-model host owns the HBlank/VBlank edges, so nothing
+         * else calls these — measured, ppu_handleVblank and ppu_checkOverscan
+         * have no other caller anywhere in the runner. handleVblank re-latches
+         * OAMADDR from $2102/$2103 at vblank, which every game relies on when
+         * it streams its sprite table during the NMI handler; skip it and OAM
+         * writes land at whatever address the last frame left behind. */
+        ppu_checkOverscan(g_ppu);
+        ppu_handleVblank(g_ppu);
+    }
 
-    if (interp_bridge_lle_took_wai()) {
-        /* The guest executed WAI and is waiting for an interrupt. A finished
-         * port pushes the interrupt frame and runs the handler here — see
-         * cpu_push_interrupt_frame_at() and interp_bridge_run_interrupt().
-         * Left undone on purpose: delivering NMI before this title's own
-         * vblank bookkeeping is ready tends to hang in a way that reads as a
-         * framework bug rather than an unfinished port. */
+    /* Arm the raster journal BEFORE the field alignment below.
+     *
+     * The alignment walk SERVICES pending raster IRQs, and those handlers are
+     * exactly the ones that write the per-line waveform. Arming after them
+     * throws the whole frame's splits away: measured, the journal came back
+     * with 0 entries where the unaligned build recorded 17, and the frame drew
+     * flat. The journal must be open across every path that can run guest code
+     * for this field. */
+    ppu_rasterBegin(g_ppu);
+
+
+    if (!booting && g_snes->nmiEnabled) {
+        /* Vblank edge. NMITIMEN gates this: firing before the guest enables
+         * NMI would land an interrupt frame in the middle of the SEI boot
+         * sequence. The frame is pushed at the *resume* PC so the handler's
+         * terminal RTI returns into the interrupted instruction stream. */
+        /* Record where the PPU field actually is when NMI is delivered. On
+         * hardware this is a vblank event (line 225+); anything inside the
+         * visible field means the host frame boundary and the PPU field
+         * boundary have drifted, and the splits this NMI schedules for early
+         * lines are already behind the beam. */
+        g_snes->dbgNmiBeamLine = g_snes->vPos;
+        g_snes->dbgBeamLagAtNmi = g_cpu.master_cycles - g_snes->beamMasterLast;
+        if (g_snes->vPos < 200u) g_snes->dbgNmiLateCount++;
+
+        g_snes->inNmi = true;
+        cpu_push_interrupt_frame_at(&g_cpu, g_resume_pc);
+        interp_bridge_set_master_deadline(frame_end);
+        /* Freeze the beam across NMI, as for the raster handlers.
+         *
+         * NMI is a vblank event and everything it writes is the NEXT field's
+         * baseline. Letting the beam run during it means a long handler
+         * straddles the field boundary and its tail executes at lines 0-2 —
+         * where the raster journal, which attributes by beam line, files those
+         * writes as mid-frame SPLITS. Measured: a bad frame journaled
+         * `$212C = 0x06` at line 1, switching layers back on at the top of the
+         * screen and defeating the HDMA letterbox, while a good frame in the
+         * same scene journaled nothing at all and folded the identical writes
+         * into the baseline. That is the intermittent missing top bar. */
+        snes_beam_hold(1);
+        (void)interp_bridge_run_interrupt(&g_cpu, nmi_vector());
+        snes_beam_hold(0);
+        interp_bridge_set_master_deadline(0);
+        g_snes->inNmi = false;
+        g_resume_pc = interp_bridge_lle_resume_pc();
+    }
+
+    /* Run out the frame, servicing raster IRQs as the beam crosses them.
+     *
+     * The subtle part is what happens when the CPU parks. This title spends
+     * most of every frame spinning in the vblank wait at $00:80B4
+     * (`LDA $0E / BIT #$0001 / BEQ`), so run_until_quiescent returns almost
+     * immediately. Simply breaking there — which is what this loop used to do —
+     * means guest time never advances while the CPU is parked, so the beam
+     * never reaches the raster line and the IRQ never latches.
+     *
+     * That is not a cosmetic loss. Measured against Mesen: the game programs
+     * VTIME=21 from NMI case $00:83E0, and the IRQ handler at $00:885B
+     * dispatches through `JSR ($8875,X)` into $00:8950, which does
+     * `LDA #$02 / TRB $0E` — the only thing that clears bit 1 of the vblank
+     * flag. Mesen executes that block 29,513 times across frames 3108-4056;
+     * this runtime executed it zero times, so $0E stuck at $02, the NMI's
+     * `BIT #$03 / BNE` skipped its update forever, and the main loop never
+     * woke. Gameplay never started.
+     *
+     * So when the CPU parks, walk the beam a scanline at a time and let the
+     * IRQ latch. That costs a bounded number of cheap beam steps only while
+     * the CPU has nothing to do — it does not slice CPU execution per line,
+     * which was measured at ~15 fps. */
+    while (g_cpu.master_cycles < frame_end && slices < 400) {
+        uint64_t next;
+        uint32_t to_irq;
+
+        slices++;
+
+        /* Dispatch a pending IRQ BEFORE running the CPU. When the beam step
+         * below latches one, letting run_until_quiescent go first was measured
+         * costing ~1.7 scanlines of emulated time before the handler ran
+         * (latch at v=21, dispatch at v=23.5). This title's split handler
+         * programs its NEXT split only two lines ahead ($00:888E, VTIME=$17
+         * written from the line-21 handler), so that latency alone pushed the
+         * beam past the new target before it was armed — the line-23 split
+         * never fired and INIDISP brightness was never restored: the entire
+         * gameplay demo rendered black. Handler first, CPU after. */
+        if (!g_snes->inIrq) {
+            interp_bridge_set_master_deadline(frame_end);
+            (void)interp_bridge_run_until_quiescent(&g_cpu, g_resume_pc);
+            interp_bridge_set_master_deadline(0);
+            g_resume_pc = interp_bridge_lle_resume_pc();
+        }
+
+        if (g_snes->inIrq) {            cpu_push_interrupt_frame_at(&g_cpu, g_resume_pc);
+            /* Freeze the beam for the handler's duration: on silicon a raster
+             * handler runs within tens of clocks of the latch, but here
+             * master_cycles already carries the pre-empted mainline's time, and
+             * walking the beam through it mid-handler pushes any close-ahead
+             * split target ($00:888E schedules VTIME=+2 lines) into the past
+             * before it is armed. */
+            snes_beam_hold(1);
+            interp_bridge_set_master_deadline(frame_end);
+            (void)interp_bridge_run_interrupt(&g_cpu, irq_vector());
+            interp_bridge_set_master_deadline(0);
+            snes_beam_hold(0);            g_resume_pc = interp_bridge_lle_resume_pc();
+            continue;
+        }
+
+        if (g_cpu.master_cycles >= frame_end)
+            break;
+
+        /* CPU is parked (WAI, or spinning on an MMIO/flag wait). The beam does
+         * not stop for it: step forward so a programmed raster IRQ can latch,
+         * then let the CPU run again.
+         *
+         * Step to the NEXT SCHEDULED MATCH when one is nearer than a scanline,
+         * a whole scanline otherwise. A fixed whole-line step lands the beam
+         * up to a line past the match, and that overshoot eats into the
+         * two-line window this title's chained splits leave the handler. */
+        to_irq = snes_master_clocks_until_irq(g_snes);
+        /* +1: snes_advance_beam's window test is [h, h+span) — EXCLUSIVE of
+         * the end. A step landing exactly ON the match point does not latch;
+         * measured, the latch then slipped to the next CPU run and the
+         * dispatch landed 2.5 lines late. Land one clock past the match. */
+        if (to_irq)
+            to_irq += 1;
+        if (to_irq == 0 || to_irq > GAME_MASTER_CYCLES_PER_LINE)
+            to_irq = (uint32_t)GAME_MASTER_CYCLES_PER_LINE;
+        next = g_cpu.master_cycles + to_irq;
+        if (next > frame_end)
+            next = frame_end;
+        g_cpu.master_cycles = next;
+        snes_sync_master_clock(g_snes, g_cpu.master_cycles);
+    }
+
+    /* Drain the beam to the frame boundary, servicing whatever latches on the
+     * way.
+     *
+     * The walk above exits on CPU time (master_cycles >= frame_end), but the
+     * BEAM can still be behind: snes_advance_beam stops at every latch and is
+     * frozen across handlers, so clocks it did not consume stay owed. That debt
+     * carries into the next frame, which is how the host frame boundary drifts
+     * away from the PPU field boundary — and once the drift passes the chain's
+     * first split line, the NMI programs that split BEHIND the beam, where a
+     * window comparator cannot fire it at all. Measured: NMI delivered at line
+     * 18 on attract loop 1 and lines 30/34 later; targetInPast 0.00 -> 1.00 per
+     * frame; latches 5.01 -> 2.01 per frame; the demo's palette upload, which
+     * the chain drives, never ran again.
+     *
+     * Draining HERE rather than before the next frame's NMI is deliberate: the
+     * raster journal is armed for THIS field, so splits serviced during the
+     * drain are still recorded. Draining at the start of the next frame threw
+     * them away — measured, the journal went from 17 entries to 0 and the frame
+     * drew flat. */
+    {
+        int drain = 0;
+        /* Run the beam on to the START OF VBLANK, servicing what latches.
+         *
+         * Two things at once, and both have to happen here rather than at the
+         * next frame's start. Paying the debt keeps the beam from falling
+         * behind the CPU; stopping at line 225 rather than at frame_end makes
+         * the host's frame boundary coincide with the PPU's FIELD boundary, so
+         * the next NMI is delivered in vblank the way hardware delivers it.
+         *
+         * Measured, each half alone is not enough: draining to frame_end fixes
+         * the lag but preserves whatever phase the frame started with (NMI
+         * still arrived at line 30), while correcting the phase at the START of
+         * the next frame consumed that field's raster splits before the journal
+         * was armed and the frame drew flat (journal 17 entries -> 0). */
+        while (g_snes->vPos < 225u && drain++ < 600) {
+            uint32_t step;
+            if (g_snes->inIrq) {
+                cpu_push_interrupt_frame_at(&g_cpu, g_resume_pc);
+                snes_beam_hold(1);
+                (void)interp_bridge_run_interrupt(&g_cpu, irq_vector());
+                snes_beam_hold(0);
+                g_resume_pc = interp_bridge_lle_resume_pc();
+                continue;
+            }
+            step = snes_master_clocks_until_line(g_snes, 225u);
+            if (!step) break;
+            g_cpu.master_cycles += step;
+            snes_sync_master_clock(g_snes, g_cpu.master_cycles);
+        }
     }
 }
 
@@ -76,15 +308,43 @@ void GameDrawPpuFrame(void)
 {
     int line;
 
-    /* Render the visible field. A title with mid-frame raster effects will
-     * need this driven from the beam instead of a single sweep. */
-    for (line = 1; line <= 224; line++)
-        ppu_runLine(g_ppu, line);
+    /* Render the visible field, stepping HDMA once per scanline.
+     *
+     * A frame-model host owns the HBlank edges, so nothing else drives HDMA —
+     * dma_doHdma had no caller anywhere in the runner because the engine did
+     * not exist. This title needs it: through the intro, channel 1 is
+     * HDMA-active onto $212C (TM), turning BG layers off on the top and bottom
+     * bands and on in the middle, with OBJ left enabled so the characters draw
+     * over the black bars. Without the per-line stream every scanline got one
+     * TM value and the letterbox vanished.
+     *
+     * Stepping HDMA here rather than interleaving CPU execution per scanline
+     * is deliberate: it costs a few register writes per line and leaves guest
+     * timing untouched. Chopping the CPU into 262 slices to walk the beam was
+     * measured at ~15 fps instead of 60. */
+    /* Line-0 register state first, so per-line HDMA (the intro letterbox's
+     * TM stream) and journal entries both land ON TOP of it, in beam order. */
+    ppu_rasterRenderBegin(g_ppu);
+    dma_initHdma(g_snes->dma);
+    for (line = 1; line <= 224; line++) {
+        dma_doHdma(g_snes->dma);
+        ppu_rasterApplyLine(g_ppu, line);
+        {
+            /* A journalled $420C write: apply the enable mask and (re)start the
+             * tables of channels it just switched on, so a transition enabled
+             * mid-frame actually streams from that line. */
+            uint8_t hdmaen;
+            if (ppu_rasterTakeHdmaen(&hdmaen)) {
+                dma_startDma(g_snes->dma, hdmaen, true);
+                dma_initHdma(g_snes->dma);
+            }
+        }        ppu_runLine(g_ppu, line);
+    }
 }
 
 const RtlGameInfo kGameInfo = {
     .title = "gundamwingendlessduel",
-    .initialize = NULL,
+    .initialize = &GameInitialize,
     .run_frame = &GameRunOneFrame,
     .draw_ppu_frame = &GameDrawPpuFrame,
     .save_name_prefix = "save",
@@ -97,4 +357,9 @@ void GameSessionReset(void)
      * been fine" is the usual desync culprit, because single-player never
      * re-enters the boot path twice in one process. */
     g_resume_pc = 0;
+    g_booted = 0;
+    /* Cold-boot the CPU from RESET rather than resuming stale registers or a
+     * stale WAI: g_cpu survives a session teardown, so a rematch that skipped
+     * this would start frame 1 mid-flight. Re-points g_cpu.ram too. */
+    cpu_state_init(&g_cpu, g_ram);
 }

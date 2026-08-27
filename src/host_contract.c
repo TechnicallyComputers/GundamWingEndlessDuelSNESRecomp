@@ -26,6 +26,7 @@
 #include <stdint.h>
 
 #include "common_rtl.h"
+#include "debug_server.h"   /* SNESRECOMP_TRACE */
 #include "spc_player.h"
 #include "desktop/sdl_compat.h"
 
@@ -57,6 +58,10 @@ void RtlApuUnlock(void)
 /* NULL = no interception; the guest uploads its own SPC program. */
 SpcPlayer *g_spc_player;
 
+/* A trace build links debug_server.c, which defines these for real. Defining
+ * them here too is a duplicate symbol at link time, so the stubs exist only
+ * for the production build that has no debug server to own them. */
+#if !SNESRECOMP_TRACE
 void debug_on_block_enter(uint32_t pc, uint32_t a, uint32_t x, uint32_t y)
 {
     (void)pc; (void)a; (void)x; (void)y;
@@ -71,3 +76,4 @@ void debug_on_wram_write_word(uint32_t addr, uint16_t old_val, uint16_t new_val)
 {
     (void)addr; (void)old_val; (void)new_val;
 }
+#endif /* !SNESRECOMP_TRACE */
