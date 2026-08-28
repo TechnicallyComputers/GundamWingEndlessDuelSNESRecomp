@@ -1,0 +1,16 @@
+[Keybinds] Loaded keybinds.ini
+[cpu_trace] ring allocated: 16777216 entries (~640 MB)
+[boundary_audit] ring allocated: 1048576 entries (~88 MB)
+[gm14_trace] ring allocated: 131072 entries (~6 MB)
+[debug_server] OAM rings: write 524288 entries (~32 MB), render 256 snaps (~196 KB)
+[debug_server] VRAM rings allocated: 8388608 entries each (recomp ~1280 MB, oracle ~64 MB)
+[debug_server] Listening on port 4370 (threaded)
+[main] debug server listening on 127.0.0.1:4370
+[video] vsync off — pacing on the 60.0988 Hz SNES clock (config.ini [Video] Vsync)
+audio: 32040 Hz, 2 ch, 534 frames/block
+[input] gamepad map: 12 binding(s) from ../config.ini
+[input] gamepad 0: DualSense Wireless Controller
+[debug_server] Client connected
+[debug_server] Client disconnected
+[debug_server] Client connected
+[debug_server] Client disconnected
