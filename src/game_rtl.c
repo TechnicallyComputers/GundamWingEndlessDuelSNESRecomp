@@ -291,6 +291,10 @@ void GameRunOneFrame(void)
             if (ps) g_park_skipped_master += (next - g_cpu.master_cycles);
         }
         g_cpu.master_cycles = next;
+        /* Parked time is idle skipped on the guest's behalf — it displaces no
+         * work, so exempt it from the DRAM-refresh tax; taxing it would drift
+         * the IRQ latch point this jump aims at. */
+        snes_refresh_exempt();
         snes_sync_master_clock(g_snes, g_cpu.master_cycles);
     }
 
