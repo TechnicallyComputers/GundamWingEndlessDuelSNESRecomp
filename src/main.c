@@ -755,7 +755,6 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
                                     (initial_rom && initial_rom[0]) ? initial_rom
                                                                     : NULL,
                                     out, cap);
-    fprintf(stderr, "[diag] lr=%d out=%s\n", lr, out[0] ? out : "(empty)");
     if (lr == RECOMP_LAUNCHER_RESULT_QUIT)
         return -1;
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && out[0])
@@ -873,6 +872,23 @@ int main(int argc, char **argv)
     uint8_t sha[32];
     const uint8_t *want_sha = expected_rom_sha256(sha);
     int has_positional = (argc > 1 && argv[1] && argv[1][0] && argv[1][0] != '-');
+    /* --launcher / --no-launcher, as the reference host spells them.
+     *
+     * A positional ROM used to suppress the launcher outright, which was
+     * wrong in the case that matters most: Studio always knows the ROM and
+     * always passes it, so the launcher never appeared from the Build or
+     * Diagnostics tabs. A ROM says WHICH rom, not whether a human is here,
+     * so it preloads the launcher instead. Suppression stays explicit,
+     * because scripted harnesses run `<exe> <rom>` and would otherwise hang
+     * on a window nobody is watching. */
+    int force_launcher = 0, no_launcher = 0;
+    {
+        int ai;
+        for (ai = 1; ai < argc; ++ai) {
+            if (argv[ai] && strcmp(argv[ai], "--launcher") == 0) force_launcher = 1;
+            else if (argv[ai] && strcmp(argv[ai], "--no-launcher") == 0) no_launcher = 1;
+        }
+    }
     int rom_size = 0;
     uint8 *rom;
     SDL_Window *window;
@@ -890,13 +906,19 @@ int main(int argc, char **argv)
         const char *vd = getenv("SDL_VIDEODRIVER");
         int headless = (vd && strcmp(vd, "dummy") == 0);
 
-        if (!headless && !has_positional) {
+        if (!headless && !no_launcher && (force_launcher || !has_positional)) {
             /* Open on the ROM the player already has, so a second launch is
              * PLAY rather than Change-ROM: the copy beside the executable
              * first, else whatever the last run cached in rom.cfg. */
             char hint[1024];
 
-            snprintf(hint, sizeof(hint), "%s", beside_exe);
+            /* An explicit ROM outranks a copy beside the exe and the cache:
+             * --launcher with a ROM means "show the launcher, loaded with
+             * THIS one". */
+            if (has_positional)
+                snprintf(hint, sizeof(hint), "%s", argv[1]);
+            else
+                snprintf(hint, sizeof(hint), "%s", beside_exe);
             if (!hint[0] && !snesrecomp_rom_cache_read(hint, sizeof(hint)))
                 hint[0] = '\0';
             {
