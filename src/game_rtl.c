@@ -69,6 +69,14 @@ static uint32_t reset_vector(void)
 static void GameInitialize(void)
 {
     cpu_state_init(&g_cpu, g_ram);
+    /* This host's render loop walks the REAL HDMA tables per line
+     * (dma_initHdma + dma_primeHdmaFirstLine + dma_doHdma in
+     * GameDrawPpuFrame) — the model every pixel of the intro letterbox and
+     * the VS-screen band edges was validated under. Upstream's beam-timeline
+     * HDMA (snesrecomp #16) would consume the same tables a second time per
+     * frame, so opt out. Set here rather than in main.c so it holds no
+     * matter which host shell wraps this game. */
+    snes_set_hdma_beam_enabled(g_snes, false);
 }
 
 /* Read a 16-bit CPU vector out of bank $00 through the guest bus. The
