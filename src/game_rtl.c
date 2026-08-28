@@ -330,15 +330,20 @@ void GameDrawPpuFrame(void)
         dma_doHdma(g_snes->dma);
         ppu_rasterApplyLine(g_ppu, line);
         {
-            /* A journalled $420C write: apply the enable mask and (re)start the
-             * tables of channels it just switched on, so a transition enabled
-             * mid-frame actually streams from that line. */
+            /* A journalled $420C write: apply the enable mask. Channels this
+             * switches on are marked as owing a table initialization, which
+             * dma_doHdma() spends the NEXT slot performing -- it no longer
+             * initializes and transfers on the same line.
+             *
+             * Doing both at once here put the first transfer one scanline
+             * early, and every band edge with it: measured against Mesen,
+             * this screen enables $420C on line 21 and hardware's first
+             * $212C write lands on line 23, while we wrote it on line 22. */
             uint8_t hdmaen;
-            if (ppu_rasterTakeHdmaen(&hdmaen)) {
+            if (ppu_rasterTakeHdmaen(&hdmaen))
                 dma_startDma(g_snes->dma, hdmaen, true);
-                dma_initHdma(g_snes->dma);
-            }
-        }        ppu_runLine(g_ppu, line);
+        }
+        ppu_runLine(g_ppu, line);
     }
 }
 
