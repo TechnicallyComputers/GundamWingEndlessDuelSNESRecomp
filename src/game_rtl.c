@@ -119,6 +119,24 @@ void GameRunOneFrame(void)
          * writes land at whatever address the last frame left behind. */
         ppu_checkOverscan(g_ppu);
         ppu_handleVblank(g_ppu);
+
+        /* Charge the frame's HDMA CPU-stall time up front. Hardware steals
+         * these clocks line by line across the visible field; a lump charge
+         * at the frame's start keeps the pass count honest without slicing
+         * the CPU per line (measured at ~15 fps when tried). Six active
+         * channels on this title's menu/VS screens cost ~10.7% of a frame —
+         * uncharged, the menu lag blocks ran a frame short of Mesen and the
+         * scene-entry phase that pairs the sprite-table and tile-art updates
+         * came up wrong on half of entries (the detached-thruster artifact).
+         * See dma_hdmaMasterEstimate(). */
+        {
+            uint64_t hdma_master = dma_hdmaMasterEstimate(g_snes->dma);
+            if (hdma_master) {
+                g_cpu.master_cycles += hdma_master;
+                snes_refresh_exempt();   /* stall, not execution: no refresh tax */
+                snes_sync_master_clock(g_snes, g_cpu.master_cycles);
+            }
+        }
     }
 
     /* Arm the raster journal BEFORE the field alignment below.
