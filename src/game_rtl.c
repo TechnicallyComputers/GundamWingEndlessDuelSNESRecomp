@@ -97,7 +97,30 @@ static uint32_t irq_vector(void)
 /* 0 until the reset vector has been entered once. */
 static int g_booted;
 
-uint64_t g_park_skipped_master;   /* diagnostic; see the park block */
+uint64_t g_park_skipped_master;
+uint8 g_q22_at_nmi[256];   /* $22 at NMI entry (diagnostic ring) */   /* diagnostic; see the park block */
+
+/* Scanout latch: OAM/CGRAM as of the frame's start (post-NMI, pre-pass).
+ *
+ * Hardware scans out the sprite table that is in OAM at line 0; this title's
+ * pose DMA fires from the line-219 raster IRQ (measured in Mesen's dma.csv:
+ * CGRAM at line 216, OAM at 219 — below every mech sprite), so it belongs to
+ * the NEXT scanout, while the art DMA lands in vblank (lines 228-239) and
+ * pairs with it there. Rendering from LIVE OAM after the pass showed the
+ * mid-pass pose one frame early: presented (pose N, art N-1) against
+ * hardware's (pose N-1, art N-1) — the detached-thruster artifact. Marker-
+ * anchored proof: our presented pairing was O0+OV1/O2+OV0 where hardware
+ * scans out O0+HV0/O2+HV1, byte-identical states, opposite art age.
+ *
+ * The latch renders each frame from the OAM/CGRAM that were current when its
+ * field began. VRAM stays live: the art queue drains in the NMI at the top
+ * of this function, i.e. before the snapshot, so it is already correctly
+ * aged — and mid-pass VRAM writes don't exist on hardware (active-display
+ * VRAM writes are ignored). */
+static uint16_t s_scanout_oam[0x100];
+static uint8_t  s_scanout_high_oam[0x20];
+static uint16_t s_scanout_cgram[0x100];
+static int      s_scanout_valid;
 
 void GameRunOneFrame(void)
 {
@@ -179,12 +202,26 @@ void GameRunOneFrame(void)
          * same scene journaled nothing at all and folded the identical writes
          * into the baseline. That is the intermittent missing top bar. */
         snes_beam_hold(1);
+        /* DIAGNOSTIC: guest DMA work-queue write pointer ($22) at NMI
+         * entry, kept in a ring the debug server can read. Writing it to
+         * stderr every frame wedged the runtime; a ring costs nothing. */
+        g_q22_at_nmi[(unsigned)snes_frame_counter & 255u] = g_ram[0x22];
         (void)interp_bridge_run_interrupt(&g_cpu, nmi_vector());
         snes_beam_hold(0);
         interp_bridge_set_master_deadline(0);
         g_snes->inNmi = false;
         g_resume_pc = interp_bridge_lle_resume_pc();
     }
+
+    /* Latch OAM/CGRAM for this frame's render — the scanout state. Taken
+     * AFTER the NMI (vblank uploads, including the art drain, are visible
+     * this frame, as on hardware) and BEFORE the pass (whose line-216/219
+     * IRQ DMAs belong to the NEXT scanout). See the block comment at
+     * s_scanout_oam. */
+    memcpy(s_scanout_oam, g_ppu->oam, sizeof(s_scanout_oam));
+    memcpy(s_scanout_high_oam, g_ppu->highOam, sizeof(s_scanout_high_oam));
+    memcpy(s_scanout_cgram, g_ppu->cgram, sizeof(s_scanout_cgram));
+    s_scanout_valid = 1;
 
     /* Run out the frame, servicing raster IRQs as the beam crosses them.
      *
@@ -372,6 +409,24 @@ void GameDrawPpuFrame(void)
 {
     int line;
 
+    /* Swap the scanout latch in for the render (see s_scanout_oam): the
+     * presented frame must show the OAM/CGRAM its field STARTED with, not
+     * whatever the mid-pass IRQ DMAs left behind. The live arrays are
+     * restored afterwards so guest-visible state is untouched. Bypassed for
+     * render_inject, whose contract is "render exactly the state given". */
+    uint16_t live_oam[0x100];
+    uint8_t  live_high_oam[0x20];
+    uint16_t live_cgram[0x100];
+    int latched = s_scanout_valid && !g_ppu_scanout_latch_bypass;
+    if (latched) {
+        memcpy(live_oam, g_ppu->oam, sizeof(live_oam));
+        memcpy(live_high_oam, g_ppu->highOam, sizeof(live_high_oam));
+        memcpy(live_cgram, g_ppu->cgram, sizeof(live_cgram));
+        memcpy(g_ppu->oam, s_scanout_oam, sizeof(s_scanout_oam));
+        memcpy(g_ppu->highOam, s_scanout_high_oam, sizeof(s_scanout_high_oam));
+        memcpy(g_ppu->cgram, s_scanout_cgram, sizeof(s_scanout_cgram));
+    }
+
     /* Render the visible field, stepping HDMA once per scanline.
      *
      * A frame-model host owns the HBlank edges, so nothing else drives HDMA —
@@ -434,6 +489,12 @@ void GameDrawPpuFrame(void)
          * 54. Comparing that index against the oracle's write scanline makes
          * an off-by-one look correct; compare pixels. */
         dma_doHdma(g_snes->dma);
+    }
+
+    if (latched) {
+        memcpy(g_ppu->oam, live_oam, sizeof(live_oam));
+        memcpy(g_ppu->highOam, live_high_oam, sizeof(live_high_oam));
+        memcpy(g_ppu->cgram, live_cgram, sizeof(live_cgram));
     }
 }
 
