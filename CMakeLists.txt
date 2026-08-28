@@ -85,5 +85,12 @@ if(NOT MSVC)
 endif()
 
 snesrecomp_enable_recomp_net(GundamWingEndlessDuelSNESRecomp)
-snesrecomp_enable_rollback(GundamWingEndlessDuelSNESRecomp)
+# Rollback netcode is an optional framework feature. Calling it unguarded
+# makes the port fail to CONFIGURE against any framework build that does not
+# ship it -- including a framework branch carrying only runtime fixes, which
+# is exactly what you want to bisect a rendering bug against. Absent, the port
+# builds without rollback rather than not at all.
+if(COMMAND snesrecomp_enable_rollback)
+    snesrecomp_enable_rollback(GundamWingEndlessDuelSNESRecomp)
+endif()
 # No multitap: two seats, one controller per port.
