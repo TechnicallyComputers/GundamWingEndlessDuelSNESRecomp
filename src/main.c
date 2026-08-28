@@ -755,6 +755,7 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
                                     (initial_rom && initial_rom[0]) ? initial_rom
                                                                     : NULL,
                                     out, cap);
+    fprintf(stderr, "[diag] lr=%d out=%s\n", lr, out[0] ? out : "(empty)");
     if (lr == RECOMP_LAUNCHER_RESULT_QUIT)
         return -1;
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && out[0])
