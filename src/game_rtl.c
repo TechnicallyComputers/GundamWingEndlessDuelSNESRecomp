@@ -142,24 +142,6 @@ void GameRunOneFrame(void)
          * writes land at whatever address the last frame left behind. */
         ppu_checkOverscan(g_ppu);
         ppu_handleVblank(g_ppu);
-
-        /* Charge the frame's HDMA CPU-stall time up front. Hardware steals
-         * these clocks line by line across the visible field; a lump charge
-         * at the frame's start keeps the pass count honest without slicing
-         * the CPU per line (measured at ~15 fps when tried). Six active
-         * channels on this title's menu/VS screens cost ~10.7% of a frame —
-         * uncharged, the menu lag blocks ran a frame short of Mesen and the
-         * scene-entry phase that pairs the sprite-table and tile-art updates
-         * came up wrong on half of entries (the detached-thruster artifact).
-         * See dma_hdmaMasterEstimate(). */
-        {
-            uint64_t hdma_master = dma_hdmaMasterEstimate(g_snes->dma);
-            if (hdma_master) {
-                g_cpu.master_cycles += hdma_master;
-                snes_refresh_exempt();   /* stall, not execution: no refresh tax */
-                snes_sync_master_clock(g_snes, g_cpu.master_cycles);
-            }
-        }
     }
 
     /* Arm the raster journal BEFORE the field alignment below.
@@ -222,6 +204,35 @@ void GameRunOneFrame(void)
     memcpy(s_scanout_high_oam, g_ppu->highOam, sizeof(s_scanout_high_oam));
     memcpy(s_scanout_cgram, g_ppu->cgram, sizeof(s_scanout_cgram));
     s_scanout_valid = 1;
+
+    /* Charge the frame's HDMA CPU-stall time. Hardware steals these clocks
+     * line by line across the visible field; a lump charge here keeps the
+     * pass count honest without slicing the CPU per line (measured at
+     * ~15 fps when tried). Six active channels on this title's menu/VS
+     * screens cost ~10.7% of a frame — uncharged, the menu lag blocks ran a
+     * frame short of Mesen. See dma_hdmaMasterEstimate().
+     *
+     * AFTER the NMI, and with the beam HELD. This block used to sit before
+     * the NMI and let the charge advance the beam — in the intro's heavy
+     * HDMA stretches that pushed the beam across the field boundary, the
+     * NMI was delivered at beam line 1, and its entire write-set journaled
+     * as line-1 raster splits: base TM lost its layers and the letterbox's
+     * top bar vanished for the stretch (measured: bad frames journal 11
+     * entries all at line 1, nmiBeamLine=1; good frames journal 0,
+     * nmiBeamLine=257). Hardware order is NMI at vblank first, then the
+     * field's stalls. The hold keeps the charge a pure CPU-budget theft so
+     * the raster splits the NMI just armed (VTIME=21/23) stay AHEAD of the
+     * beam; the end-of-frame drain realigns beam and CPU time as always. */
+    if (!booting) {
+        uint64_t hdma_master = dma_hdmaMasterEstimate(g_snes->dma);
+        if (hdma_master) {
+            snes_beam_hold(1);
+            g_cpu.master_cycles += hdma_master;
+            snes_refresh_exempt();   /* stall, not execution: no refresh tax */
+            snes_sync_master_clock(g_snes, g_cpu.master_cycles);
+            snes_beam_hold(0);
+        }
+    }
 
     /* Run out the frame, servicing raster IRQs as the beam crosses them.
      *
@@ -445,6 +456,13 @@ void GameDrawPpuFrame(void)
      * TM stream) and journal entries both land ON TOP of it, in beam order. */
     ppu_rasterRenderBegin(g_ppu);
     dma_initHdma(g_snes->dma);
+    /* Hardware's vblank init also performs each channel's FIRST transfer
+     * before any visible pixel; without it the first rendered row keeps the
+     * pre-HDMA register state — a one-line bright strip above the intro
+     * letterbox, visible wherever the backdrop isn't dark. State-neutral:
+     * the per-line cadence below still consumes the table exactly as the
+     * Mesen-validated band edges require. */
+    dma_primeHdmaFirstLine(g_snes->dma);
     for (line = 1; line <= 224; line++) {
         /* Replay the PREVIOUS line's journal entries, not this line's.
          *
