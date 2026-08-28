@@ -97,6 +97,8 @@ static uint32_t irq_vector(void)
 /* 0 until the reset vector has been entered once. */
 static int g_booted;
 
+uint64_t g_park_skipped_master;   /* diagnostic; see the park block */
+
 void GameRunOneFrame(void)
 {
     const uint64_t frame_end =
@@ -236,6 +238,40 @@ void GameRunOneFrame(void)
          * a whole scanline otherwise. A fixed whole-line step lands the beam
          * up to a line past the match, and that overshoot eats into the
          * two-line window this title's chained splits leave the handler. */
+        /* Diagnostic: where is the CPU parked, and how much time do we skip
+         * on its behalf? Hardware has no "park" -- a spinning CPU still burns
+         * bus cycles -- so every clock skipped here is a cycle the guest did
+         * NOT execute. Measured at ~109k master clocks/frame (30% of a frame),
+         * which is why our cpu_cycles/frame reads ~31k against hardware's
+         * ~43k. Harmless only if the CPU really is in a pure poll loop; if it
+         * is parked somewhere that does work, we are dropping that work.
+         * Enabled with SNESRECOMP_PARK_STATS=1. */
+        {
+            static int park_stats = -1;
+            static uint64_t ev, last_pc;
+            static int last_frame;
+            extern int snes_frame_counter;
+            if (park_stats < 0) {
+                const char *e = getenv("SNESRECOMP_PARK_STATS");
+                park_stats = (e && e[0] && e[0] != '0') ? 1 : 0;
+            }
+            if (park_stats) {
+                ev++;
+                last_pc = g_resume_pc;
+                if (snes_frame_counter != last_frame) {
+                    if (last_frame)
+                        fprintf(stderr,
+                                "[park] f=%d events=%llu skipped_master=%llu "
+                                "last_resume_pc=$%06X\n",
+                                last_frame, (unsigned long long)ev,
+                                (unsigned long long)g_park_skipped_master,
+                                (unsigned)last_pc);
+                    last_frame = snes_frame_counter; ev = 0;
+                    g_park_skipped_master = 0;
+                }
+            }
+        }
+
         to_irq = snes_master_clocks_until_irq(g_snes);
         /* +1: snes_advance_beam's window test is [h, h+span) — EXCLUSIVE of
          * the end. A step landing exactly ON the match point does not latch;
@@ -248,6 +284,12 @@ void GameRunOneFrame(void)
         next = g_cpu.master_cycles + to_irq;
         if (next > frame_end)
             next = frame_end;
+        {
+            static int ps = -1;
+            if (ps < 0) { const char *e = getenv("SNESRECOMP_PARK_STATS");
+                          ps = (e && e[0] && e[0] != '0') ? 1 : 0; }
+            if (ps) g_park_skipped_master += (next - g_cpu.master_cycles);
+        }
         g_cpu.master_cycles = next;
         snes_sync_master_clock(g_snes, g_cpu.master_cycles);
     }
@@ -327,8 +369,23 @@ void GameDrawPpuFrame(void)
     ppu_rasterRenderBegin(g_ppu);
     dma_initHdma(g_snes->dma);
     for (line = 1; line <= 224; line++) {
-        dma_doHdma(g_snes->dma);
-        ppu_rasterApplyLine(g_ppu, line);
+        /* Replay the PREVIOUS line's journal entries, not this line's.
+         *
+         * A raster split works by writing registers in H-blank, after the
+         * line has been drawn, so the write takes effect on the NEXT line.
+         * The journal stores only (line, reg, value) with no horizontal
+         * position, and every write this game makes is in H-blank -- Mesen
+         * stamps them at hclk 1190-1322 of a ~1364-clock line. Applying them
+         * to the line they were recorded on therefore lands them one line
+         * early, which is exactly what the pixels showed: our band edges at
+         * output rows 54/102/134/182 against hardware's 55/103/135/183, and
+         * the INIDISP teardown a row early at 214.
+         *
+         * A write early in a visible line would take effect part-way along
+         * that line on hardware; a whole-line renderer cannot express that
+         * either way, and for a title that raster-splits deliberately, the
+         * H-blank case is the one that matters. */
+        ppu_rasterApplyLine(g_ppu, line - 1);
         {
             /* A journalled $420C write: apply the enable mask. Channels this
              * switches on are marked as owing a table initialization, which
@@ -344,6 +401,17 @@ void GameDrawPpuFrame(void)
                 dma_startDma(g_snes->dma, hdmaen, true);
         }
         ppu_runLine(g_ppu, line);
+        /* HDMA runs in the H-blank AFTER this line, so what it writes lands
+         * on the NEXT one. Stepping it before the line instead made every
+         * band edge one output row early -- measured in a sprite-free column
+         * against Mesen, our transitions sat at rows 54/102/134/182 where
+         * hardware has 55/103/135/183.
+         *
+         * Note the loop renders lines 1..224 into output rows 0..223, so a
+         * per-line register log reading "changed at line 55" is output row
+         * 54. Comparing that index against the oracle's write scanline makes
+         * an off-by-one look correct; compare pixels. */
+        dma_doHdma(g_snes->dma);
     }
 }
 
