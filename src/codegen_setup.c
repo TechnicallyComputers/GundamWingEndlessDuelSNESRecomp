@@ -1,4 +1,4 @@
-/* Codegen identity for Gundam Wing Endless Duel.
+/* Codegen identity for Shin Kidou Senki Gundam W - Endless Duel.
  *
  * These digests are the single source of truth for "is this the right ROM".
  * tools/regen.sh and the CI workflow both read them from here via
@@ -8,7 +8,7 @@
 #include "codegen_setup.h"
 
 const GameCodegenIdentity kGameCodegenIdentity = {
-    .display_name   = "Gundam Wing Endless Duel",
+    .display_name   = "Shin Kidou Senki Gundam W - Endless Duel",
     .rom_file       = "Shin Kidou Senki Gundam W - Endless Duel (Japan).sfc",
     .expected_crc32 = "c0aecdca",
     .expected_sha256= "dd94308d822636c6ddf73c5e2644c84f2eb8fb4d9201150fc5f37d44d6f423f1",

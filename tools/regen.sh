@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate src/gen/*.c for Gundam Wing Endless Duel from a verified ROM.
+# Regenerate src/gen/*.c for Shin Kidou Senki Gundam W - Endless Duel from a verified ROM.
 #
 # Generated C is derived from copyrighted ROM data and is never committed;
 # every developer regenerates from their own copy. The ROM digests below are
@@ -51,7 +51,7 @@ fi
 
 # --rom / SNESRECOMP_ROM win; otherwise look for a known name at the root.
 if [ -z "$ROM" ]; then
-  for cand in "Shin Kidou Senki Gundam W - Endless Duel (Japan).sfc" "gundamwingendlessduel.sfc" "gundamwingendlessduel.smc"; do
+  for cand in "Shin Kidou Senki Gundam W - Endless Duel (Japan).sfc" "Shin Kidou Senki Gundam W - Endless Duel (Japan).sfc" "Shin Kidou Senki Gundam W - Endless Duel (Japan).smc"; do
     if [ -f "$cand" ]; then ROM="$cand"; break; fi
   done
 fi
@@ -59,7 +59,7 @@ if [ -z "$ROM" ] || [ ! -f "$ROM" ]; then
   echo "regen.sh: no ROM found." >&2
   echo "          Pass --rom /path/to/Shin Kidou Senki Gundam W - Endless Duel (Japan).sfc, set SNESRECOMP_ROM, or put" >&2
   echo "          it at the repo root. You must legally own a copy of" >&2
-  echo "          Gundam Wing Endless Duel." >&2
+  echo "          Shin Kidou Senki Gundam W - Endless Duel." >&2
   exit 1
 fi
 
