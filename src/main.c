@@ -66,6 +66,32 @@ static SnesNetplayConfig g_netplay_cfg;
 static int g_netplay_pending;    /* launcher armed a session; start after SnesInit */
 static int g_netplay_from_lobby; /* admit pump waits for the lobby peer */
 
+#if defined(SNESRECOMP_NET_ROLLBACK)
+/* Declared here rather than via snes_netplay_rb.h: that header pulls
+ * retcomm-rbengine's headers, which the host does not otherwise need. */
+void snes_netplay_rb_set_default(int on);
+#endif
+
+/* Runs on EVERY netplay path (launcher lobby and env-driven direct connect),
+ * before any mode decision. This title defaults to ROLLBACK: a fighting game
+ * lives on input latency, and delay-7 lobby sessions are the motivation. The
+ * default ships identically in every build of this repo, which is what keeps
+ * the mode session-wide (NETPLAY.md §4); SNES_NET_MODE overrides both ways
+ * ("delay" forces delay-sync, "rollback" forces rollback). */
+static void netplay_apply_title_defaults(void)
+{
+#if defined(SNESRECOMP_NET_ROLLBACK)
+    static int once;
+    if (once)
+        return;
+    once = 1;
+    snes_netplay_rb_set_default(1);
+    fprintf(stderr,
+            "netplay: rollback is this title's default "
+            "(SNES_NET_MODE=delay overrides)\n");
+#endif
+}
+
 static void host_lobby_ensure_init(void)
 {
     static int once;
@@ -74,6 +100,7 @@ static void host_lobby_ensure_init(void)
     if (once)
         return;
     once = 1;
+    netplay_apply_title_defaults();
     memset(&id, 0, sizeof(id));
     id.game_name = SNES_GAME_TITLE;
     id.game_version = SNES_GAME_VERSION;
@@ -1075,7 +1102,22 @@ int main(int argc, char **argv)
                     kPpuRenderFlags_NewRenderer);
     start_debug_server();
 #if defined(SNES_HAS_LOBBY_CLIENT)
+    if (!g_netplay_pending) {
+        /* Headless / scripted direct connect: SNES_NETPLAY=1 with
+         * SNES_NET_SLOT / SNES_NET_BIND / SNES_NET_PEER (see
+         * snes_netplay_apply_env). Same session machinery as a lobby
+         * launch, minus the lobby. */
+        SnesNetplayConfig env_cfg;
+        snes_netplay_config_defaults(&env_cfg);
+        snes_netplay_apply_env(&env_cfg);
+        if (env_cfg.enabled) {
+            g_netplay_cfg = env_cfg;
+            g_netplay_pending = 1;
+            g_netplay_from_lobby = 0;
+        }
+    }
     if (g_netplay_pending) {
+        netplay_apply_title_defaults();
         int nrc = snes_netplay_start(&g_netplay_cfg);
         if (nrc != 0)
             fprintf(stderr,
