@@ -871,7 +871,19 @@ int main(int argc, char **argv)
     char beside_exe[1024] = "";
     uint8_t sha[32];
     const uint8_t *want_sha = expected_rom_sha256(sha);
-    int has_positional = (argc > 1 && argv[1] && argv[1][0] && argv[1][0] != '-');
+    /* First non-flag argument, not argv[1]: this ecosystem's hosts take their
+     * flags BEFORE the ROM (`<exe> --launcher <rom>`), so reading argv[1] here
+     * would see "--launcher" and conclude no ROM was given. */
+    int pos_arg = 0;
+    {
+        int ai;
+        for (ai = 1; ai < argc; ++ai) {
+            if (!argv[ai] || !argv[ai][0] || argv[ai][0] == '-') continue;
+            pos_arg = ai;
+            break;
+        }
+    }
+    int has_positional = (pos_arg != 0);
     /* --launcher / --no-launcher, as the reference host spells them.
      *
      * A positional ROM used to suppress the launcher outright, which was
@@ -916,7 +928,7 @@ int main(int argc, char **argv)
              * --launcher with a ROM means "show the launcher, loaded with
              * THIS one". */
             if (has_positional)
-                snprintf(hint, sizeof(hint), "%s", argv[1]);
+                snprintf(hint, sizeof(hint), "%s", argv[pos_arg]);
             else
                 snprintf(hint, sizeof(hint), "%s", beside_exe);
             if (!hint[0] && !snesrecomp_rom_cache_read(hint, sizeof(hint)))
@@ -940,7 +952,7 @@ int main(int argc, char **argv)
 
         resolve_argv[0] = argv[0];
         if (has_positional) {
-            resolve_argv[1] = argv[1];
+            resolve_argv[1] = argv[pos_arg];
             resolve_argc = 2;
         } else if (beside_exe[0]) {
             resolve_argv[1] = beside_exe;
