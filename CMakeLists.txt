@@ -20,6 +20,15 @@ if(SNESRECOMP_BUILD_VERSION STREQUAL "")
     endif()
 endif()
 
+# ICE (STUN/TURN via static libjuice) — required for internet play. The
+# public lobby hands out HOSTED sessions, and a build without ICE refuses
+# them at launch: both peers logged "hosted lobby requires ICE, but ICE is
+# not available in this build" and fell back to running offline solo, which
+# looks like a desync but is two disconnected games. Must be set BEFORE
+# runner.cmake is included so recomp_net picks it up.
+set(SNESRECOMP_NET_ICE ON CACHE BOOL
+    "ICE/libjuice transport for internet netplay (lobby hosted sessions)" FORCE)
+
 set(SNESRECOMP_ROOT "${CMAKE_SOURCE_DIR}/snesrecomp" CACHE PATH
     "Path to the snesrecomp checkout used by this game")
 if(NOT EXISTS "${SNESRECOMP_ROOT}/runner/runner.cmake")
