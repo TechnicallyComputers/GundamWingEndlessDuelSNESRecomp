@@ -48,6 +48,45 @@
 #include "launcher_profile.h"
 #endif
 
+#if defined(SNES_HAS_LOBBY_CLIENT)
+/* Delay-sync netplay + MotK lobby. Defined by snesrecomp_enable_recomp_net()
+ * in CMakeLists.txt, which also links recomp-net and puts these headers on
+ * the include path. Without that call every netplay block compiles out and
+ * the launcher's netplay button stays capability-gated off.
+ *
+ * This is the MINIMAL host wiring: lobby button in the launcher, delay-sync
+ * session from the lobby's launch result, exit on quit. The fully-featured
+ * reference (rematch, soft-return to the waiting room, dual viewport) is
+ * MetalWarriorsSNESRecomp's src/main.c. */
+#include "snes_netplay.h"
+#include "snes_host_lobby.h"
+#include "snes_host_app.h"
+
+static SnesNetplayConfig g_netplay_cfg;
+static int g_netplay_pending;    /* launcher armed a session; start after SnesInit */
+static int g_netplay_from_lobby; /* admit pump waits for the lobby peer */
+
+static void host_lobby_ensure_init(void)
+{
+    static int once;
+    SnesHostLobbyIdentity id;
+    SnesHostLobbyOpts opts;
+    if (once)
+        return;
+    once = 1;
+    memset(&id, 0, sizeof(id));
+    id.game_name = SNES_GAME_TITLE;
+    id.game_version = SNES_GAME_VERSION;
+    id.lan_registry_path = "netplay_lan_lobby.txt";
+    id.default_lobby_name = "Netplay Lobby";
+    memset(&opts, 0, sizeof(opts));
+    opts.rematch_set_ready = 1;
+    /* fill_match_caps NULL → input delay 2, no widescreen caps exchange. */
+    if (snes_host_lobby_init(&id, &opts) != 0)
+        fprintf(stderr, "netplay: snes_host_lobby_init failed\n");
+}
+#endif /* SNES_HAS_LOBBY_CLIENT */
+
 #define GAME_WIDTH  256
 #define GAME_HEIGHT 224
 
@@ -603,6 +642,30 @@ static uint16_t read_keyboard(void)
     return pad;
 }
 
+#if defined(SNES_HAS_LOBBY_CLIENT)
+/* Barrier hooks: the admit pump stalls the sim until the peer's inputs
+ * arrive, and needs the host to keep sampling the pad and pumping SDL so a
+ * stall never looks like a hang. */
+static uint16_t netplay_capture_pad(void *ctx)
+{
+    (void)ctx;
+    return (uint16_t)((read_keyboard() | read_gamepad(0)) & 0x0fffu);
+}
+
+static void netplay_poll_events(void *ctx, int *want_soft_exit)
+{
+    SDL_Event event;
+    (void)ctx;
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_QUIT)
+            *want_soft_exit = 2;
+        if (event.type == SDL_KEYDOWN &&
+            SNESRECOMP_SDL_EVENT_KEY(event) == SDLK_ESCAPE)
+            *want_soft_exit = 1;
+    }
+}
+#endif /* SNES_HAS_LOBBY_CLIENT */
+
 static int hex_nibble(char c)
 {
     if (c >= '0' && c <= '9') return c - '0';
@@ -749,12 +812,35 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
         gi.expected_crc     = crc;
         gi.has_expected_crc = 1;
     }
+#if defined(SNES_HAS_LOBBY_CLIENT)
+    /* The netplay button is capability-gated: without these two fields the
+     * launcher never shows it (which is exactly why a build without
+     * snesrecomp_enable_recomp_net has no netplay UI). */
+    gi.netplay_supported = 1;
+    host_lobby_ensure_init();
+    gi.netplay = snes_host_lobby_callbacks();
+#endif
 
     out[0] = '\0';
     lr = recomp_launcher_run_window("Gundam Wing Endless Duel", &ls, &gi, assets_dir,
                                     (initial_rom && initial_rom[0]) ? initial_rom
                                                                     : NULL,
                                     out, cap);
+#if defined(SNES_HAS_LOBBY_CLIENT)
+    /* A lobby launch arms the session; snes_netplay_start() runs after
+     * SnesInit, once the guest exists. */
+    if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && ls.netplay_launch.enabled) {
+        SnesHostLaunchResult res;
+        snes_host_app_apply_launch(&ls.netplay_launch, &res);
+        g_netplay_cfg = res.net_cfg;
+        g_netplay_pending = 1;
+        g_netplay_from_lobby = 1;
+        fprintf(stderr,
+                "netplay: lobby launch slot=%d bind=%s peer=%s delay=%d\n",
+                ls.netplay_launch.local_slot, ls.netplay_launch.bind_hostport,
+                ls.netplay_launch.peer_hostport, ls.netplay_launch.input_delay);
+    }
+#endif
     if (lr == RECOMP_LAUNCHER_RESULT_QUIT)
         return -1;
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && out[0])
@@ -988,6 +1074,16 @@ int main(int argc, char **argv)
     PpuBeginDrawing(g_ppu, (uint8_t *)g_render_pixels, GAME_WIDTH * 4,
                     kPpuRenderFlags_NewRenderer);
     start_debug_server();
+#if defined(SNES_HAS_LOBBY_CLIENT)
+    if (g_netplay_pending) {
+        int nrc = snes_netplay_start(&g_netplay_cfg);
+        if (nrc != 0)
+            fprintf(stderr,
+                    "netplay: snes_netplay_start failed (%d) — continuing "
+                    "offline\n", nrc);
+        g_netplay_pending = 0;
+    }
+#endif
 
     /* snesrecomp_sdl_* wrap the SDL2/SDL3 API differences, so this host
      * builds against either backend (-DSNESRECOMP_SDL_BACKEND=SDL2|SDL3). */
@@ -1059,6 +1155,48 @@ int main(int argc, char **argv)
             }
         }
 
+#if defined(SNES_HAS_LOBBY_CLIENT)
+        /* Netplay session: the delay-sync admit pump owns the frame cadence.
+         * Both seats' inputs come back merged from the netcode; on a stall
+         * the held framebuffer is re-presented so the window stays live. */
+        if (snes_netplay_active()) {
+            SnesHostBarrierHooks hooks;
+            int run = running;
+            int admitted;
+            memset(&hooks, 0, sizeof(hooks));
+            hooks.capture_local_pad = &netplay_capture_pad;
+            hooks.poll_events = &netplay_poll_events;
+            admitted = snes_host_barrier_admit(g_netplay_from_lobby, &run,
+                                               &hooks);
+            running = run;
+            if (!running)
+                break;
+            if (admitted) {
+                int burst = 0;
+                for (;;) {
+                    inputs = snes_netplay_published_inputs() |
+                             snes_netplay_active_mask();
+                    RtlRunFrame(inputs);
+                    snes_netplay_finish_frame();
+                    /* Catch-up: extra sim ticks when the peer is ahead, so a
+                     * hitch on one side doesn't grow into permanent lag. */
+                    if (burst >= snes_host_catchup_budget())
+                        break;
+                    snes_netplay_stage_local(netplay_capture_pad(NULL));
+                    if (!snes_netplay_poll_admit())
+                        break;
+                    burst++;
+                }
+                game_present(renderer, texture, 1);
+            } else {
+                game_present(renderer, texture, 0);   /* held frame */
+            }
+            if (!g_vsync)
+                game_frame_limit();
+            continue;
+        }
+#endif /* SNES_HAS_LOBBY_CLIENT */
+
         /* Seat 0 in the low 12 bits, seat 1 in the next 12. Seats 2..7 (with
          * a multitap) go through RtlSetPadState — see
          * snesrecomp/docs/MULTITAP.md. */
@@ -1102,6 +1240,11 @@ int main(int argc, char **argv)
             }
         }
         inputs |= (uint32)read_gamepad(1) << 12;
+        /* TCP-injected pads (debug_server's "set_controller"). The reference
+         * host merges this word; this host never did, so every scripted
+         * harness that thought it was pressing Start was actually watching
+         * the attract reel. No-op inline in a non-trace build. */
+        inputs |= debug_server_get_controller_inputs();
         /* TCP-requested save/load (debug_server's "savestate N" / "loadstate
          * N"). The reference host consumes these; the scaffold never did, so
          * the commands answered OK and then nothing happened. Consuming them

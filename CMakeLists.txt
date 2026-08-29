@@ -75,7 +75,17 @@ if(NOT EXISTS "${RECOMP_UI_ROOT}/recomp_ui.cmake")
         "Run: git submodule update --init --recursive recomp-ui")
 endif()
 include(${RECOMP_UI_ROOT}/recomp_ui.cmake)
-recomp_target_launcher_ui(GundamWingEndlessDuelSNESRecomp CONSOLE snes)
+# BOXART stages launcher_assets/img/boxart.tga beside the exe as
+# assets/img/boxart.tga, where the launcher looks by default. Guarded by
+# EXISTS inside recomp_ui.cmake, so a repo without the art configures fine —
+# fetch it with snesrecomp/tools/new_project/fetch_boxart.py and reconfigure.
+recomp_target_launcher_ui(GundamWingEndlessDuelSNESRecomp CONSOLE snes
+    BOXART "${CMAKE_SOURCE_DIR}/launcher_assets/img/boxart.tga")
+
+# Delay-sync netplay + MotK lobby client (defines SNES_HAS_LOBBY_CLIENT, which
+# is what compiles the netplay blocks in src/main.c and lights the launcher's
+# netplay button). LAN by default; opt into ICE with -DSNESRECOMP_NET_ICE=ON.
+snesrecomp_enable_recomp_net(GundamWingEndlessDuelSNESRecomp)
 
 # Generated C is machine output: it is not held to the runner's warning bar,
 # and treating it as such buries real warnings from hand-written host code.
