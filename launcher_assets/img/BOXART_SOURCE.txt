@@ -1,0 +1,5 @@
+Box art sourced from libretro-thumbnails (Named_Boxarts).
+Matched name: Shin Kidou Senki Gundam W - Endless Duel (Japan)
+URL: https://thumbnails.libretro.com/Nintendo%20-%20Super%20Nintendo%20Entertainment%20System/Named_Boxarts/Shin%20Kidou%20Senki%20Gundam%20W%20-%20Endless%20Duel%20(Japan).png
+https://github.com/libretro-thumbnails/libretro-thumbnails
+PNG is for README; TGA is for recomp-ui LAUNCHER_BOXART.
