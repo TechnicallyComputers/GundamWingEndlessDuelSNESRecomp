@@ -7,13 +7,16 @@ image after boot and does not alter the user's ROM file.
 
 - `en`: English reference patch data from Aeon Genesis.
 - `es`: Spanish reference patch data from Max1323.
-- `fr`, `it`, `pt`: selectable, with a native overlay for the first intro
-  line and English fallback for all other text.
+- `fr`, `it`, `pt`: selectable, currently fall back to English patch data.
 - `ko`, `zh`: selectable, currently fall back to English patch data.
 
-The Korean and Chinese entries also need new glyph/tile work before native text
-can be rendered. The current table can encode text through `[[glyph]]` mappings,
-but this project does not yet contain a CJK font sheet or table entries.
+French, Italian, Portuguese, Korean, and Chinese need new glyph/tile work before
+native text can be rendered safely. The visible opening crawl is built from
+paired tile rows and patch-specific glyph art, not a complete reusable alphabet;
+runtime experiments with direct Latin tile codes produced corrupted glyphs in
+screenshots. The current table can encode text through `[[glyph]]` mappings, but
+this project does not yet contain the font sheet/table entries needed for these
+languages.
 
 ## Adding Native Language Data
 
@@ -23,6 +26,7 @@ The runtime tries the selected language first and then follows the root-level
 `fallback_<lang>` mapping. A native entry therefore overrides the English
 fallback one patch at a time.
 
-The current French/Italian/Portuguese overlay demonstrates that model by using
-the English-patched intro bytes as `source_hex` and replacing them after the
-base English fallback has been applied.
+For tile-art text such as the opening crawl, first add or identify a complete
+glyph sheet for the target language, then encode both tile rows for each visible
+line. Do not add native overlay bytes without screenshot validation; arbitrary
+Latin letter codes can render as unrelated tiles in that layer.
