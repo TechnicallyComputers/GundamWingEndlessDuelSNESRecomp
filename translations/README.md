@@ -57,6 +57,16 @@ python scripts\generate_option_patch.py --check
 The option generator fails on non-ASCII text or any translation whose byte
 length does not match the source patch width.
 
+To inspect native and fallback coverage across the generated table and the
+source-backed text files, run:
+
+```powershell
+python scripts\audit_localization_coverage.py
+```
+
+This reports runtime patch counts, patched byte counts, root fallback mappings,
+and per-language editable crawl/option entries.
+
 ## Visual QA Harness
 
 Use `scripts/validate_localization_tcp.ps1` with a trace build to verify runtime
@@ -82,3 +92,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate_localizatio
 
 The crawl harness also emits `contact.png` when `System.Drawing` is available,
 which is the easiest artifact to inspect or attach to review notes.
+
+For remaining title/menu label investigation, capture the visible mode menu and
+the exact PPU/VRAM/CGRAM/OAM state used to draw it:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\probe_title_menu_vram.ps1 `
+  -RomPath C:\path\to\gwedj.smc -Languages off,en,es,fr,it,pt
+```
+
+This probe uses TCP input to advance to the mode menu, then writes
+`mode_menu.bmp`, `ppu_state.json`, `vram.json`, `cgram.json`, `oam.json`, and a
+contact HTML sheet for each language. The current evidence shows the Japanese
+ROM already draws the visible `STORY MODE`, `VS. MODE`, `TRIAL MODE`, and
+`OPTION` labels in English using tilemap-backed 8x8 graphics; the existing
+English/Spanish reference patches and the French/Italian/Portuguese fallback
+path leave those label tiles byte-identical. Translating them further will need
+a dedicated menu-font/tile-asset pass, not only plain text replacement.
