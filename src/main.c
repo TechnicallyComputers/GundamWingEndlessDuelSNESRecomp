@@ -40,6 +40,7 @@
 #include "launcher.h"        /* snesrecomp_launcher_resolve_rom_sha256 */
 #include "launcher_cache.h"  /* snesrecomp_rom_cache_read */
 #include "codegen_setup.h"   /* kGameCodegenIdentity - the ROM digests */
+#include "title_menu_overlay.h"
 #if SNESRECOMP_ENABLE_MODS
 #include "mod_runtime.h"
 #endif
@@ -158,6 +159,9 @@ void RtlDrawPpuFrame(uint8 *pixel_buffer, size_t pitch, uint32 render_flags)
      * build calls draw_ppu_frame — common_rtl.c's call is inside SNES_COSIM —
      * so a host that omits it presents an untouched texture forever. */
     g_rtl_game_info->draw_ppu_frame();
+    gwed_title_menu_overlay_apply((uint32_t *)g_ppu->renderBuffer,
+                                  GAME_WIDTH, GAME_HEIGHT,
+                                  (int)(g_ppu->renderPitch / 4));
     RtlWidescreenPresent(pixel_buffer, pitch, g_ppu->renderBuffer,
                          GAME_WIDTH, GAME_HEIGHT);
 }

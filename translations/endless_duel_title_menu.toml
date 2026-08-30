@@ -1,7 +1,7 @@
 # Source data for the title-screen mode selector labels.
 #
 # These labels are visible in the presented title frame but are not reproduced
-# by the current raw BG/OAM helper renders. The first replacement path is a
+# by the current raw BG/OAM helper renders. The runtime replacement path is a
 # screen-space host overlay keyed by language; a later pass can replace this
 # with VRAM/tile assets if the exact upload path is recovered.
 

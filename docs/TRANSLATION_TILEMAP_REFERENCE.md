@@ -51,7 +51,7 @@ Current Endless Duel source files:
 - `translations/endless_duel_dialogue_targets.toml`: authored French, Italian,
   and Portuguese dialogue text.
 - `translations/endless_duel_title_menu.toml`: editable rectangles and strings
-  for title-screen mode selector overlay previews.
+  for the title-screen mode selector runtime overlay.
 - `translations/endless_duel_cjk_candidates.toml`: inactive CJK research input.
 
 The generators are intentionally strict. They fail on unsupported glyphs, text
@@ -127,31 +127,33 @@ the original Japanese ROM. A 2026-08-30 probe showed the current runtime patches
 leave this surface byte-identical across `off`, `en`, `es`, `fr`, `it`, and
 `pt`.
 
-For these surfaces, the preferred path is asset replacement:
+For these surfaces, use the least invasive replacement that can be visually
+validated:
 
 1. Capture the target screen with `scripts/probe_title_menu_vram.ps1`.
 2. Identify BG/OAM ownership and tile IDs.
 3. Extract or author replacement tile graphics for each language.
 4. Patch the ROM-backed upload source or add language-gated `[[vram_patch]]`
-   entries if runtime injection is cleaner.
+   entries if runtime injection is cleaner, or use a host overlay when the
+   exact SNES upload path is not yet recovered.
 5. Screenshot-validate every language on the exact screen.
 
-When ownership is not yet fully recovered, use the host-overlay preview path as
-the editable contract for fit and language coverage:
+When ownership is not yet fully recovered, use the host-overlay path as the
+editable contract for fit and language coverage:
 
 ```powershell
 py -3 scripts\render_title_menu_overlay_preview.py `
   C:\path\to\title-menu-capture\en --langs es,fr,it,pt
 ```
 
-The preview renderer reads `translations/endless_duel_title_menu.toml`, masks
-only the four configured label rectangles, and writes ignored BMPs under
-`translations/title_menu_previews/`. This is intentionally a preview/prototype:
-the current 2026-08-30 evidence says the text is visible in the presented title
-frame, while the raw BG/OAM helper renderers only reproduce surrounding title
-art. Until the exact SNES upload path is recovered, a language-gated host
-overlay is the shortest shippable implementation path because it is not
-constrained by the ROM's existing glyph inventory.
+The runtime implementation is `src/title_menu_overlay.c`. It reads the selected
+language from the localization mod, detects the real title mode menu in the
+presented PPU frame, reads the selected row from WRAM `$7E0504`, and draws the
+translated labels before presentation. The preview renderer reads the same
+`translations/endless_duel_title_menu.toml` geometry and writes ignored BMPs
+under `translations/title_menu_previews/` for quick fit checks. The current
+2026-08-30 evidence says the text is visible in the presented title frame,
+while the raw BG/OAM helper renderers only reproduce surrounding title art.
 
 This is also the path for CJK. If the game has no Chinese/Korean glyph tiles,
 do not expose the language as a fallback-only option. Add real glyph assets,

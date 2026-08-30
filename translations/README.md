@@ -89,17 +89,22 @@ The title-screen mode selector labels live in
 `endless_duel_title_menu.toml`. These are `STORY MODE`, `VS. MODE`,
 `TRIAL MODE`, and `OPTION` on the first selectable title menu. They are not
 plain option-menu strings and the current BG/OAM helper renders do not yet
-reproduce the exact source layer, so the first tooling pass is a screen-space
-overlay preview that uses editable label rectangles and per-language strings:
+reproduce the exact source layer, so the live replacement is a screen-space
+host overlay keyed by the selected runtime language. It masks only the four
+configured title-label rectangles, reads the selected title row from WRAM
+`$7E0504` (`0,2,4,6` for rows 0-3), and then draws the translated labels into
+the PPU frame buffer before SDL presentation and TCP screenshots.
+
+To preview rectangle fit against a captured frame without launching the game:
 
 ```powershell
 py -3 scripts\render_title_menu_overlay_preview.py `
   C:\path\to\title-menu-capture\en --langs es,fr,it,pt
 ```
 
-The generated BMPs are ignored under `translations/title_menu_previews/`. Treat
-them as fit/positioning previews for a future runtime overlay or recovered
-tile-asset replacement, not as final SNES tile data.
+The generated BMPs are ignored under `translations/title_menu_previews/`. They
+use the same string/rectangle source as the runtime overlay, but they are review
+previews only; the actual in-game path is `src/title_menu_overlay.c`.
 
 The battle and ending dialogue decoded from the English and Spanish IPS files
 lives in `endless_duel_dialogue.toml`, with a readable audit report in
@@ -210,10 +215,10 @@ map base `0xe000`, BG3 map base `0xf000`, and BG1/BG2 tile base `0xc000`.
 The visible mode labels are still not reached by the normal runtime text patch
 path. A later frame-keyed probe showed the simplified BG/OAM render helpers can
 draw surrounding logo/bracket art from the capture, but do not reproduce the
-visible label text itself. Replacing these labels therefore has two viable
-tracks: recover the missing upload/render path and patch its ROM or VRAM source,
-or add a language-gated host overlay using the rectangle/string data in
-`endless_duel_title_menu.toml`.
+visible label text itself. `src/title_menu_overlay.c` handles the current
+runtime replacement by drawing translated labels over that presented frame for
+Spanish, French, Italian, and Portuguese. A future lower-level track can still
+recover the missing upload/render path and patch its ROM or VRAM source.
 
 ## External Reverse-Engineering Context
 
