@@ -7,7 +7,8 @@ image after boot and does not alter the user's ROM file.
 
 - `en`: English reference patch data from Aeon Genesis.
 - `es`: Spanish reference patch data from Max1323.
-- `fr`, `it`, `pt`: selectable, currently fall back to English patch data.
+- `fr`, `it`, `pt`: selectable, with a native overlay for the first intro
+  line and English fallback for all other text.
 - `ko`, `zh`: selectable, currently fall back to English patch data.
 
 The Korean and Chinese entries also need new glyph/tile work before native text
@@ -21,3 +22,7 @@ to the existing `[[rom_patch]]`, `[[ram_patch]]`, or `[[vram_patch]]` entries.
 The runtime tries the selected language first and then follows the root-level
 `fallback_<lang>` mapping. A native entry therefore overrides the English
 fallback one patch at a time.
+
+The current French/Italian/Portuguese overlay demonstrates that model by using
+the English-patched intro bytes as `source_hex` and replacing them after the
+base English fallback has been applied.

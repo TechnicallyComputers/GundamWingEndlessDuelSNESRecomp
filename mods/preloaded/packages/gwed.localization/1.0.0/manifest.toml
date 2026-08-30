@@ -3,7 +3,7 @@ id = "gwed.localization"
 version = "1.0.0"
 name = "Gundam Wing Endless Duel Localization"
 author = "Aeon Genesis; Max1323; runtime integration by mstan"
-description = "Runtime localization using in-memory patches and text/glyph data derived from supplied reference translation patches. English and Spanish use reference patch data; other listed languages currently fall back to English until native tables/glyphs are authored. The game ROM file is not modified."
+description = "Runtime localization using in-memory patches and text/glyph data derived from supplied reference translation patches. English and Spanish use reference patch data; French, Italian, and Portuguese have partial native overlays and fall back to English elsewhere. Korean and Chinese fall back to English until native glyphs are authored. The game ROM file is not modified."
 license = "Fan translation reference material; runtime integration MIT"
 resolver = "declarative"
 save_compatibility = "shared"
@@ -38,11 +38,11 @@ label = "Spanish"
 
 [[option.choice]]
 value = "fr"
-label = "French (English fallback)"
+label = "French (partial)"
 
 [[option.choice]]
 value = "it"
-label = "Italian (English fallback)"
+label = "Italian (partial)"
 
 [[option.choice]]
 value = "ko"
@@ -54,7 +54,7 @@ label = "Chinese (English fallback)"
 
 [[option.choice]]
 value = "pt"
-label = "Portuguese (English fallback)"
+label = "Portuguese (partial)"
 
 [[option.choice]]
 value = "off"
