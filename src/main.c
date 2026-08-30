@@ -1331,11 +1331,18 @@ session_reboot:
      * rematch: session_reboot re-runs SnesInit and game_audio_open, and
      * leaking either one per match is a slow drift into no-audio and
      * exhausted memory over a long lobby night. */
+#if SNESRECOMP_SDL3
     if (g_audio_stream) {
         SDL_DestroyAudioStream(g_audio_stream);
         g_audio_stream = NULL;
+    }
+    g_audio_device = 0;
+#else
+    if (g_audio_device) {
+        SDL_CloseAudioDevice(g_audio_device);
         g_audio_device = 0;
     }
+#endif
     if (g_snes) {
         snes_free(g_snes);
         g_snes = NULL;
