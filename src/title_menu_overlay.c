@@ -9,49 +9,54 @@
 
 typedef struct TitleMenuLabel {
     int x, y, w, h;
+    int text_y;
+    int source_x, source_y;
     char id[32];
+    char source[64];
     char text[64];
     int present;
 } TitleMenuLabel;
 
+typedef struct TitleGlyph {
+    unsigned char width;
+    unsigned short rows[8];
+} TitleGlyph;
+
 static TitleMenuLabel g_title_labels[4];
 static int g_title_menu_active;
 
-static const unsigned char kFont5x7[][7] = {
-    /* space */ {0x00,0x00,0x00,0x00,0x00,0x00,0x00},
-    /* . */     {0x00,0x00,0x00,0x00,0x00,0x0c,0x0c},
-    /* A */     {0x0e,0x11,0x11,0x1f,0x11,0x11,0x11},
-    /* B */     {0x1e,0x11,0x11,0x1e,0x11,0x11,0x1e},
-    /* C */     {0x0f,0x10,0x10,0x10,0x10,0x10,0x0f},
-    /* D */     {0x1e,0x11,0x11,0x11,0x11,0x11,0x1e},
-    /* E */     {0x1f,0x10,0x10,0x1e,0x10,0x10,0x1f},
-    /* F */     {0x1f,0x10,0x10,0x1e,0x10,0x10,0x10},
-    /* G */     {0x0f,0x10,0x10,0x13,0x11,0x11,0x0f},
-    /* H */     {0x11,0x11,0x11,0x1f,0x11,0x11,0x11},
-    /* I */     {0x1f,0x04,0x04,0x04,0x04,0x04,0x1f},
-    /* J */     {0x07,0x02,0x02,0x02,0x12,0x12,0x0c},
-    /* K */     {0x11,0x12,0x14,0x18,0x14,0x12,0x11},
-    /* L */     {0x10,0x10,0x10,0x10,0x10,0x10,0x1f},
-    /* M */     {0x11,0x1b,0x15,0x15,0x11,0x11,0x11},
-    /* N */     {0x11,0x19,0x15,0x13,0x11,0x11,0x11},
-    /* O */     {0x0e,0x11,0x11,0x11,0x11,0x11,0x0e},
-    /* P */     {0x1e,0x11,0x11,0x1e,0x10,0x10,0x10},
-    /* Q */     {0x0e,0x11,0x11,0x11,0x15,0x12,0x0d},
-    /* R */     {0x1e,0x11,0x11,0x1e,0x14,0x12,0x11},
-    /* S */     {0x0f,0x10,0x10,0x0e,0x01,0x01,0x1e},
-    /* T */     {0x1f,0x04,0x04,0x04,0x04,0x04,0x04},
-    /* U */     {0x11,0x11,0x11,0x11,0x11,0x11,0x0e},
-    /* V */     {0x11,0x11,0x11,0x11,0x11,0x0a,0x04},
-    /* W */     {0x11,0x11,0x11,0x15,0x15,0x15,0x0a},
-    /* X */     {0x11,0x11,0x0a,0x04,0x0a,0x11,0x11},
-    /* Y */     {0x11,0x11,0x0a,0x04,0x04,0x04,0x04},
-    /* Z */     {0x1f,0x01,0x02,0x04,0x08,0x10,0x1f},
+static const TitleGlyph kEmptyGlyph = { 8, { 0 } };
+static const TitleGlyph kSpaceGlyph = { 5, { 0 } };
+static const TitleGlyph kDotGlyph = {
+    2, { 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0003, 0x0003 }
 };
-
-enum {
-    FONT_SPACE = 0,
-    FONT_DOT = 1,
-    FONT_A = 2,
+static const TitleGlyph kNativeTitleGlyphs[26] = {
+    /* A */ { 8, { 0x007e, 0x00ff, 0x00c3, 0x00df, 0x00df, 0x00c3, 0x00c3, 0x00c3 } },
+    /* B */ { 8, { 0x00fe, 0x00ff, 0x00c3, 0x00fe, 0x00ff, 0x00c3, 0x00ff, 0x00fe } },
+    /* C */ { 8, { 0x007e, 0x00ff, 0x00c0, 0x00c0, 0x00c0, 0x00c0, 0x00ff, 0x007e } },
+    /* D */ { 8, { 0x00fe, 0x00ff, 0x00c3, 0x00c3, 0x00c3, 0x00c3, 0x00df, 0x00de } },
+    /* E */ { 8, { 0x007f, 0x00ff, 0x00e0, 0x00ff, 0x00ff, 0x00e0, 0x00ff, 0x00ff } },
+    /* F */ { 8, { 0x007f, 0x00ff, 0x00e0, 0x00ff, 0x00ff, 0x00e0, 0x00e0, 0x00e0 } },
+    /* G */ { 8, { 0x007f, 0x00ff, 0x00c0, 0x00c0, 0x00cf, 0x00c3, 0x00ff, 0x007f } },
+    /* H */ { 8, { 0x00c3, 0x00c3, 0x00c3, 0x00ff, 0x00ff, 0x00c3, 0x00c3, 0x00c3 } },
+    /* I */ { 3, { 0x0007, 0x0007, 0x0007, 0x0007, 0x0007, 0x0007, 0x0007, 0x0007 } },
+    /* J */ { 8, { 0x001f, 0x001f, 0x0006, 0x0006, 0x00c6, 0x00c6, 0x00fe, 0x007c } },
+    /* K */ { 8, { 0x00c3, 0x00c6, 0x00cc, 0x00f8, 0x00fc, 0x00ce, 0x00c7, 0x00c3 } },
+    /* L */ { 7, { 0x0070, 0x0070, 0x0070, 0x0070, 0x0070, 0x0070, 0x007f, 0x007f } },
+    /* M */ { 8, { 0x00fe, 0x00ff, 0x00db, 0x00db, 0x00db, 0x00db, 0x00db, 0x00db } },
+    /* N */ { 8, { 0x00fe, 0x00ff, 0x00c3, 0x00c3, 0x00c3, 0x00c3, 0x00c3, 0x00c3 } },
+    /* O */ { 8, { 0x007e, 0x00ff, 0x00c3, 0x00c3, 0x00c3, 0x00c3, 0x00ff, 0x007e } },
+    /* P */ { 8, { 0x00fe, 0x00ff, 0x00c3, 0x00df, 0x00de, 0x00c0, 0x00c0, 0x00c0 } },
+    /* Q */ { 8, { 0x007e, 0x00ff, 0x00c3, 0x00c3, 0x00db, 0x00cf, 0x00ff, 0x007b } },
+    /* R */ { 8, { 0x00fe, 0x00ff, 0x00c3, 0x00df, 0x00de, 0x00c3, 0x00c3, 0x00c3 } },
+    /* S */ { 8, { 0x007f, 0x00ff, 0x00c0, 0x00fe, 0x007f, 0x0003, 0x00ff, 0x00fe } },
+    /* T */ { 7, { 0x007f, 0x007f, 0x001c, 0x001c, 0x001c, 0x001c, 0x001c, 0x001c } },
+    /* U */ { 8, { 0x00c3, 0x00c3, 0x00c3, 0x00c3, 0x00c3, 0x00c3, 0x00ff, 0x007e } },
+    /* V */ { 10, { 0x0303, 0x0303, 0x0387, 0x01ce, 0x00cc, 0x00fc, 0x0078, 0x0030 } },
+    /* W */ { 8, { 0x00db, 0x00db, 0x00db, 0x00db, 0x00db, 0x00db, 0x00ff, 0x0066 } },
+    /* X */ { 8, { 0x00c3, 0x00e7, 0x007e, 0x003c, 0x003c, 0x007e, 0x00e7, 0x00c3 } },
+    /* Y */ { 8, { 0x00c3, 0x00c3, 0x00c3, 0x00c3, 0x00ff, 0x007e, 0x0018, 0x0018 } },
+    /* Z */ { 8, { 0x00ff, 0x00ff, 0x0006, 0x000c, 0x0018, 0x0030, 0x00ff, 0x00ff } },
 };
 
 static uint32_t rgb(unsigned r, unsigned g, unsigned b)
@@ -193,27 +198,31 @@ static int language_supported(const char *language)
            strcmp(language, "it") == 0 || strcmp(language, "pt") == 0;
 }
 
-static int glyph_index(char c)
+static const TitleGlyph *title_glyph(char c)
 {
     if (c == ' ')
-        return FONT_SPACE;
+        return &kSpaceGlyph;
     if (c == '.')
-        return FONT_DOT;
+        return &kDotGlyph;
     if (c >= 'A' && c <= 'Z')
-        return FONT_A + (c - 'A');
+        return &kNativeTitleGlyphs[c - 'A'];
     if (c >= 'a' && c <= 'z')
-        return FONT_A + (c - 'a');
-    return FONT_SPACE;
+        return &kNativeTitleGlyphs[c - 'a'];
+    return &kEmptyGlyph;
 }
 
 static int text_width(const char *text, int scale)
 {
+    int width = 0;
     int chars = 0;
-    while (text && text[chars])
+    while (text && text[chars]) {
+        const TitleGlyph *glyph = title_glyph(text[chars]);
+        if (chars)
+            width += scale;
+        width += glyph->width * scale;
         chars++;
-    if (!chars)
-        return 0;
-    return (chars * 6 - 1) * scale;
+    }
+    return width;
 }
 
 static uint32_t row_background(const uint32_t *pixels, int width, int height,
@@ -255,24 +264,52 @@ static void erase_source_label(uint32_t *pixels, int width, int height,
                                int pitch_pixels, const TitleMenuLabel *label)
 {
     uint32_t bg = row_background(pixels, width, height, pitch_pixels, label);
-    int x0 = label->x + 4;
-    int x1 = label->x + label->w - 4;
-    int y0 = label->y;
-    int y1 = label->y + label->h;
-    int y, x;
+    int scale = 1;
+    int cursor = label->source_x ? label->source_x :
+                 label->x + (label->w - text_width(label->source, scale) + 1) / 2;
+    int y = label->source_y ? label->source_y :
+            (label->text_y ? label->text_y : label->y);
+    const char *source = label->source;
+    int source_x = cursor;
+    int source_w = text_width(source, scale);
+    int cleanup_x0 = source_x - 1;
+    int cleanup_x1 = source_x + source_w + 2;
+    int cleanup_y0 = y - 1;
+    int cleanup_y1 = y + 10;
+    int cy, cx;
 
-    if (x0 < 0) x0 = 0;
-    if (y0 < 0) y0 = 0;
-    if (x1 > width) x1 = width;
-    if (y1 > height) y1 = height;
-    if (x0 >= x1 || y0 >= y1)
-        return;
+    while (source && *source) {
+        const TitleGlyph *glyph = title_glyph(*source++);
+        int gy, gx;
 
-    for (y = y0; y < y1; y++) {
-        uint32_t *row = pixels + y * pitch_pixels;
-        for (x = x0; x < x1; x++) {
-            if (is_menu_text_pixel(row[x]))
-                row[x] = bg;
+        for (gy = 0; gy < 8; gy++) {
+            for (gx = 0; gx < glyph->width; gx++) {
+                int px;
+                int py;
+                if (!(glyph->rows[gy] & (1u << (glyph->width - 1 - gx))))
+                    continue;
+                px = cursor + gx * scale;
+                py = y + gy * scale;
+                if (px >= 0 && px < width && py >= 0 && py < height)
+                    pixels[py * pitch_pixels + px] = bg;
+                px += scale;
+                py += scale;
+                if (px >= 0 && px < width && py >= 0 && py < height)
+                    pixels[py * pitch_pixels + px] = bg;
+            }
+        }
+        cursor += (glyph->width + 1) * scale;
+    }
+
+    if (cleanup_x0 < 0) cleanup_x0 = 0;
+    if (cleanup_y0 < 0) cleanup_y0 = 0;
+    if (cleanup_x1 > width) cleanup_x1 = width;
+    if (cleanup_y1 > height) cleanup_y1 = height;
+    for (cy = cleanup_y0; cy < cleanup_y1; cy++) {
+        uint32_t *row = pixels + cy * pitch_pixels;
+        for (cx = cleanup_x0; cx < cleanup_x1; cx++) {
+            if (near_color(row[cx], 255, 247, 189, 18))
+                row[cx] = bg;
         }
     }
 }
@@ -283,12 +320,11 @@ static void draw_text(uint32_t *pixels, int width, int height, int pitch_pixels,
 {
     int cursor = x;
     while (text && *text) {
-        int gi = glyph_index(*text++);
+        const TitleGlyph *glyph = title_glyph(*text++);
         int gy, gx, sy, sx;
-        const unsigned char *glyph = kFont5x7[gi];
-        for (gy = 0; gy < 7; gy++) {
-            for (gx = 0; gx < 5; gx++) {
-                if (!(glyph[gy] & (1u << (4 - gx))))
+        for (gy = 0; gy < 8; gy++) {
+            for (gx = 0; gx < glyph->width; gx++) {
+                if (!(glyph->rows[gy] & (1u << (glyph->width - 1 - gx))))
                     continue;
                 for (sy = 0; sy < scale; sy++) {
                     int py = y + gy * scale + sy;
@@ -302,7 +338,7 @@ static void draw_text(uint32_t *pixels, int width, int height, int pitch_pixels,
                 }
             }
         }
-        cursor += 6 * scale;
+        cursor += (glyph->width + 1) * scale;
     }
 }
 
@@ -313,12 +349,12 @@ static void draw_label(uint32_t *pixels, int width, int height, int pitch_pixels
     uint32_t shadow = selected ? rgb(56, 120, 96) : rgb(24, 56, 48);
     int scale = 1;
     int tw = text_width(label->text, scale);
-    int th = 7 * scale;
+    int th = 8 * scale;
     int tx, ty;
 
     erase_source_label(pixels, width, height, pitch_pixels, label);
     tx = label->x + (label->w - tw) / 2;
-    ty = label->y + (label->h - th) / 2;
+    ty = label->text_y ? label->text_y : label->y + (label->h - th) / 2;
     if (tx < label->x)
         tx = label->x;
     if (ty < label->y)
@@ -380,10 +416,19 @@ int gwed_title_menu_overlay_load(const char *path, const char *language)
             g_title_labels[current].x = atoi(value);
         } else if (strcmp(key, "y") == 0) {
             g_title_labels[current].y = atoi(value);
+        } else if (strcmp(key, "text_y") == 0) {
+            g_title_labels[current].text_y = atoi(value);
+        } else if (strcmp(key, "source_x") == 0) {
+            g_title_labels[current].source_x = atoi(value);
+        } else if (strcmp(key, "source_y") == 0) {
+            g_title_labels[current].source_y = atoi(value);
         } else if (strcmp(key, "width") == 0) {
             g_title_labels[current].w = atoi(value);
         } else if (strcmp(key, "height") == 0) {
             g_title_labels[current].h = atoi(value);
+        } else if (strcmp(key, "source") == 0) {
+            parse_toml_string(value, g_title_labels[current].source,
+                              sizeof(g_title_labels[current].source));
         } else if (strcmp(key, language) == 0) {
             parse_toml_string(value, g_title_labels[current].text,
                               sizeof(g_title_labels[current].text));
@@ -392,8 +437,9 @@ int gwed_title_menu_overlay_load(const char *path, const char *language)
     fclose(f);
 
     for (i = 0; i < 4; i++) {
-        if (!g_title_labels[i].present || !g_title_labels[i].text[0] ||
-            g_title_labels[i].w <= 0 || g_title_labels[i].h <= 0) {
+        if (!g_title_labels[i].present || !g_title_labels[i].source[0] ||
+            !g_title_labels[i].text[0] || g_title_labels[i].w <= 0 ||
+            g_title_labels[i].h <= 0) {
             gwed_title_menu_overlay_clear();
             return 0;
         }
