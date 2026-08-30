@@ -58,3 +58,10 @@ The harness writes per-language screenshots, `xlate_stats.json`, and a
 `contact.html` sheet. It uses `set_controller` over the debug TCP port to skip
 through the intro, title, menu, and VS route, so spacing or tile corruption can
 be checked visually instead of inferred from patch counts.
+
+For the scrolling opening/fight crawl specifically, capture fixed-time frames:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate_localization_crawl_tcp.ps1 `
+  -RomPath C:\path\to\gwedj.smc -Languages en,es,fr,it,pt -CaptureSeconds 55,60
+```
