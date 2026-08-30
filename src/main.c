@@ -31,6 +31,7 @@
 #include "widescreen.h"
 #include "game_rtl.h"
 #include "snes/ppu.h"
+#include "snes/snes.h"       /* snes_free on session reboot */
 #include "debug_server.h"
 #include "snes_savestate_menu.h" /* Select+R save-state overlay */
 #include "cpu_trace.h"
@@ -61,6 +62,7 @@
 #include "snes_netplay.h"
 #include "snes_host_lobby.h"
 #include "snes_host_app.h"
+#include "snes_host_session.h"
 
 static SnesNetplayConfig g_netplay_cfg;
 static int g_netplay_pending;    /* launcher armed a session; start after SnesInit */
@@ -1060,6 +1062,19 @@ int main(int argc, char **argv)
         return 1;
 
     RtlRegisterGame(&kGameInfo);
+
+session_reboot:
+#if defined(SNES_HAS_LOBBY_CLIENT)
+    /* recomp-ui's launcher_platform_close() may have SDL_Quit()'d before a
+     * rematch; the engine helper re-inits only what is missing. */
+    if (snes_host_ensure_sdl() != 0) {
+        fprintf(stderr, "GundamWingEndlessDuelSNESRecomp: SDL re-init failed\n");
+        return 1;
+    }
+    /* Game-specific sticky state (RtlGameInfo.session_reset) between matches;
+     * a no-op when the game registers none. */
+    snes_host_session_reset();
+#endif
     if (!SnesInit(rom, rom_size)) {
         fprintf(stderr, "GundamWingEndlessDuelSNESRecomp: SnesInit failed\n");
         return 1;
@@ -1155,11 +1170,31 @@ int main(int argc, char **argv)
             /* SDL2 spellings: sdl_compat.h defines SDL_ENABLE_OLD_NAMES for
              * SDL3, so these compile against either backend. The SDL3-only
              * names (SDL_EVENT_QUIT, ...) do not. */
-            if (event.type == SDL_QUIT)
+            if (event.type == SDL_QUIT) {
+#if defined(SNES_HAS_LOBBY_CLIENT)
+                /* In a lobby match, closing the window returns to the waiting
+                 * room with the party intact rather than killing the process
+                 * — the peer sees a clean end, not a timeout. */
+                if (snes_netplay_active())
+                    snes_netplay_soft_exit_to_lobby("sdl_quit",
+                                                    g_netplay_from_lobby);
+#endif
                 running = 0;
+            }
             if (event.type == SDL_KEYDOWN &&
-                SNESRECOMP_SDL_EVENT_KEY(event) == SDLK_ESCAPE)
+                SNESRECOMP_SDL_EVENT_KEY(event) == SDLK_ESCAPE) {
+#if defined(SNES_HAS_LOBBY_CLIENT)
+                if (snes_netplay_active()) {
+                    snes_netplay_soft_exit_to_lobby("escape",
+                                                    g_netplay_from_lobby);
+                    if (snes_netplay_return_to_lobby_requested()) {
+                        running = 0;
+                        break;
+                    }
+                }
+#endif
                 running = 0;
+            }
             /* Hotplug: a pad connected after launch must still work, and one
              * unplugged mid-game must not leave a dangling handle. */
             if (event.type == SDL_CONTROLLERDEVICEADDED)
@@ -1186,6 +1221,11 @@ int main(int argc, char **argv)
             running = run;
             if (!running)
                 break;
+            /* Peer left, or the barrier asked for the waiting room. */
+            if (snes_netplay_return_to_lobby_requested()) {
+                running = 0;
+                break;
+            }
             if (admitted) {
                 int burst = 0;
                 for (;;) {
@@ -1280,11 +1320,63 @@ int main(int argc, char **argv)
     }
 
     game_close_pads();
-    if (g_overlay_tex)
+    if (g_overlay_tex) {
         SDL_DestroyTexture(g_overlay_tex);
+        g_overlay_tex = NULL;
+    }
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+    /* Release the audio device and the guest machine before a possible
+     * rematch: session_reboot re-runs SnesInit and game_audio_open, and
+     * leaking either one per match is a slow drift into no-audio and
+     * exhausted memory over a long lobby night. */
+    if (g_audio_stream) {
+        SDL_DestroyAudioStream(g_audio_stream);
+        g_audio_stream = NULL;
+        g_audio_device = 0;
+    }
+    if (g_snes) {
+        snes_free(g_snes);
+        g_snes = NULL;
+    }
+
+#if defined(SNES_HAS_LOBBY_CLIENT)
+    /* ── Soft return: match over, party stays together ────────────────────
+     *
+     * The lobby WebSocket is deliberately NOT closed. Everyone who was in the
+     * room is still in it; this reopens the waiting room on top of the same
+     * connection, marks us ready for a rematch, and re-binds the Direct IP
+     * listener the finished session had released
+     * (snes_host_lobby_prepare_rematch, via begin_soft_return).
+     *
+     * A rematch then re-enters at session_reboot with the new launch config,
+     * so the guest is cold-booted per match — the alternative, reusing a
+     * dirty machine, is a desync on the first frame. */
+    if (snes_netplay_return_to_lobby_requested() && g_netplay_from_lobby) {
+        char rematch_rom[1024];
+        int lr;
+
+        snes_netplay_shutdown();
+        snes_host_app_begin_soft_return(NULL, 0);
+        g_netplay_from_lobby = 0;
+        g_netplay_pending = 0;
+
+        snprintf(rematch_rom, sizeof(rematch_rom), "%s", rom_path);
+        lr = run_gui_launcher(rematch_rom[0] ? rematch_rom : NULL,
+                              rom_path, sizeof(rom_path));
+        if (lr >= 0) {
+            /* run_gui_launcher already armed g_netplay_cfg from the lobby's
+             * launch result when this was a netplay start. Rematch or offline
+             * Play both reboot the session; only Quit falls through. */
+            SDL_Quit();
+            running = 1;
+            goto session_reboot;
+        }
+        snes_host_lobby_disconnect();
+    }
+#endif
+
     SDL_Quit();
     free(rom);
     return 0;
