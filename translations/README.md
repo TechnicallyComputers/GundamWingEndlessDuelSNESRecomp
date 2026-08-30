@@ -33,6 +33,17 @@ game uploads to VRAM. Do not add native overlay bytes without screenshot
 validation; arbitrary Latin letter codes can render as unrelated pixels in that
 layer.
 
+The current native Latin crawl text lives in `endless_duel_crawl.toml`. Run the
+generator after editing those lines:
+
+```powershell
+python scripts\generate_crawl_patch.py --write
+python scripts\generate_crawl_patch.py --check
+```
+
+The generator fails on unsupported glyphs or lines that do not fit their
+validated tilemap slots.
+
 ## Visual QA Harness
 
 Use `scripts/validate_localization_tcp.ps1` with a trace build to verify runtime
