@@ -39,6 +39,9 @@
 #include "launcher.h"        /* snesrecomp_launcher_resolve_rom_sha256 */
 #include "launcher_cache.h"  /* snesrecomp_rom_cache_read */
 #include "codegen_setup.h"   /* kGameCodegenIdentity - the ROM digests */
+#if SNESRECOMP_ENABLE_MODS
+#include "mod_runtime.h"
+#endif
 
 #if defined(RECOMP_LAUNCHER)
 /* Defined by recomp_target_launcher_ui() in CMakeLists.txt. Absent when the
@@ -92,6 +95,10 @@ static void host_lobby_ensure_init(void)
 #define GAME_HEIGHT 224
 
 extern Ppu *g_ppu;
+
+#if SNESRECOMP_ENABLE_MODS
+static int g_mods_ready;
+#endif
 
 /* Developer TCP debug server (opt in with -DSNESRECOMP_ENABLE_TRACE=ON).
  * debug_server.h replaces every entry point with a no-op static inline when
@@ -813,6 +820,9 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
         gi.expected_crc     = crc;
         gi.has_expected_crc = 1;
     }
+#if SNESRECOMP_ENABLE_MODS
+    gi.mods = g_mods_ready ? snes_mod_runtime_launcher_provider_c() : NULL;
+#endif
 #if defined(SNES_HAS_LOBBY_CLIENT)
     /* The netplay button is capability-gated: without these two fields the
      * launcher never shows it (which is exactly why a build without
@@ -998,6 +1008,20 @@ int main(int argc, char **argv)
     if (!has_positional)
         find_rom_beside_exe(beside_exe, sizeof(beside_exe));
 
+#if SNESRECOMP_ENABLE_MODS
+    {
+        char mods_dir[1024];
+        if (snesrecomp_exe_dir_path("mods", mods_dir, sizeof(mods_dir))) {
+            g_mods_ready = snes_mod_runtime_initialize_c(
+                mods_dir, "gwed-jp", kGameCodegenIdentity.expected_sha256);
+            if (!g_mods_ready) {
+                fprintf(stderr, "SNES mods unavailable: %s\n",
+                        snes_mod_runtime_last_error_c());
+            }
+        }
+    }
+#endif
+
 #if defined(RECOMP_LAUNCHER)
     /* A dummy video driver means CI or a screenshot harness: there is no one
      * to answer a GUI, and blocking on one would hang the job. */
@@ -1055,6 +1079,14 @@ int main(int argc, char **argv)
         }
     }
 
+#if SNESRECOMP_ENABLE_MODS
+    if (g_mods_ready && !snes_mod_runtime_commit_c(rom_path)) {
+        fprintf(stderr, "SNES mod plan rejected: %s\n",
+                snes_mod_runtime_last_error_c());
+        return 1;
+    }
+#endif
+
     rom = read_rom(rom_path, &rom_size);
     if (!rom)
         return 1;
@@ -1064,6 +1096,10 @@ int main(int argc, char **argv)
         fprintf(stderr, "GundamWingEndlessDuelSNESRecomp: SnesInit failed\n");
         return 1;
     }
+#if SNESRECOMP_ENABLE_MODS
+    if (g_mods_ready)
+        snes_mod_runtime_activate_plugins_c();
+#endif
 
     /* Give the PPU somewhere to composite into. Must happen after SnesInit
      * (which creates g_ppu) and before the first frame is drawn. */
