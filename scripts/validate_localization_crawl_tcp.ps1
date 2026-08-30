@@ -112,6 +112,54 @@ function Stop-Game($Proc) {
     }
 }
 
+function New-ContactPng([string]$Root, [string[]]$Langs, [int[]]$Seconds) {
+    try {
+        Add-Type -AssemblyName System.Drawing
+    } catch {
+        Write-Warning "System.Drawing is unavailable; skipping PNG contact sheet."
+        return ""
+    }
+
+    $scale = 2
+    $labelH = 28
+    $firstShot = Join-Path $Root (Join-Path $Langs[0] ("crawl_{0}s.bmp" -f $Seconds[0]))
+    $probe = [System.Drawing.Bitmap]::FromFile($firstShot)
+    $srcW = $probe.Width
+    $srcH = $probe.Height
+    $probe.Dispose()
+
+    $cellW = $srcW * $scale
+    $cellH = ($srcH * $scale) + $labelH
+    $sheet = New-Object System.Drawing.Bitmap ($cellW * $Seconds.Count), ($cellH * $Langs.Count)
+    $g = [System.Drawing.Graphics]::FromImage($sheet)
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
+    $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
+    $g.Clear([System.Drawing.Color]::FromArgb(17, 17, 17))
+    $font = New-Object System.Drawing.Font "Segoe UI", 12
+
+    for ($row = 0; $row -lt $Langs.Count; $row++) {
+        for ($col = 0; $col -lt $Seconds.Count; $col++) {
+            $lang = $Langs[$row]
+            $second = $Seconds[$col]
+            $x = $col * $cellW
+            $y = $row * $cellH
+            $g.DrawString(("{0} {1}s" -f $lang.ToUpper(), $second),
+                          $font, [System.Drawing.Brushes]::White, $x + 8, $y + 6)
+            $bmp = [System.Drawing.Bitmap]::FromFile(
+                (Join-Path $Root (Join-Path $lang ("crawl_{0}s.bmp" -f $second))))
+            $g.DrawImage($bmp, $x, $y + $labelH, $srcW * $scale, $srcH * $scale)
+            $bmp.Dispose()
+        }
+    }
+
+    $pngPath = Join-Path $Root "contact.png"
+    $sheet.Save($pngPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    $g.Dispose()
+    $sheet.Dispose()
+    $font.Dispose()
+    return $pngPath
+}
+
 if (-not $RomPath) {
     throw "Pass -RomPath or set SNESRECOMP_ROM to an extracted .sfc/.smc ROM path."
 }
@@ -209,5 +257,9 @@ $($rows -join "`n")
 "@ | Set-Content -LiteralPath $htmlPath -Encoding utf8
 
 $summary | Set-Content -LiteralPath (Join-Path $outFull "summary.txt") -Encoding ascii
+$pngPath = New-ContactPng $outFull $Languages $CaptureSeconds
 Write-Host "Wrote TCP crawl screenshots to $outFull"
 Write-Host "Open contact sheet: $htmlPath"
+if ($pngPath) {
+    Write-Host "PNG contact sheet: $pngPath"
+}

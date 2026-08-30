@@ -65,3 +65,6 @@ For the scrolling opening/fight crawl specifically, capture fixed-time frames:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate_localization_crawl_tcp.ps1 `
   -RomPath C:\path\to\gwedj.smc -Languages en,es,fr,it,pt -CaptureSeconds 55,60
 ```
+
+The crawl harness also emits `contact.png` when `System.Drawing` is available,
+which is the easiest artifact to inspect or attach to review notes.
