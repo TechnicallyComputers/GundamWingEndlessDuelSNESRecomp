@@ -77,8 +77,9 @@ def generate_entries(source: dict) -> dict[int, dict[str, str]]:
         if address in generated:
             raise ValueError(f"text_patch {index}: duplicate address {address:#x}")
         source_text = str(entry["source"])
-        width = len(source_text.encode("ascii"))
-        values = {"source_hex": ascii_hex(source_text, f"{address:#x} source")}
+        source_hex = ascii_hex(source_text, f"{address:#x} source")
+        width = len(bytes.fromhex(source_hex))
+        values = {"source_hex": source_hex}
         for lang in LANGS:
             if lang in entry:
                 values[f"{lang}_hex"] = ascii_hex(str(entry[lang]), f"{address:#x} {lang}", width)
