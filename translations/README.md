@@ -7,16 +7,17 @@ image after boot and does not alter the user's ROM file.
 
 - `en`: English reference patch data from Aeon Genesis.
 - `es`: Spanish reference patch data from Max1323.
-- `fr`, `it`, `pt`: selectable, currently fall back to English patch data.
+- `fr`, `it`, `pt`: native opening/fight crawl tilemap overlays; other text
+  falls back to English patch data.
 - `ko`, `zh`: selectable, currently fall back to English patch data.
 
-French, Italian, Portuguese, Korean, and Chinese need new glyph/tile work before
-native text can be rendered safely. Live VRAM captures of the visible opening
-crawl show that its bytes are rendered tile/bitmap data, not reusable character
-IDs. Runtime experiments with direct Latin byte substitutions produced corrupted
-glyphs in screenshots. The current table can encode text through `[[glyph]]`
-mappings, but this project does not yet contain the tile/bitmap encoder or font
-assets needed for these languages.
+The opening crawl is encoded as a 64-tile-wide BG tilemap strip. Each visible
+glyph uses a top tile entry and a bottom tile entry, with the bottom half stored
+32 tile indices after the top half. The current native crawl overlays reuse the
+Latin glyph set recovered from the English and Spanish references; the supported
+set is intentionally limited and avoids accents, `x`, and CJK glyphs until new
+font/tile assets are added. Korean and Chinese therefore still need native CJK
+assets before readable non-fallback text can be rendered safely.
 
 ## Adding Native Language Data
 
@@ -27,8 +28,8 @@ The runtime tries the selected language first and then follows the root-level
 fallback one patch at a time.
 
 For tile-art text such as the opening crawl, first add or identify a complete
-glyph sheet for the target language, then generate the same tile/bitmap format
-the game uploads to VRAM. Do not add native overlay bytes without screenshot
+glyph sheet for the target language, then generate the same tilemap format the
+game uploads to VRAM. Do not add native overlay bytes without screenshot
 validation; arbitrary Latin letter codes can render as unrelated pixels in that
 layer.
 
