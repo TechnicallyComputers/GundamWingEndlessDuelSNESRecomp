@@ -1,0 +1,47 @@
+# Pending CJK crawl translations.
+#
+# These are intentionally not consumed by generate_crawl_patch.py yet. The
+# current runtime table has no authored Hangul/Chinese tile assets, so emitting
+# these lines as tilemap bytes would render garbage. Use
+# scripts/audit_cjk_feasibility.py to inspect missing glyph coverage before
+# moving either language into the runtime crawl generator.
+
+schema = 1
+
+[source.ja]
+lines = [
+  "流星のごとく、地球に",
+  "降り立った5人の少年。",
+  "ガンダムを駆る彼らに",
+  "託された極秘司令は、",
+  "連合のMSの破壊及び、",
+  "任務遂行を妨げる",
+  "一切の排除であった。",
+  "少年たちは戦う、",
+  "平和と自由を勝ちとるために",
+]
+
+[pending.zh]
+name = "Chinese"
+status = "pending native 16x16 Chinese tile assets"
+lines = [
+  "如流星般降临地球的五名少年。",
+  "他们驾驶高达，",
+  "受命执行一项极机密任务：",
+  "摧毁联盟的MS，",
+  "并排除一切阻碍任务的人。",
+  "少年们为赢得和平与自由而战。",
+]
+
+[pending.ko]
+name = "Korean"
+status = "pending native 16x16 Hangul tile assets"
+lines = [
+  "유성처럼 지구에 내려선 다섯 소년.",
+  "건담을 모는 그들에게",
+  "극비 임무가 내려졌다.",
+  "연합의 MS를 파괴하고,",
+  "임무 수행을 방해하는 자를",
+  "모두 제거하라.",
+  "소년들은 평화와 자유를 얻기 위해 싸운다.",
+]

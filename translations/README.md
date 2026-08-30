@@ -9,7 +9,9 @@ image after boot and does not alter the user's ROM file.
 - `es`: Spanish reference patch data from Max1323.
 - `fr`, `it`, `pt`: native opening/fight crawl tilemap overlays and option-menu
   labels; other text falls back to English patch data.
-- `ko`, `zh`: selectable, currently fall back to English patch data.
+- `ko`, `zh`: selectable, currently fall back to English patch data. Draft
+  crawl translations live in `endless_duel_cjk_candidates.toml`, but they are
+  not emitted until native tile assets exist.
 
 The opening crawl is encoded as a 64-tile-wide BG tilemap strip. Each visible
 glyph uses a top tile entry and a bottom tile entry, with the bottom half stored
@@ -74,6 +76,16 @@ python scripts\audit_localization_coverage.py
 
 This reports runtime patch counts, patched byte counts, root fallback mappings,
 and per-language editable crawl/option entries.
+
+To audit the pending Korean and Chinese crawl drafts against the CJK/kana glyphs
+identified in the original Japanese crawl, run:
+
+```powershell
+python scripts\audit_cjk_feasibility.py
+```
+
+The current audit shows Korean needs authored Hangul tiles and the Chinese draft
+needs additional Chinese glyph tiles beyond the original Japanese crawl set.
 
 ## Visual QA Harness
 
