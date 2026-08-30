@@ -25,12 +25,16 @@
 /input.ini
 
 .DS_Store
+__pycache__/
 
 # Diagnostic capture bundles (snes_frame_capture.py / snes_asset_decode.py).
 # These embed VRAM/CGRAM dumps taken from a running game, i.e. data derived
 # from the ROM — the same reason src/gen is never committed. Regenerate them
 # locally; they are evidence, not source.
 /analysis/
+translations/reference_tiles/
+translations/reference_tiles_2bpp/
+translations/reference_tilemaps/
 analysis/oracle/scene.csv
 snes-diag.log
 snes-run.log

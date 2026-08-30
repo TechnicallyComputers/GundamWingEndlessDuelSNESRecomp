@@ -5,8 +5,6 @@ schema = 1
 default_lang = "en"
 fallback_fr = "en"
 fallback_it = "en"
-fallback_ko = "en"
-fallback_zh = "en"
 fallback_pt = "en"
 
 [[rom_patch]]
