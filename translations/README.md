@@ -55,10 +55,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate_localizatio
   -RomPath C:\path\to\gwedj.smc -Languages en,es,fr,it,pt,ko,zh
 ```
 
-The harness writes per-language screenshots, `xlate_stats.json`, and a
-`contact.html` sheet. It uses `set_controller` over the debug TCP port to skip
-through the intro, title, menu, and VS route, so spacing or tile corruption can
-be checked visually instead of inferred from patch counts.
+The harness writes per-language screenshots, `xlate_stats.json`, `contact.html`,
+and `contact.png` when `System.Drawing` is available. It uses `set_controller`
+over the debug TCP port to skip through the intro, title, menu, VS route, option
+menu, option value changes, and key-config route, so spacing or tile corruption
+can be checked visually instead of inferred from patch counts.
 
 For the scrolling opening/fight crawl specifically, capture fixed-time frames:
 

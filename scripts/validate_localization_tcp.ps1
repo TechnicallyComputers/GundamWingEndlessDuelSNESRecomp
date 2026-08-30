@@ -3,7 +3,8 @@ param(
     [string]$BuildDir = "build-local-xlate-trace",
     [string[]]$Languages = @("en", "es", "fr", "it", "pt", "ko", "zh"),
     [string]$OutDir = "",
-    [int]$BasePort = 4370
+    [int]$BasePort = 4370,
+    [switch]$SkipOptionScreens
 )
 
 $ErrorActionPreference = "Stop"
@@ -114,6 +115,68 @@ function Stop-Game($Proc) {
     }
 }
 
+function Add-ContactRow($Rows, [string]$Language, [string]$Step, [string]$RelativePath) {
+    $Rows.Add(('<tr><td>{0}</td><td>{1}</td><td><img src="{2}" width="512"></td></tr>' -f $Language, $Step, $RelativePath.Replace('\', '/'))) | Out-Null
+}
+
+function New-ContactPng([string]$Root, [string[]]$LanguageList) {
+    try {
+        Add-Type -AssemblyName System.Drawing
+    } catch {
+        return ""
+    }
+
+    $entries = New-Object System.Collections.Generic.List[object]
+    foreach ($lang in $LanguageList) {
+        $langDir = Join-Path $Root $lang
+        if (-not (Test-Path -LiteralPath $langDir)) {
+            continue
+        }
+        Get-ChildItem -LiteralPath $langDir -File -Filter "*.bmp" |
+            Sort-Object Name |
+            ForEach-Object {
+                $entries.Add([pscustomobject]@{
+                    Language = $lang.ToUpperInvariant()
+                    Name = $_.Name
+                    Path = $_.FullName
+                }) | Out-Null
+            }
+    }
+
+    if ($entries.Count -eq 0) {
+        return ""
+    }
+
+    $first = [System.Drawing.Bitmap]::new($entries[0].Path)
+    $w = $first.Width
+    $h = $first.Height
+    $labelH = 26
+    $cols = 3
+    $rows = [int][Math]::Ceiling($entries.Count / $cols)
+    $font = [System.Drawing.Font]::new("Segoe UI", 10)
+    $canvas = [System.Drawing.Bitmap]::new($w * $cols, ($h + $labelH) * $rows)
+    $g = [System.Drawing.Graphics]::FromImage($canvas)
+    $g.Clear([System.Drawing.Color]::FromArgb(17, 17, 17))
+
+    for ($i = 0; $i -lt $entries.Count; $i++) {
+        $bmp = [System.Drawing.Bitmap]::new($entries[$i].Path)
+        $x = ($i % $cols) * $w
+        $y = [Math]::Floor($i / $cols) * ($h + $labelH)
+        $label = "{0} {1}" -f $entries[$i].Language, $entries[$i].Name
+        $g.DrawString($label, $font, [System.Drawing.Brushes]::White, $x + 4, $y + 4)
+        $g.DrawImage($bmp, $x, $y + $labelH, $w, $h)
+        $bmp.Dispose()
+    }
+
+    $pngPath = Join-Path $Root "contact.png"
+    $g.Dispose()
+    $font.Dispose()
+    $first.Dispose()
+    $canvas.Save($pngPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    $canvas.Dispose()
+    return $pngPath
+}
+
 if (-not $RomPath) {
     throw "Pass -RomPath or set SNESRECOMP_ROM to an extracted .sfc/.smc ROM path."
 }
@@ -174,7 +237,7 @@ foreach ($lang in $Languages) {
             $shotPath = Join-Path $langDir $shot.Name
             Take-Shot $conn $shotPath
             $rel = Join-Path $lang $shot.Name
-            $rows.Add(('<tr><td>{0}</td><td>{1}</td><td><img src="{2}" width="512"></td></tr>' -f $lang, $shot.Name, $rel.Replace('\', '/'))) | Out-Null
+            Add-ContactRow $rows $lang $shot.Name $rel
         }
 
         $summary.Add(("{0}: ok, stats {1}" -f $lang, $statsPath)) | Out-Null
@@ -185,6 +248,54 @@ foreach ($lang in $Languages) {
             $conn.Client.Dispose()
         }
         Stop-Game $proc
+    }
+
+    if (-not $SkipOptionScreens) {
+        $optionProc = $null
+        $optionConn = $null
+        try {
+            Write-StateFile $statePath $lang
+            $optionProc = Start-Game $exePath $buildPath $romFull ($port + 1000)
+            $optionConn = Connect-Tcp ($port + 1000)
+            Start-Sleep -Milliseconds 2200
+            $optionStats = Invoke-TcpLine $optionConn "xlate_stats"
+            $optionStatsPath = Join-Path $langDir "option_xlate_stats.json"
+            $optionStats | Set-Content -LiteralPath $optionStatsPath -Encoding ascii
+
+            Tap-Button $optionConn "start" 150 3200
+            Tap-Button $optionConn "start" 150 900
+            Tap-Button $optionConn "a" 150 900
+            Tap-Button $optionConn "a" 150 1500
+            Tap-Button $optionConn "start" 150 2600
+            Tap-Button $optionConn "down" 150 300
+            Tap-Button $optionConn "down" 150 300
+            Tap-Button $optionConn "down" 150 500
+
+            $optionShots = @(
+                @{ Name = "09_option_selected.bmp"; Action = { Start-Sleep -Milliseconds 1 } },
+                @{ Name = "10_option_screen.bmp"; Action = { Tap-Button $optionConn "start" 150 900; Tap-Button $optionConn "a" 150 2500 } },
+                @{ Name = "11_option_level_right.bmp"; Action = { Tap-Button $optionConn "right" 150 900 } },
+                @{ Name = "12_option_controls_selected.bmp"; Action = { Tap-Button $optionConn "left" 150 900; Tap-Button $optionConn "down" 150 500; Tap-Button $optionConn "down" 150 500; Tap-Button $optionConn "down" 150 500 } },
+                @{ Name = "13_option_key_config.bmp"; Action = { Tap-Button $optionConn "start" 150 1800 } }
+            )
+
+            foreach ($shot in $optionShots) {
+                & $shot.Action
+                $shotPath = Join-Path $langDir $shot.Name
+                Take-Shot $optionConn $shotPath
+                $rel = Join-Path $lang $shot.Name
+                Add-ContactRow $rows $lang $shot.Name $rel
+            }
+
+            $summary.Add(("{0}: option route ok, stats {1}" -f $lang, $optionStatsPath)) | Out-Null
+        } finally {
+            if ($null -ne $optionConn) {
+                $optionConn.Reader.Dispose()
+                $optionConn.Writer.Dispose()
+                $optionConn.Client.Dispose()
+            }
+            Stop-Game $optionProc
+        }
     }
 }
 
@@ -216,5 +327,9 @@ $($rows -join "`n")
 "@ | Set-Content -LiteralPath $htmlPath -Encoding utf8
 
 $summary | Set-Content -LiteralPath (Join-Path $outFull "summary.txt") -Encoding ascii
+$pngPath = New-ContactPng $outFull $Languages
 Write-Host "Wrote TCP localization screenshots to $outFull"
 Write-Host "Open contact sheet: $htmlPath"
+if ($pngPath) {
+    Write-Host "PNG contact sheet: $pngPath"
+}
