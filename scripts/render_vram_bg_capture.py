@@ -34,9 +34,9 @@ def cgram_colors(cgram: bytes) -> list[tuple[int, int, int]]:
 
 
 def decode_4bpp_tile(vram: bytes, offset: int) -> list[list[int]]:
-    if offset < 0 or offset + 32 > len(vram):
+    if offset < 0:
         return [[0 for _ in range(8)] for _ in range(8)]
-    tile = vram[offset:offset + 32]
+    tile = bytes(vram[(offset + index) % len(vram)] for index in range(32))
     pixels = [[0 for _ in range(8)] for _ in range(8)]
     for y in range(8):
         p0 = tile[y * 2]
@@ -55,9 +55,9 @@ def decode_4bpp_tile(vram: bytes, offset: int) -> list[list[int]]:
 
 
 def decode_2bpp_tile(vram: bytes, offset: int) -> list[list[int]]:
-    if offset < 0 or offset + 16 > len(vram):
+    if offset < 0:
         return [[0 for _ in range(8)] for _ in range(8)]
-    tile = vram[offset:offset + 16]
+    tile = bytes(vram[(offset + index) % len(vram)] for index in range(16))
     pixels = [[0 for _ in range(8)] for _ in range(8)]
     for y in range(8):
         p0 = tile[y * 2]

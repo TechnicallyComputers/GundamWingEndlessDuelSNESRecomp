@@ -3,12 +3,17 @@
 `endless_duel.toml` is a runtime patch table. It patches the in-memory cartridge
 image after boot and does not alter the user's ROM file.
 
+The broader implementation pattern is documented in
+`docs/TRANSLATION_TILEMAP_REFERENCE.md`; this file is the Endless Duel-specific
+map of current assets, commands, and open surfaces.
+
 ## Current Coverage
 
 - `en`: English reference patch data from Aeon Genesis.
 - `es`: Spanish reference patch data from Max1323.
-- `fr`, `it`, `pt`: native opening/fight crawl tilemap overlays and option-menu
-  labels; other text falls back to English patch data.
+- `fr`, `it`, `pt`: native opening/fight crawl tilemap overlays, option-menu
+  labels, and decoded battle/ending dialogue tilemap rows. Remaining title/menu
+  graphics and still-undecoded reference spans fall back to English patch data.
 - `ko`, `zh`: not exposed in the launcher. Korean and Chinese crawl drafts live
   in `endless_duel_cjk_candidates.toml`, but they are research input only until
   native glyph assets exist and pass screenshot validation.
@@ -82,9 +87,12 @@ length does not match the source patch width.
 
 The battle and ending dialogue decoded from the English and Spanish IPS files
 lives in `endless_duel_dialogue.toml`, with a readable audit report in
-`reference_dialogue_decode.md`. These lines are tilemaps, not script text: each
-line is a 32-tile top row followed by a 32-tile bottom row, and each visible
-16px glyph is encoded as `top_tile` plus `top_tile + 0x10`.
+`reference_dialogue_decode.md`. The authored French, Italian, and Portuguese
+target strings live separately in `endless_duel_dialogue_targets.toml` so the
+decoder can be regenerated without overwriting human translation work. These
+lines are tilemaps, not script text: each line is a 32-tile top row followed by
+a 32-tile bottom row, and each visible 16px glyph is encoded as `top_tile` plus
+`top_tile + 0x10`.
 
 Regenerate the dialogue source and the language-gated runtime patch section
 after editing the decoder or adding `fr`, `it`, or `pt` strings:
@@ -106,10 +114,22 @@ currently report top/bottom tile mismatches, `0x017e00` and `0x027580`; treat
 them as visual-QA targets before using those rows as authoritative translation
 examples.
 
+To render dependency-free SVG contact sheets for the generated dialogue rows,
+run:
+
+```powershell
+python scripts\render_dialogue_previews.py
+```
+
+The preview renderer re-encodes each target string, decodes the generated tile
+row back through the recovered charmap, verifies the top/bottom glyph halves,
+and writes ignored review artifacts under `translations/dialogue_previews/`.
+
 To inspect native and fallback coverage across the generated table and the
 source-backed text files, run:
 
 ```powershell
+python scripts\check_localization.py
 python scripts\audit_localization_coverage.py
 ```
 
@@ -252,14 +272,25 @@ the exact PPU/VRAM/CGRAM/OAM state used to draw it:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\probe_title_menu_vram.ps1 `
-  -RomPath C:\path\to\gwedj.smc -Languages off,en,es,fr,it,pt
+  -RomPath C:\path\to\gwedj.smc -Languages off,en,es,fr,it,pt -Visible
 ```
 
 This probe uses TCP input to advance to the mode menu, then writes
 `mode_menu.bmp`, `ppu_state.json`, `vram.json`, `cgram.json`, `oam.json`, and a
-contact HTML sheet for each language. The current evidence shows the Japanese
-ROM already draws the visible `STORY MODE`, `VS. MODE`, `TRIAL MODE`, and
-`OPTION` labels in English using tilemap-backed 8x8 graphics; the existing
-English/Spanish reference patches and the French/Italian/Portuguese fallback
-path leave those label tiles byte-identical. Translating them further will need
-a dedicated menu-font/tile-asset pass, not only plain text replacement.
+contact HTML sheet for each language. Render the captured BG or OBJ layers with:
+
+```powershell
+python scripts\render_vram_bg_capture.py C:\path\to\capture\en --bg 1
+python scripts\render_oam_capture.py C:\path\to\capture\en
+```
+
+The current evidence shows the Japanese ROM already draws the visible
+`STORY MODE`, `VS. MODE`, `TRIAL MODE`, and `OPTION` labels in English. A
+2026-08-30 visible probe confirmed those labels are byte-identical across
+`off`, `en`, `es`, `fr`, `it`, and `pt`; the active runtime table does not touch
+this surface. On that capture the mode-menu screen is Mode 1, BG1 map base
+`0xd000`, BG2 map base `0xe000`, BG3 map base `0xf000`, BG1/BG2 tile base
+`0xc000`, and OBJ base `0x00000`. The selectable label area lines up with BG1
+map rows 17-22 and tile-art entries such as `0x3a70-0x3aaa`. Translating these
+labels further will need a dedicated menu-font/tile-asset pass, not only plain
+text replacement.

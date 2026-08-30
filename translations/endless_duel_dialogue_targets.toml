@@ -1,0 +1,663 @@
+# Authored target-language text for decoded dialogue tilemaps.
+# Regenerate runtime overlays with:
+#   python scripts/generate_dialogue_patch.py --write
+#
+# The current recovered dialogue font supports only A-Z, a-z, space, . , ' ? !
+# plus Spanish inverted punctuation. Keep FR/IT/PT text unaccented until a
+# replacement glyph sheet is added.
+
+schema = 1
+
+[[line]]
+address = 0x017000
+fr = "Tu es faible!"
+it = "Sei debole!"
+pt = "Voce e fraco!"
+
+[[line]]
+address = 0x017100
+fr = "Pourquoi insister ainsi!?"
+it = "Perche continui!?"
+pt = "Por que insiste assim!?"
+
+[[line]]
+address = 0x017200
+fr = "Nataku... Devenons"
+it = "Nataku... Diventiamo"
+pt = "Nataku... Vamos ficar"
+
+[[line]]
+address = 0x017280
+fr = "forts ensemble!"
+it = "forti insieme!"
+pt = "fortes juntos!"
+
+[[line]]
+address = 0x017300
+fr = "Qui hesite est perdu!"
+it = "Chi esita e perduto!"
+pt = "Quem hesita se perde!"
+
+[[line]]
+address = 0x017400
+fr = "Les faibles tomberont"
+it = "I deboli cadranno"
+pt = "Os fracos certamente"
+
+[[line]]
+address = 0x017480
+fr = "forcement au combat!"
+it = "sempre in battaglia!"
+pt = "cairao em batalha!"
+
+[[line]]
+address = 0x017500
+fr = "Je savais depuis le debut"
+it = "Lo sapevo fin dall'inizio"
+pt = "Eu sabia desde o comeco"
+
+[[line]]
+address = 0x017580
+fr = "que ca arriverait!"
+it = "che sarebbe successo!"
+pt = "que isso aconteceria!"
+
+[[line]]
+address = 0x017600
+fr = "J'avais raison?"
+it = "Avevo ragione?"
+pt = "Eu estava certo?"
+
+[[line]]
+address = 0x017680
+fr = "Montre moi, Nataku..."
+it = "Mostramelo, Nataku..."
+pt = "Mostre me, Nataku..."
+
+[[line]]
+address = 0x017700
+fr = "Que crois tu pouvoir"
+it = "Cosa pensi di poter"
+pt = "O que voce acha que"
+
+[[line]]
+address = 0x017780
+fr = "faire maintenant!?"
+it = "fare ora!?"
+pt = "pode fazer agora!?"
+
+[[line]]
+address = 0x017800
+fr = "On ne devrait pas se battre"
+it = "Non dovremmo combattere"
+pt = "Nao deviamos lutar"
+
+[[line]]
+address = 0x017880
+fr = "entre nous!"
+it = "tra noi!"
+pt = "entre nos!"
+
+[[line]]
+address = 0x017900
+fr = "Desole..."
+it = "Scusa..."
+pt = "Desculpe..."
+
+[[line]]
+address = 0x017a00
+fr = "Protegeons la colonie"
+it = "Proteggiamo la colonia"
+pt = "Vamos proteger a colonia"
+
+[[line]]
+address = 0x017a80
+fr = "ensemble!"
+it = "insieme!"
+pt = "juntos!"
+
+[[line]]
+address = 0x017b00
+fr = "C'est terrible! J'appelle"
+it = "E terribile! Chiamo"
+pt = "Isto e terrivel! Chamarei"
+
+[[line]]
+address = 0x017b80
+fr = "les secours!"
+it = "i soccorsi!"
+pt = "os medicos!"
+
+[[line]]
+address = 0x017c00
+fr = "Tu aurais du"
+it = "Avresti dovuto"
+pt = "Voce deveria ter"
+
+[[line]]
+address = 0x017c80
+fr = "te rendre..."
+it = "arrenderti..."
+pt = "se rendido..."
+
+[[line]]
+address = 0x017d00
+fr = "Je ne ferai plus d'erreur!"
+it = "Non faro piu errori!"
+pt = "Nao cometerei erros!"
+
+[[line]]
+address = 0x017e00
+fr = "Cette guerre semble"
+it = "Questa guerra sembra"
+pt = "Esta guerra parece"
+
+[[line]]
+address = 0x017e80
+fr = "ne jamais finir..."
+it = "non finire mai..."
+pt = "nunca acabar..."
+
+[[line]]
+address = 0x017f00
+fr = "Bien! C'etait plus facile"
+it = "Bene! Era piu facile"
+pt = "Certo! Foi mais facil"
+
+[[line]]
+address = 0x017f80
+fr = "que je ne le pensais!"
+it = "di quanto pensassi!"
+pt = "do que eu pensei!"
+
+[[line]]
+address = 0x026b00
+fr = "Cela n'a pas de sens."
+it = "Non ha senso."
+pt = "Isto nao faz sentido."
+
+[[line]]
+address = 0x026c00
+fr = "......"
+it = "......"
+pt = "......"
+
+[[line]]
+address = 0x026d00
+fr = "Nous sommes tous des"
+it = "Siamo tutti degli"
+pt = "Somos todos uns"
+
+[[line]]
+address = 0x026d80
+fr = "idiots incroyables..."
+it = "sciocchi incredibili..."
+pt = "tolos incriveis..."
+
+[[line]]
+address = 0x026e00
+fr = "Ton impatience est un"
+it = "La tua impazienza e un"
+pt = "Sua impaciencia e um"
+
+[[line]]
+address = 0x026e80
+fr = "defaut trop visible..."
+it = "difetto molto evidente..."
+pt = "defeito bem visivel..."
+
+[[line]]
+address = 0x026f00
+fr = "Il ne faut pas ceder."
+it = "Non devi arrenderti."
+pt = "Nao se deve desistir."
+
+[[line]]
+address = 0x027000
+fr = "Je suppose que c'est"
+it = "Suppongo che sia"
+pt = "Suponho que seja"
+
+[[line]]
+address = 0x027080
+fr = "tout ce que tu peux."
+it = "il meglio che puoi."
+pt = "o melhor que sabe."
+
+[[line]]
+address = 0x027100
+fr = "Desole, mais je n'ai pas"
+it = "Scusa, ma non ho"
+pt = "Desculpe, mas nao tenho"
+
+[[line]]
+address = 0x027180
+fr = "de temps pour ca."
+it = "tempo per questo."
+pt = "tempo para isso."
+
+[[line]]
+address = 0x027200
+fr = "Encore et encore,"
+it = "Ancora e ancora,"
+pt = "De novo e de novo,"
+
+[[line]]
+address = 0x027280
+fr = "c'est toujours pareil."
+it = "e sempre lo stesso."
+pt = "e sempre igual."
+
+[[line]]
+address = 0x027300
+fr = "Ouais! Bien!"
+it = "Si! Va bene!"
+pt = "Isso! Muito bem!"
+
+[[line]]
+address = 0x027400
+fr = "He! Je n'ai pas fini!"
+it = "Ehi, non ho finito!"
+pt = "Ei, ainda nao acabei!"
+
+[[line]]
+address = 0x027500
+fr = "He, c'etait amusant!"
+it = "Ehi, e stato divertente!"
+pt = "Ei, isso foi divertido!"
+
+[[line]]
+address = 0x027580
+fr = "Tu veux recommencer?"
+it = "Vuoi rifarlo?"
+pt = "Quer outra vez?"
+
+[[line]]
+address = 0x027600
+fr = "Tremble de peur!"
+it = "Trema di paura!"
+pt = "Trema de medo!"
+
+[[line]]
+address = 0x027700
+fr = "Coupe, tranche, tue tue tue!"
+it = "Taglia, affetta, uccidi!"
+pt = "Corta, fatia, mata mata!"
+
+[[line]]
+address = 0x027800
+fr = "Qui me voit doit mourir!"
+it = "Chi mi vede deve morire!"
+pt = "Quem me ve deve morrer!"
+
+[[line]]
+address = 0x027900
+fr = "Alors? Le chat a"
+it = "Che c'e? Il gatto ti"
+pt = "O que foi? O gato"
+
+[[line]]
+address = 0x027980
+fr = "pris ta langue? Ha."
+it = "ha preso la lingua? Ah."
+pt = "comeu sua lingua? Ha."
+
+[[line]]
+address = 0x027a00
+fr = "He, tu es bien faible,"
+it = "Eh, sei piuttosto debole,"
+pt = "He, voce e bem fraco,"
+
+[[line]]
+address = 0x027a80
+fr = "hein?"
+it = "eh?"
+pt = "hein?"
+
+[[line]]
+address = 0x03eb00
+fr = "Regarde avec ton coeur,"
+it = "Guarda col cuore, e"
+pt = "Veja com seu coracao, e"
+
+[[line]]
+address = 0x03eb80
+fr = "tout deviendra clair."
+it = "tutto sara chiaro."
+pt = "tudo ficara claro."
+
+[[line]]
+address = 0x03ec00
+fr = "Regarde avec ton coeur,"
+it = "Guarda col cuore, e"
+pt = "Veja com seu coracao, e"
+
+[[line]]
+address = 0x03ec80
+fr = "tout deviendra clair."
+it = "tutto sara chiaro."
+pt = "tudo ficara claro."
+
+[[line]]
+address = 0x03ed00
+fr = "Regarde avec ton coeur,"
+it = "Guarda col cuore, e"
+pt = "Veja com seu coracao, e"
+
+[[line]]
+address = 0x03ed80
+fr = "tout deviendra clair."
+it = "tutto sara chiaro."
+pt = "tudo ficara claro."
+
+[[line]]
+address = 0x03ee00
+fr = "Regarde avec ton coeur,"
+it = "Guarda col cuore, e"
+pt = "Veja com seu coracao, e"
+
+[[line]]
+address = 0x03ee80
+fr = "tout deviendra clair."
+it = "tutto sara chiaro."
+pt = "tudo ficara claro."
+
+[[line]]
+address = 0x03ef00
+fr = "Je ne chercherai plus"
+it = "Non inventero piu"
+pt = "Nao vou mais inventar"
+
+[[line]]
+address = 0x03ef80
+fr = "d'excuses!"
+it = "scuse!"
+pt = "desculpas!"
+
+[[line]]
+address = 0x03f000
+fr = "Je ne chercherai plus"
+it = "Non inventero piu"
+pt = "Nao vou mais inventar"
+
+[[line]]
+address = 0x03f080
+fr = "d'excuses!"
+it = "scuse!"
+pt = "desculpas!"
+
+[[line]]
+address = 0x03f100
+fr = "Je ne chercherai plus"
+it = "Non inventero piu"
+pt = "Nao vou mais inventar"
+
+[[line]]
+address = 0x03f180
+fr = "d'excuses!"
+it = "scuse!"
+pt = "desculpas!"
+
+[[line]]
+address = 0x03f200
+fr = "Je ne chercherai plus"
+it = "Non inventero piu"
+pt = "Nao vou mais inventar"
+
+[[line]]
+address = 0x03f280
+fr = "d'excuses!"
+it = "scuse!"
+pt = "desculpas!"
+
+[[line]]
+address = 0x03f300
+fr = "Alors, mon Epyon a ete"
+it = "Dunque, il mio Epyon e"
+pt = "Entao, meu Epyon foi"
+
+[[line]]
+address = 0x03f380
+fr = "vaincu."
+it = "stato battuto."
+pt = "vencido."
+
+[[line]]
+address = 0x03f400
+fr = "Chacun a sans doute"
+it = "Suppongo che tutti abbiano"
+pt = "Suponho que todos tem"
+
+[[line]]
+address = 0x03f480
+fr = "un style different..."
+it = "uno stile diverso..."
+pt = "um estilo diferente..."
+
+[[line]]
+address = 0x03f500
+fr = "A part ca, tu as"
+it = "A parte cio, hai"
+pt = "Fora isso, voce"
+
+[[line]]
+address = 0x03f580
+fr = "depasse mes attentes."
+it = "superato le mie attese."
+pt = "superou minhas expectativas."
+
+[[line]]
+address = 0x03f600
+fr = "La guerre... est finie, tu"
+it = "La guerra... e finita,"
+pt = "A guerra... acabou,"
+
+[[line]]
+address = 0x03f680
+fr = "demandes?"
+it = "chiedi?"
+pt = "voce pergunta?"
+
+[[line]]
+address = 0x03f700
+fr = "Non. L'humanite survit."
+it = "No. L'umanita prospera."
+pt = "Nao. A humanidade prospera."
+
+[[line]]
+address = 0x03f800
+fr = "Tu devras sans doute"
+it = "Probabilmente dovrai"
+pt = "Voce provavelmente tera"
+
+[[line]]
+address = 0x03f880
+fr = "continuer a combattre..."
+it = "continuare a lottare..."
+pt = "que continuar lutando..."
+
+[[line]]
+address = 0x03f900
+fr = "Tout ca parce que..."
+it = "Tutto perche..."
+pt = "Tudo porque..."
+
+[[line]]
+address = 0x03fa00
+fr = "Cette guerre..."
+it = "Questa guerra..."
+pt = "Esta guerra..."
+
+[[line]]
+address = 0x03fa80
+fr = "  C'est un duel sans fin..."
+it = "  E un duello senza fine..."
+pt = "  E um duelo sem fim..."
+
+[[line]]
+address = 0x05e000
+fr = "Toute la mission est"
+it = "L'intera missione e"
+pt = "Toda a missao esta"
+
+[[line]]
+address = 0x05e080
+fr = "enfin terminee..."
+it = "finalmente completa..."
+pt = "finalmente completa..."
+
+[[line]]
+address = 0x05e100
+fr = "Apres tout ca, pourrai je"
+it = "Dopo tutto, potro ancora"
+pt = "Depois de tudo, ainda vou"
+
+[[line]]
+address = 0x05e180
+fr = "encore me battre...?"
+it = "combattere ancora...?"
+pt = "poder lutar...?"
+
+[[line]]
+address = 0x05e200
+fr = "Ouf! C'etait vraiment"
+it = "Uff! E stato davvero"
+pt = "Ufa! Isso foi bem"
+
+[[line]]
+address = 0x05e280
+fr = "dur, hein Deathscythe?"
+it = "duro, eh Deathscythe?"
+pt = "dificil, hein Deathscythe?"
+
+[[line]]
+address = 0x05e300
+fr = "Tu les as bien demolis!"
+it = "Li hai proprio distrutti!"
+pt = "Voce acabou com eles!"
+
+[[line]]
+address = 0x05e400
+fr = "Le combat etait triste, mais"
+it = "La battaglia era triste, ma"
+pt = "A batalha foi triste, mas"
+
+[[line]]
+address = 0x05e480
+fr = "j'ai des gens a proteger."
+it = "ho gente da proteggere."
+pt = "tenho gente a proteger."
+
+[[line]]
+address = 0x05e500
+fr = "Certains continueront"
+it = "Alcuni continueranno"
+pt = "Alguns vao continuar"
+
+[[line]]
+address = 0x05e580
+fr = "a combattre..."
+it = "a lottare..."
+pt = "a lutar..."
+
+[[line]]
+address = 0x05e600
+fr = "Pere... J'ai reussi!"
+it = "Padre... Ce l'ho fatta!"
+pt = "Pai... Eu consegui!"
+
+[[line]]
+address = 0x05e700
+fr = "Grace a mes efforts, la paix"
+it = "Grazie ai miei sforzi,"
+pt = "Gracas aos meus esforcos, a"
+
+[[line]]
+address = 0x05e780
+fr = "revint aux colonies!"
+it = "pace torna alle colonie!"
+pt = "paz voltou as colonias!"
+
+[[line]]
+address = 0x05e800
+fr = "Cela signifie la fin de"
+it = "Questo significa la fine"
+pt = "Isto significa o fim da"
+
+[[line]]
+address = 0x05e880
+fr = "la guerre. J'avais raison."
+it = "della guerra. Avevo ragione."
+pt = "guerra. Eu estava certo."
+
+[[line]]
+address = 0x05e900
+fr = "N'est ce pas, Nataku..."
+it = "Non e cosi, Nataku..."
+pt = "Nao e assim, Nataku..."
+
+[[line]]
+address = 0x05ea00
+fr = "J'ai vraiment eu du mal"
+it = "Ho avuto molti problemi"
+pt = "Eu tive alguns problemas"
+
+[[line]]
+address = 0x05ea80
+fr = "a gerer certaines choses..."
+it = "a gestire alcune cose..."
+pt = "para lidar com coisas..."
+
+[[line]]
+address = 0x05eb00
+fr = "Alors j'ai cesse de montrer"
+it = "Cosi smisi di mostrare"
+pt = "Entao parei de mostrar"
+
+[[line]]
+address = 0x05eb80
+fr = "mes emotions a Relena."
+it = "emozioni con Relena."
+pt = "quando Relena zangou."
+
+[[line]]
+address = 0x05ec00
+fr = "Duc Treize! Mobile ennemi"
+it = "Duca Treize! Mobile nemico"
+pt = "Duque Treize! Mobile inimigo"
+
+[[line]]
+address = 0x05ec80
+fr = "neutralise!"
+it = "neutralizzato!"
+pt = "neutralizado!"
+
+[[line]]
+address = 0x05ed00
+fr = "Hein? Ce suit a ete fait"
+it = "Eh? Quel suit fu fatto"
+pt = "Huh? Esse suit foi feito"
+
+[[line]]
+address = 0x05ed80
+fr = "par le Duc Treize..."
+it = "dal Duca Treize..."
+pt = "pelo Duque Treize..."
+
+[[line]]
+address = 0x05ee00
+fr = "Nous avons gagne la paix"
+it = "Abbiamo ottenuto la pace"
+pt = "Alcancamos a paz"
+
+[[line]]
+address = 0x05ee80
+fr = "en faisant la guerre..."
+it = "facendo una guerra..."
+pt = "lutando numa guerra..."
+
+[[line]]
+address = 0x05ef00
+fr = "Quelle ironie..."
+it = "Che ironia..."
+pt = "Que ironico..."

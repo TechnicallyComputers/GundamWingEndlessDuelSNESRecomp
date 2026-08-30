@@ -3,7 +3,8 @@ param(
     [string]$BuildDir = "build-local-xlate-trace",
     [string[]]$Languages = @("off", "en", "es", "fr", "it", "pt"),
     [string]$OutDir = "",
-    [int]$BasePort = 4870
+    [int]$BasePort = 4870,
+    [switch]$Visible
 )
 
 $ErrorActionPreference = "Stop"
@@ -59,14 +60,16 @@ language = "$Language"
 "@ | Set-Content -LiteralPath $StatePath -NoNewline -Encoding ascii
 }
 
-function Start-Game([string]$ExePath, [string]$WorkDir, [string]$Rom, [int]$Port) {
+function Start-Game([string]$ExePath, [string]$WorkDir, [string]$Rom, [int]$Port, [bool]$ShowWindow) {
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = $ExePath
     $psi.WorkingDirectory = $WorkDir
     $psi.UseShellExecute = $false
-    $psi.CreateNoWindow = $true
+    $psi.CreateNoWindow = -not $ShowWindow
     $psi.Arguments = ('--no-launcher "{0}"' -f $Rom.Replace('"', '\"'))
-    $psi.Environment["SDL_VIDEODRIVER"] = "dummy"
+    if (-not $ShowWindow) {
+        $psi.Environment["SDL_VIDEODRIVER"] = "dummy"
+    }
     $psi.Environment["SDL_AUDIODRIVER"] = "dummy"
     $psi.Environment["SNESRECOMP_DEBUG_PORT"] = [string]$Port
     return [System.Diagnostics.Process]::Start($psi)
@@ -178,7 +181,7 @@ foreach ($lang in $Languages) {
     $proc = $null
     $conn = $null
     try {
-        $proc = Start-Game $exePath $buildPath $romFull $port
+        $proc = Start-Game $exePath $buildPath $romFull $port ([bool]$Visible)
         $conn = Connect-Tcp $port
         Start-Sleep -Milliseconds 2200
         Tap-Button $conn "start" 150 3200

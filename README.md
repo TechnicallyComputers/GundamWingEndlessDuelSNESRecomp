@@ -94,6 +94,8 @@ BIOS/ROM/save plumbing so you are not stuck repeating each game’s wizard by ha
 | `src/` | Host code you own: `main.c`, `game_rtl.c`, `codegen_setup.c` |
 | `src/gen/` | Generated C. Never committed — regenerate locally |
 | `snesrecomp/` | Framework submodule (owns `lib/recomp-net`, `lib/retcomm-rbengine`) |
+| `translations/` | Runtime localization tables and Endless Duel-specific source data |
+| `docs/TRANSLATION_TILEMAP_REFERENCE.md` | Reference workflow for runtime translations, tilemaps, and visual QA |
 | `tools/` | `regen.sh` — the ROM → C pipeline |
 | `scripts/` | `package_release.sh` — player-facing zip |
 | `framework_pins.txt` | Exact framework commits this project was scaffolded against |

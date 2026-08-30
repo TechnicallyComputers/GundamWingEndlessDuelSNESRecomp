@@ -64,7 +64,26 @@ def encode_line(source_hex: str, start_col: int, text: str) -> str:
     return source.hex()
 
 
-def generated_blocks(dialogue: dict) -> list[str]:
+def load_targets(path: Path) -> dict[int, dict[str, str]]:
+    if not path.is_file():
+        return {}
+    data = load_toml(path)
+    targets: dict[int, dict[str, str]] = {}
+    for index, entry in enumerate(data.get("line", []), 1):
+        address = int(entry["address"])
+        if address in targets:
+            raise ValueError(f"target line {index}: duplicate address 0x{address:06x}")
+        values = {
+            lang: str(entry[lang])
+            for lang in TARGET_LANGS
+            if lang in entry and str(entry[lang])
+        }
+        if values:
+            targets[address] = values
+    return targets
+
+
+def generated_blocks(dialogue: dict, targets: dict[int, dict[str, str]]) -> list[str]:
     blocks = [BEGIN_MARKER]
     count = 0
     for index, entry in enumerate(dialogue.get("line", []), 1):
@@ -73,7 +92,7 @@ def generated_blocks(dialogue: dict) -> list[str]:
         source_hex = entry["en_hex"]
         values = {}
         for lang in TARGET_LANGS:
-            text = entry.get(lang)
+            text = targets.get(address, {}).get(lang, entry.get(lang))
             if not text:
                 continue
             values[lang] = encode_line(source_hex, start_col, text)
@@ -113,13 +132,24 @@ def main() -> int:
         "--table",
         default=str(root / "translations" / "endless_duel.toml"),
     )
+    parser.add_argument(
+        "--targets",
+        default=str(root / "translations" / "endless_duel_dialogue_targets.toml"),
+        help="authored target-language dialogue text table",
+    )
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args()
 
     source_path = Path(args.source)
     table_path = Path(args.table)
     dialogue = load_toml(source_path)
-    generated = "\n".join(generated_blocks(dialogue))
+    targets = load_targets(Path(args.targets))
+    decoded_addresses = {int(entry["address"]) for entry in dialogue.get("line", [])}
+    unknown_targets = sorted(set(targets) - decoded_addresses)
+    if unknown_targets:
+        formatted = ", ".join(f"0x{address:06x}" for address in unknown_targets)
+        raise ValueError(f"target dialogue address not present in decoded source: {formatted}")
+    generated = "\n".join(generated_blocks(dialogue, targets))
     table_text = table_path.read_text(encoding="utf-8")
     updated = replace_generated_section(table_text, generated)
 

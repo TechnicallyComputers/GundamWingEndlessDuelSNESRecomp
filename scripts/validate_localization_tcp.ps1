@@ -4,7 +4,8 @@ param(
     [string[]]$Languages = @("en", "es", "fr", "it", "pt"),
     [string]$OutDir = "",
     [int]$BasePort = 4370,
-    [switch]$SkipOptionScreens
+    [switch]$SkipOptionScreens,
+    [switch]$Visible
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,14 +43,16 @@ language = "$Language"
 "@ | Set-Content -LiteralPath $StatePath -NoNewline -Encoding ascii
 }
 
-function Start-Game([string]$ExePath, [string]$WorkDir, [string]$Rom, [int]$Port) {
+function Start-Game([string]$ExePath, [string]$WorkDir, [string]$Rom, [int]$Port, [bool]$ShowWindow) {
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = $ExePath
     $psi.WorkingDirectory = $WorkDir
     $psi.UseShellExecute = $false
-    $psi.CreateNoWindow = $true
+    $psi.CreateNoWindow = -not $ShowWindow
     $psi.Arguments = ('--no-launcher "{0}"' -f $Rom.Replace('"', '\"'))
-    $psi.Environment["SDL_VIDEODRIVER"] = "dummy"
+    if (-not $ShowWindow) {
+        $psi.Environment["SDL_VIDEODRIVER"] = "dummy"
+    }
     $psi.Environment["SDL_AUDIODRIVER"] = "dummy"
     $psi.Environment["SNESRECOMP_DEBUG_PORT"] = [string]$Port
     return [System.Diagnostics.Process]::Start($psi)
@@ -213,7 +216,7 @@ foreach ($lang in $Languages) {
     $proc = $null
     $conn = $null
     try {
-        $proc = Start-Game $exePath $buildPath $romFull $port
+        $proc = Start-Game $exePath $buildPath $romFull $port ([bool]$Visible)
         $conn = Connect-Tcp $port
         Start-Sleep -Milliseconds 2200
         $stats = Invoke-TcpLine $conn "xlate_stats"
@@ -255,7 +258,7 @@ foreach ($lang in $Languages) {
         $optionConn = $null
         try {
             Write-StateFile $statePath $lang
-            $optionProc = Start-Game $exePath $buildPath $romFull ($port + 1000)
+            $optionProc = Start-Game $exePath $buildPath $romFull ($port + 1000) ([bool]$Visible)
             $optionConn = Connect-Tcp ($port + 1000)
             Start-Sleep -Milliseconds 2200
             $optionStats = Invoke-TcpLine $optionConn "xlate_stats"

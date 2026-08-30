@@ -66,6 +66,15 @@ def crawl_langs(source: dict) -> dict[str, int]:
     return result
 
 
+def dialogue_langs(source: dict) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for entry in source.get("line", []):
+        for lang in LANGS:
+            if lang in entry and str(entry[lang]):
+                counts[lang] += 1
+    return counts
+
+
 def main() -> int:
     root = repo_root()
     parser = argparse.ArgumentParser()
@@ -83,6 +92,11 @@ def main() -> int:
         "--options",
         default=str(root / "translations" / "endless_duel_options.toml"),
         help="source-backed option text table",
+    )
+    parser.add_argument(
+        "--dialogue-targets",
+        default=str(root / "translations" / "endless_duel_dialogue_targets.toml"),
+        help="source-backed dialogue target-language text table",
     )
     args = parser.parse_args()
 
@@ -109,8 +123,10 @@ def main() -> int:
 
     option_source = load_toml(Path(args.options))
     crawl_source = load_toml(Path(args.crawl))
+    dialogue_source = load_toml(Path(args.dialogue_targets))
     option_counts = text_patch_langs(option_source)
     crawl_counts = crawl_langs(crawl_source)
+    dialogue_counts = dialogue_langs(dialogue_source)
 
     print("Endless Duel localization coverage")
     print(f"  default_lang: {table.get('default_lang', 'en')}")
@@ -134,7 +150,8 @@ def main() -> int:
     for lang in LANGS:
         print(
             f"  {lang}: option_entries={option_counts[lang]} "
-            f"crawl_lines={crawl_counts.get(lang, 0)}"
+            f"crawl_lines={crawl_counts.get(lang, 0)} "
+            f"dialogue_lines={dialogue_counts[lang]}"
         )
     print()
     print("Language status:")
