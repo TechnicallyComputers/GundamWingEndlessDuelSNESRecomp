@@ -33,8 +33,9 @@ game uploads to VRAM. Do not add native overlay bytes without screenshot
 validation; arbitrary Latin letter codes can render as unrelated pixels in that
 layer.
 
-The current native Latin crawl text lives in `endless_duel_crawl.toml`. Run the
-generator after editing those lines:
+The current Latin crawl text for English, Spanish, French, Italian, and
+Portuguese lives in `endless_duel_crawl.toml`. Run the generator after editing
+those lines:
 
 ```powershell
 python scripts\generate_crawl_patch.py --write

@@ -31,8 +31,17 @@ def validate_hex_word(value: str, label: str) -> str:
 def generate_language_hex(source: dict, lang: str) -> str:
     row_width = int(source["row_width"])
     rows = int(source["rows"])
-    slots = source["line_slot"]
-    lines = source["languages"][lang]["lines"]
+    lang_data = source["languages"][lang]
+    slots = [dict(slot) for slot in source["line_slot"]]
+    lines = lang_data["lines"]
+    for override in lang_data.get("line_slot", []):
+        line_index = int(override["line"]) - 1
+        if line_index < 0 or line_index >= len(slots):
+            raise ValueError(f"{lang}: line slot override {line_index + 1} is outside the slot table")
+        slots[line_index] = {
+            "top": override["top"],
+            "bottom": override["bottom"],
+        }
     if len(lines) != len(slots):
         raise ValueError(f"{lang}: expected {len(slots)} lines, got {len(lines)}")
 
@@ -64,6 +73,20 @@ def generate_language_hex(source: dict, lang: str) -> str:
             top, bottom = glyphs[char]
             grid[top_row][top_col + i] = top
             grid[bottom_row][bottom_col + i] = bottom
+
+    for raw in lang_data.get("raw_tile", []):
+        row = int(raw["row"])
+        col = int(raw["col"])
+        values = [validate_hex_word(value, f"{lang} raw tile") for value in raw["hex"]]
+        if row < 0 or row >= rows:
+            raise ValueError(f"{lang} raw tile row {row} outside 0..{rows - 1}")
+        if col < 0 or col + len(values) > row_width:
+            raise ValueError(
+                f"{lang} raw tile column {col} plus {len(values)} entries "
+                f"exceeds row width {row_width}"
+            )
+        for i, value in enumerate(values):
+            grid[row][col + i] = value
 
     return "".join(entry for row in grid for entry in row)
 
