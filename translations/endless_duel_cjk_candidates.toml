@@ -33,15 +33,29 @@ lines = [
   "少年们为赢得和平与自由而战。",
 ]
 
+[prototype.zh_compact]
+name = "Chinese compact"
+status = "candidate for compact 16x16 authored glyph tiles"
+lines = [
+  "五名少年如流星降临地球",
+  "驾驶高达执行极密任务",
+  "摧毁联盟",
+  "排除阻碍任务之人",
+  "为和平自由而战",
+]
+
 [pending.ko]
 name = "Korean"
-status = "pending native 16x16 Hangul tile assets"
+status = "candidate for authored 16x16 Hangul crawl tiles"
 lines = [
-  "유성처럼 지구에 내려선 다섯 소년.",
-  "건담을 모는 그들에게",
-  "극비 임무가 내려졌다.",
-  "연합의 MS를 파괴하고,",
-  "임무 수행을 방해하는 자를",
-  "모두 제거하라.",
-  "소년들은 평화와 자유를 얻기 위해 싸운다.",
+  "다섯 소년",
+  "유성처럼 지구로",
+  "건담에 올라",
+  "극비 임무를",
+  "수행한다",
+  "연합을 파괴",
+  "방해자는",
+  "모두 제거",
+  "평화와 자유를",
+  "위해 싸운다",
 ]

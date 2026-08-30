@@ -9,7 +9,7 @@ import tomllib
 from pathlib import Path
 
 
-IGNORED = set(" \t\r\n。、，：:.,'\"-MS5")
+IGNORED = set(" \t\r\n\u3002\u3001\uff0c\uff1a:.,'\"-MS5")
 
 
 def repo_root() -> Path:
@@ -65,21 +65,31 @@ def main() -> int:
     print(f"  available original-crawl CJK/kana glyphs: {len(available)}")
     print(f"  available: {''.join(sorted(available))}")
 
-    for lang, entry in sorted(source.get("pending", {}).items()):
-        chars = meaningful_chars(entry["lines"])
-        missing = chars - available
-        reusable = chars & available
-        hangul = {char for char in chars if is_hangul(char)}
+    groups = (
+        ("pending", "Pending drafts"),
+        ("prototype", "Runtime prototypes"),
+    )
+    for group, heading in groups:
+        entries = source.get(group, {})
+        if not entries:
+            continue
         print()
-        print(f"{lang}: {entry.get('name', lang)}")
-        print(f"  status: {entry.get('status', 'pending')}")
-        print(f"  unique non-ASCII text glyphs: {len(chars)}")
-        print(f"  reusable from original crawl: {len(reusable)}")
-        print(f"  missing/new asset glyphs: {len(missing)}")
-        if missing:
-            print(f"  missing: {''.join(sorted(missing))}")
-        if hangul:
-            print(f"  hangul glyphs needing authored tiles: {''.join(sorted(hangul))}")
+        print(heading)
+        for lang, entry in sorted(entries.items()):
+            chars = meaningful_chars(entry["lines"])
+            missing = chars - available
+            reusable = chars & available
+            hangul = {char for char in chars if is_hangul(char)}
+            print()
+            print(f"{lang}: {entry.get('name', lang)}")
+            print(f"  status: {entry.get('status', group)}")
+            print(f"  unique non-ASCII text glyphs: {len(chars)}")
+            print(f"  reusable from original crawl: {len(reusable)}")
+            print(f"  missing/new asset glyphs: {len(missing)}")
+            if missing:
+                print(f"  missing: {''.join(sorted(missing))}")
+            if hangul:
+                print(f"  hangul glyphs needing authored tiles: {''.join(sorted(hangul))}")
 
     return 0
 

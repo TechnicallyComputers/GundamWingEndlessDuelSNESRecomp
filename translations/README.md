@@ -9,9 +9,10 @@ image after boot and does not alter the user's ROM file.
 - `es`: Spanish reference patch data from Max1323.
 - `fr`, `it`, `pt`: native opening/fight crawl tilemap overlays and option-menu
   labels; other text falls back to English patch data.
-- `ko`, `zh`: selectable, currently fall back to English patch data. Draft
-  crawl translations live in `endless_duel_cjk_candidates.toml`, but they are
-  not emitted until native tile assets exist.
+- `ko`, `zh`: selectable, currently fall back to English patch data. Korean
+  and Chinese crawl translations live in `endless_duel_cjk_candidates.toml`,
+  but they are not emitted into the runtime table until their tile assets pass
+  screenshot validation.
 
 The opening crawl is encoded as a 64-tile-wide BG tilemap strip. Each visible
 glyph uses a top tile entry and a bottom tile entry, with the bottom half stored
@@ -20,6 +21,13 @@ Latin glyph set recovered from the English and Spanish references; the supported
 set is intentionally limited and avoids accents, `x`, and CJK glyphs until new
 font/tile assets are added. Korean and Chinese therefore still need native CJK
 assets before readable non-fallback text can be rendered safely.
+
+`scripts/generate_cjk_glyph_tiles.ps1` and
+`scripts/generate_cjk_crawl_patch.py` are experimental helpers for producing
+language-gated CJK crawl tile patches from authored candidate text. A 2026-08-30
+TCP validation pass confirmed the generated VRAM patches applied, but the
+Chinese/Korean crawl was visually unreadable in-game, so those patches are not
+checked into `endless_duel.toml` as active runtime data.
 
 ## Adding Native Language Data
 
@@ -84,8 +92,10 @@ identified in the original Japanese crawl, run:
 python scripts\audit_cjk_feasibility.py
 ```
 
-The current audit shows Korean needs authored Hangul tiles and the Chinese draft
-needs additional Chinese glyph tiles beyond the original Japanese crawl set.
+The audit reports both pending drafts and any runtime prototype text. Korean
+needs authored Hangul tiles; the full Chinese draft needs additional Chinese
+glyph tiles beyond the original Japanese crawl set; the compact Chinese
+prototype still needs a visually acceptable tile-art pass before it can ship.
 
 ## Visual QA Harness
 
