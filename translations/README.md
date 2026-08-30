@@ -11,12 +11,12 @@ image after boot and does not alter the user's ROM file.
 - `ko`, `zh`: selectable, currently fall back to English patch data.
 
 French, Italian, Portuguese, Korean, and Chinese need new glyph/tile work before
-native text can be rendered safely. The visible opening crawl is built from
-paired tile rows and patch-specific glyph art, not a complete reusable alphabet;
-runtime experiments with direct Latin tile codes produced corrupted glyphs in
-screenshots. The current table can encode text through `[[glyph]]` mappings, but
-this project does not yet contain the font sheet/table entries needed for these
-languages.
+native text can be rendered safely. Live VRAM captures of the visible opening
+crawl show that its bytes are rendered tile/bitmap data, not reusable character
+IDs. Runtime experiments with direct Latin byte substitutions produced corrupted
+glyphs in screenshots. The current table can encode text through `[[glyph]]`
+mappings, but this project does not yet contain the tile/bitmap encoder or font
+assets needed for these languages.
 
 ## Adding Native Language Data
 
@@ -27,6 +27,7 @@ The runtime tries the selected language first and then follows the root-level
 fallback one patch at a time.
 
 For tile-art text such as the opening crawl, first add or identify a complete
-glyph sheet for the target language, then encode both tile rows for each visible
-line. Do not add native overlay bytes without screenshot validation; arbitrary
-Latin letter codes can render as unrelated tiles in that layer.
+glyph sheet for the target language, then generate the same tile/bitmap format
+the game uploads to VRAM. Do not add native overlay bytes without screenshot
+validation; arbitrary Latin letter codes can render as unrelated pixels in that
+layer.
