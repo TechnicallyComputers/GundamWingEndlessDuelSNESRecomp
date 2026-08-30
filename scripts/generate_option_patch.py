@@ -10,7 +10,7 @@ import tomllib
 from pathlib import Path
 
 
-LANGS = ("en", "es", "fr", "it", "pt", "ko", "zh")
+LANGS = ("en", "es", "fr", "it", "pt")
 
 
 def repo_root() -> Path:

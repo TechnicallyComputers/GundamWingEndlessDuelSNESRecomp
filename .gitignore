@@ -35,6 +35,8 @@ __pycache__/
 translations/reference_tiles/
 translations/reference_tiles_2bpp/
 translations/reference_tilemaps/
+translations/reference_glyph_candidates/
+translations/reference_vram_tiles/
 analysis/oracle/scene.csv
 snes-diag.log
 snes-run.log

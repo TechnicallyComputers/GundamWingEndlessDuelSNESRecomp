@@ -9,6 +9,14 @@ The categories are a reverse-engineering worklist, not final truth. Anything
 marked tilemap/graphics still needs screenshot validation after it becomes a
 runtime patch.
 
+Follow-up decoding has confirmed the four `likely_tilemap_or_tile_text_layout`
+ranges below are 32-column, two-row dialogue tilemaps. The decoded source table
+is `translations/endless_duel_dialogue.toml`, and the readable audit is
+`translations/reference_dialogue_decode.md`. The large graphics ranges remain
+tile-art/font work: `0x015400-0x016843` contains title/logo and menu label
+tiles, `0x006f00-0x007eff` contains mixed text-like font tiles and other art,
+and `0x00e000-0x00ffff` contains larger UI/character tile art.
+
 ## Patch Inputs
 
 - English IPS records: 3091

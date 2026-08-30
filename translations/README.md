@@ -9,10 +9,9 @@ image after boot and does not alter the user's ROM file.
 - `es`: Spanish reference patch data from Max1323.
 - `fr`, `it`, `pt`: native opening/fight crawl tilemap overlays and option-menu
   labels; other text falls back to English patch data.
-- `ko`, `zh`: not exposed in the launcher yet. Korean and Chinese crawl
-  translations live in `endless_duel_cjk_candidates.toml`, but they are not
-  emitted into the runtime table until their tile assets pass screenshot
-  validation.
+- `ko`, `zh`: not exposed in the launcher. Korean and Chinese crawl drafts live
+  in `endless_duel_cjk_candidates.toml`, but they are research input only until
+  native glyph assets exist and pass screenshot validation.
 
 English and Spanish are broader because they were imported from existing full
 fan-translation ROM hacks as binary reference diffs. The runtime table applies
@@ -81,6 +80,32 @@ python scripts\generate_option_patch.py --check
 The option generator fails on non-ASCII text or any translation whose byte
 length does not match the source patch width.
 
+The battle and ending dialogue decoded from the English and Spanish IPS files
+lives in `endless_duel_dialogue.toml`, with a readable audit report in
+`reference_dialogue_decode.md`. These lines are tilemaps, not script text: each
+line is a 32-tile top row followed by a 32-tile bottom row, and each visible
+16px glyph is encoded as `top_tile` plus `top_tile + 0x10`.
+
+Regenerate the dialogue source and the language-gated runtime patch section
+after editing the decoder or adding `fr`, `it`, or `pt` strings:
+
+```powershell
+python scripts\decode_reference_tilemaps.py `
+  --en-ips C:\path\to\GUNDAM-W.IPS `
+  --es-ips C:\path\to\Shin Kidou Senki Gundam W - Endless Duel v1.0 (S).ips `
+  --write --allow-mismatch
+python scripts\generate_dialogue_patch.py --write
+python scripts\generate_dialogue_patch.py
+```
+
+The dialogue generator currently supports the recovered Latin tile set:
+`A-Z`, `a-z`, space, `.`, `,`, `'`, `?`, `!`, inverted question mark, and
+inverted exclamation mark. It intentionally fails on unsupported glyphs rather
+than emitting bytes that would draw unrelated tiles. Two Spanish reference rows
+currently report top/bottom tile mismatches, `0x017e00` and `0x027580`; treat
+them as visual-QA targets before using those rows as authoritative translation
+examples.
+
 To inspect native and fallback coverage across the generated table and the
 source-backed text files, run:
 
@@ -134,6 +159,44 @@ python scripts\render_snes_4bpp_tiles.py `
 
 That emits local BMP tile sheets under `translations/reference_tiles/`. The
 files are ignored by Git because they are derived from patched ROM bytes.
+
+To render captured PPU/VRAM/CGRAM bundles back into per-BG screenshots without
+relaunching the game, use:
+
+```powershell
+python scripts\render_vram_bg_capture.py C:\path\to\capture\es --bg 1
+python scripts\render_vram_bg_capture.py C:\path\to\capture\es --bg 2
+python scripts\render_vram_bg_capture.py C:\path\to\capture\es --bg 3
+```
+
+This confirmed the title/menu capture uses Mode 1, BG1 map base `0xd000`, BG2
+map base `0xe000`, BG3 map base `0xf000`, and BG1/BG2 tile base `0xc000`.
+The menu/title labels are therefore tile art uploaded to VRAM, not plain ASCII
+strings. Replacing them for languages beyond the existing reference patches
+requires an asset path: author replacement tiles, map each glyph to tile IDs,
+then patch the ROM-backed upload data or a language-gated VRAM upload at
+runtime.
+
+## External Reverse-Engineering Context
+
+The public reference pages are useful context, but not precise enough to drive
+runtime patching alone:
+
+- Aeon Genesis project page:
+  `https://aeongenesis.net/projects/gwed`
+- English reference patch page:
+  `https://www.romhacking.net/translations/570/`
+- Spanish reference patch page:
+  `https://www.romhacking.net/translations/4023/`
+
+Aeon Genesis notes that the translation was easy only after the game-specific
+hacking method was understood. The recovered IPS bytes explain why: much of the
+English/Spanish text is not ordinary ASCII script data. It is pre-rendered SNES
+tilemap and tile-art data, which is normally investigated with a hex editor,
+table/charmap notes, tile editors such as YY-CHR or Tile Molester, and emulator
+debuggers with tile/tilemap/VRAM viewers such as Mesen-S. In this project, the
+same workflow is represented by scripts that parse IPS files, render tile
+sheets, decode tilemap rows, and render captured VRAM state.
 
 To audit the pending Korean and Chinese crawl drafts against the CJK/kana glyphs
 identified in the original Japanese crawl, run:
