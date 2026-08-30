@@ -3,6 +3,11 @@
 # Entries are non-overlapping in-memory cart patches; no ROM file is modified.
 schema = 1
 default_lang = "en"
+fallback_fr = "en"
+fallback_it = "en"
+fallback_ko = "en"
+fallback_zh = "en"
+fallback_pt = "en"
 
 [[rom_patch]]
 address = 0x004819
@@ -17235,4 +17240,3 @@ address = 0x05efff
 source_hex = "00"
 en_hex = "08"
 es_hex = "08"
-
