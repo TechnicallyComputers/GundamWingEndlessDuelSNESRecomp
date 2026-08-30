@@ -31,3 +31,18 @@ glyph sheet for the target language, then generate the same tile/bitmap format
 the game uploads to VRAM. Do not add native overlay bytes without screenshot
 validation; arbitrary Latin letter codes can render as unrelated pixels in that
 layer.
+
+## Visual QA Harness
+
+Use `scripts/validate_localization_tcp.ps1` with a trace build to verify runtime
+activation and capture TCP-driven screenshots:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate_localization_tcp.ps1 `
+  -RomPath C:\path\to\gwedj.smc -Languages en,es,fr,it,pt,ko,zh
+```
+
+The harness writes per-language screenshots, `xlate_stats.json`, and a
+`contact.html` sheet. It uses `set_controller` over the debug TCP port to skip
+through the intro, title, menu, and VS route, so spacing or tile corruption can
+be checked visually instead of inferred from patch counts.
