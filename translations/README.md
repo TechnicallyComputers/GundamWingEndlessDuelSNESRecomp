@@ -45,6 +45,14 @@ python scripts\generate_crawl_patch.py --check
 The generator fails on unsupported glyphs or lines that do not fit their
 validated tilemap slots.
 
+The generated aggregate crawl patch runs after earlier English/Spanish
+reference-patch chunks at the same ROM region. Its `source_hex` is therefore the
+post-reference English bytes that are present at that point in patch order, not
+the original compressed Japanese bytes. Preserve that compatibility source when
+editing the source-backed crawl text; otherwise the later native language
+overlay cannot match and the runtime will fall back to the earlier English
+reference chunks.
+
 The fixed-width option-menu and key-config labels live in
 `endless_duel_options.toml`. They are plain ASCII text entries that generate the
 matching byte patches in `endless_duel.toml`:
@@ -92,6 +100,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate_localizatio
 
 The crawl harness also emits `contact.png` when `System.Drawing` is available,
 which is the easiest artifact to inspect or attach to review notes.
+
+To inspect the VRAM/PPU state behind a crawl frame, run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\probe_crawl_vram.ps1 `
+  -RomPath C:\path\to\gwedj.smc -Languages en,off -CaptureSecond 60
+```
+
+This writes `crawl.bmp`, `xlate_stats.json`, `ppu_state.json`, `vram.json`, and
+`cgram.json` for each language. Use it before attempting CJK glyph-tile
+replacement work; the existing Korean and Chinese selections are fallback-only
+because no native Hangul/Chinese tile assets are currently authored.
 
 For remaining title/menu label investigation, capture the visible mode menu and
 the exact PPU/VRAM/CGRAM/OAM state used to draw it:

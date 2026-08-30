@@ -136,6 +136,15 @@ def main() -> int:
             f"  {lang}: option_entries={option_counts[lang]} "
             f"crawl_lines={crawl_counts.get(lang, 0)}"
         )
+    print()
+    print("Language status:")
+    for lang in LANGS:
+        if lang_counts[lang]:
+            print(f"  {lang}: native data present")
+        elif lang in fallbacks:
+            print(f"  {lang}: fallback-only via {fallbacks[lang]}")
+        else:
+            print(f"  {lang}: no native data and no fallback")
 
     if width_errors:
         print()
