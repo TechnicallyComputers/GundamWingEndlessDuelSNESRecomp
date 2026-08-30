@@ -2060,161 +2060,311 @@ es_hex = "00e902"
 address = 0x00c0d8
 source_hex = "54"
 es_hex = "43"
+it_hex = "5a"
+pt_hex = "43"
+
+[[rom_patch]]
+address = 0x00c0d9
+source_hex = "49"
+pt_hex = "41"
+
+[[rom_patch]]
+address = 0x00c0db
+source_hex = "4e"
+pt_hex = "20"
 
 [[rom_patch]]
 address = 0x00c0ea
 source_hex = "204c4556454c"
 es_hex = "4e4956454c20"
+fr_hex = "4e4956454155"
+it_hex = "4c4956454c20"
+pt_hex = "4e4956454c20"
 
 [[rom_patch]]
 address = 0x00c0fa
 source_hex = "205449"
 es_hex = "544945"
+fr_hex = "54454d"
+it_hex = "54454d"
+pt_hex = "54454d"
+
+[[rom_patch]]
+address = 0x00c0fd
+source_hex = "4d"
+fr_hex = "50"
+it_hex = "50"
+pt_hex = "50"
 
 [[rom_patch]]
 address = 0x00c0fe
 source_hex = "45"
 es_hex = "50"
+fr_hex = "53"
+it_hex = "4f"
+pt_hex = "4f"
 
 [[rom_patch]]
 address = 0x00c109
 source_hex = "20534f554e44"
 es_hex = "534f4e49444f"
+fr_hex = "534f4e202020"
+it_hex = "415544494f20"
+pt_hex = "534f4d202020"
 
 [[rom_patch]]
 address = 0x00c119
 source_hex = "204b455920434f4e464947"
 es_hex = "4d414e444f202020202020"
+fr_hex = "434f4e54524f4c45532020"
+it_hex = "434f4d414e444920202020"
+pt_hex = "434f4e54524f4c45532020"
 
 [[rom_patch]]
 address = 0x00c12e
 source_hex = "204558"
 es_hex = "53414c"
+fr_hex = "204649"
+it_hex = "455343"
+pt_hex = "534149"
+
+[[rom_patch]]
+address = 0x00c131
+source_hex = "49"
+fr_hex = "4e"
+pt_hex = "52"
 
 [[rom_patch]]
 address = 0x00c132
 source_hex = "54"
 es_hex = "52"
+fr_hex = "20"
+it_hex = "20"
+pt_hex = "20"
 
 [[rom_patch]]
 address = 0x00c17a
 source_hex = "204c4556454c"
 es_hex = "4e4956454c20"
+fr_hex = "4e4956454155"
+it_hex = "4c4956454c20"
+pt_hex = "4e4956454c20"
 
 [[rom_patch]]
 address = 0x00c1a7
 source_hex = "204c4556454c"
 es_hex = "4e4956454c20"
+fr_hex = "4e4956454155"
+it_hex = "4c4956454c20"
+pt_hex = "4e4956454c20"
 
 [[rom_patch]]
 address = 0x00c1d7
 source_hex = "2045415359"
 es_hex = "464143494c"
+fr_hex = "464143494c"
+it_hex = "464143494c"
+pt_hex = "464143494c"
 
 [[rom_patch]]
 address = 0x00c1f9
 source_hex = "2048415244"
 es_hex = "4449464943"
+fr_hex = "4455522020"
+it_hex = "444946462e"
+pt_hex = "4449464943"
 
 [[rom_patch]]
 address = 0x00c225
 source_hex = "205449"
 es_hex = "544945"
+fr_hex = "54454d"
+it_hex = "54454d"
+pt_hex = "54454d"
+
+[[rom_patch]]
+address = 0x00c228
+source_hex = "4d"
+fr_hex = "50"
+it_hex = "50"
+pt_hex = "50"
 
 [[rom_patch]]
 address = 0x00c229
 source_hex = "45"
 es_hex = "50"
+fr_hex = "53"
+it_hex = "4f"
+pt_hex = "4f"
 
 [[rom_patch]]
 address = 0x00c251
 source_hex = "205449"
 es_hex = "544945"
+fr_hex = "54454d"
+it_hex = "54454d"
+pt_hex = "54454d"
+
+[[rom_patch]]
+address = 0x00c254
+source_hex = "4d"
+fr_hex = "50"
+it_hex = "50"
+pt_hex = "50"
 
 [[rom_patch]]
 address = 0x00c255
 source_hex = "45"
 es_hex = "50"
+fr_hex = "53"
+it_hex = "4f"
+pt_hex = "4f"
 
 [[rom_patch]]
 address = 0x00c2c2
 source_hex = "20534f554e44"
 es_hex = "534f4e49444f"
+fr_hex = "534f4e202020"
+it_hex = "415544494f20"
+pt_hex = "534f4d202020"
 
 [[rom_patch]]
 address = 0x00c2ef
 source_hex = "20534f554e44"
 es_hex = "534f4e49444f"
+fr_hex = "534f4e202020"
+it_hex = "415544494f20"
+pt_hex = "534f4d202020"
 
 [[rom_patch]]
 address = 0x00c3d4
 source_hex = "204b455920434f4e464947"
 es_hex = "4d414e444f202020202020"
+fr_hex = "434f4e54524f4c45532020"
+it_hex = "434f4d414e444920202020"
+pt_hex = "434f4e54524f4c45532020"
 
 [[rom_patch]]
 address = 0x00c406
 source_hex = "204b455920434f4e464947"
 es_hex = "4d414e444f202020202020"
+fr_hex = "434f4e54524f4c45532020"
+it_hex = "434f4d414e444920202020"
+pt_hex = "434f4e54524f4c45532020"
 
 [[rom_patch]]
 address = 0x00c439
 source_hex = "204558"
 es_hex = "53414c"
+fr_hex = "204649"
+it_hex = "455343"
+pt_hex = "534149"
+
+[[rom_patch]]
+address = 0x00c43c
+source_hex = "49"
+fr_hex = "4e"
+pt_hex = "52"
 
 [[rom_patch]]
 address = 0x00c43d
 source_hex = "54"
 es_hex = "52"
+fr_hex = "20"
+it_hex = "20"
+pt_hex = "20"
 
 [[rom_patch]]
 address = 0x00c465
 source_hex = "204558"
 es_hex = "53414c"
+fr_hex = "204649"
+it_hex = "455343"
+pt_hex = "534149"
+
+[[rom_patch]]
+address = 0x00c468
+source_hex = "49"
+fr_hex = "4e"
+pt_hex = "52"
 
 [[rom_patch]]
 address = 0x00c469
 source_hex = "54"
 es_hex = "52"
+fr_hex = "20"
+it_hex = "20"
+pt_hex = "20"
 
 [[rom_patch]]
 address = 0x00c4b2
 source_hex = "4b455920434f4e464947"
 es_hex = "20204d414e444f202020"
+fr_hex = "434f4e54524f4c455320"
+it_hex = "434f4d414e4449202020"
+pt_hex = "434f4e54524f4c455320"
 
 [[rom_patch]]
 address = 0x00c4e7
 source_hex = "5745414b"
 es_hex = "50554e4f"
+fr_hex = "434f5550"
+it_hex = "434f4c50"
+pt_hex = "534f434f"
 
 [[rom_patch]]
 address = 0x00c4ec
 source_hex = "202050554e4348"
 es_hex = "444542494c2020"
+fr_hex = "464149424c4520"
+it_hex = "4445424f4c4520"
+pt_hex = "465241434f2020"
 
 [[rom_patch]]
 address = 0x00c500
 source_hex = "535452"
 es_hex = "50554e"
+fr_hex = "434f55"
+it_hex = "434f4c"
+pt_hex = "534f43"
+
+[[rom_patch]]
+address = 0x00c503
+source_hex = "4f"
+fr_hex = "50"
+it_hex = "50"
 
 [[rom_patch]]
 address = 0x00c504
 source_hex = "4e472050554e4348"
 es_hex = "2046554552544520"
+fr_hex = "20464f5254202020"
+it_hex = "20464f5254452020"
+pt_hex = "20464f5254452020"
 
 [[rom_patch]]
 address = 0x00c519
 source_hex = "5745414b"
 es_hex = "41524d41"
+fr_hex = "41524d45"
+it_hex = "41524d41"
+pt_hex = "41524d41"
 
 [[rom_patch]]
 address = 0x00c51e
 source_hex = "2020574541504f4e"
 es_hex = "444542494c202020"
+fr_hex = "464149424c452020"
+it_hex = "4445424f4c452020"
+pt_hex = "4652414341202020"
 
 [[rom_patch]]
 address = 0x00c533
 source_hex = "5354524f4e4720574541504f4e"
 es_hex = "41524d41204655455254452020"
+fr_hex = "41524d4520464f525445202020"
+it_hex = "41524d4120464f525445202020"
+pt_hex = "41524d4120464f525445202020"
 
 [[rom_patch]]
 address = 0x00e000

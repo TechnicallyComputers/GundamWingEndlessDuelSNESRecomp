@@ -7,8 +7,8 @@ image after boot and does not alter the user's ROM file.
 
 - `en`: English reference patch data from Aeon Genesis.
 - `es`: Spanish reference patch data from Max1323.
-- `fr`, `it`, `pt`: native opening/fight crawl tilemap overlays; other text
-  falls back to English patch data.
+- `fr`, `it`, `pt`: native opening/fight crawl tilemap overlays and option-menu
+  labels; other text falls back to English patch data.
 - `ko`, `zh`: selectable, currently fall back to English patch data.
 
 The opening crawl is encoded as a 64-tile-wide BG tilemap strip. Each visible
