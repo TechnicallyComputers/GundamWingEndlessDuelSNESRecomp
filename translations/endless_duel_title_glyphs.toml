@@ -1,0 +1,36 @@
+# Authored title-menu glyph overrides for the runtime title selector overlay.
+#
+# The base runtime atlas is seeded from glyph masks extracted from native
+# selected title-menu rows. Entries here override that atlas for letters that
+# are needed by translations but do not appear in the original English labels.
+# Rows are 8 pixels tall. Bits are read left to right within `width`.
+
+schema = 1
+source_capture = "C:\\Users\\Matthew\\AppData\\Local\\Temp\\gwed_title_menu_wram_select_20260830"
+style = "Endless Duel title mode selector"
+
+[[glyph]]
+char = "H"
+origin = "authored from native A/M vertical stems and native 8px title-menu crossbar weight"
+width = 8
+row0 = "c3"
+row1 = "c3"
+row2 = "c3"
+row3 = "ff"
+row4 = "ff"
+row5 = "c3"
+row6 = "c3"
+row7 = "c3"
+
+[[glyph]]
+char = "C"
+origin = "authored from native O by opening the right side and preserving native top/bottom caps"
+width = 8
+row0 = "7e"
+row1 = "ff"
+row2 = "c0"
+row3 = "c0"
+row4 = "c0"
+row5 = "c0"
+row6 = "ff"
+row7 = "7e"

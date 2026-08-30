@@ -26,6 +26,8 @@ static void gwed_translation_activate(void)
     char language[32] = "en";
     char table_path[1024];
     char title_menu_path[1024];
+    char title_glyph_path[1024];
+    const char *resolved_title_glyph_path = NULL;
 
     if (!snes_mod_runtime_feature_enabled_c(GWED_LOCALIZATION_PACKAGE,
                                             GWED_LOCALIZATION_FEATURE))
@@ -44,9 +46,15 @@ static void gwed_translation_activate(void)
         gwed_title_menu_overlay_clear();
         return;
     }
+    if (snesrecomp_exe_dir_path("translations/endless_duel_title_glyphs.toml",
+                                title_glyph_path,
+                                sizeof(title_glyph_path))) {
+        resolved_title_glyph_path = title_glyph_path;
+    }
     if (snesrecomp_exe_dir_path("translations/endless_duel_title_menu.toml",
                                 title_menu_path, sizeof(title_menu_path))) {
-        gwed_title_menu_overlay_load(title_menu_path, language);
+        gwed_title_menu_overlay_load(title_menu_path,
+                                     resolved_title_glyph_path, language);
     }
     if (!snes_text_xlate_init_c(table_path, language)) {
         fprintf(stderr, "translation: %s\n", snes_text_xlate_last_error_c());

@@ -12,35 +12,35 @@ from pathlib import Path
 
 LANGS = ("en", "es", "fr", "it", "pt")
 
-FONT_5X7 = {
-    " ": ("00000", "00000", "00000", "00000", "00000", "00000", "00000"),
-    ".": ("00000", "00000", "00000", "00000", "00000", "01100", "01100"),
-    "A": ("01110", "10001", "10001", "11111", "10001", "10001", "10001"),
-    "B": ("11110", "10001", "10001", "11110", "10001", "10001", "11110"),
-    "C": ("01111", "10000", "10000", "10000", "10000", "10000", "01111"),
-    "D": ("11110", "10001", "10001", "10001", "10001", "10001", "11110"),
-    "E": ("11111", "10000", "10000", "11110", "10000", "10000", "11111"),
-    "F": ("11111", "10000", "10000", "11110", "10000", "10000", "10000"),
-    "G": ("01111", "10000", "10000", "10011", "10001", "10001", "01111"),
-    "H": ("10001", "10001", "10001", "11111", "10001", "10001", "10001"),
-    "I": ("11111", "00100", "00100", "00100", "00100", "00100", "11111"),
-    "J": ("00111", "00010", "00010", "00010", "10010", "10010", "01100"),
-    "K": ("10001", "10010", "10100", "11000", "10100", "10010", "10001"),
-    "L": ("10000", "10000", "10000", "10000", "10000", "10000", "11111"),
-    "M": ("10001", "11011", "10101", "10101", "10001", "10001", "10001"),
-    "N": ("10001", "11001", "10101", "10011", "10001", "10001", "10001"),
-    "O": ("01110", "10001", "10001", "10001", "10001", "10001", "01110"),
-    "P": ("11110", "10001", "10001", "11110", "10000", "10000", "10000"),
-    "Q": ("01110", "10001", "10001", "10001", "10101", "10010", "01101"),
-    "R": ("11110", "10001", "10001", "11110", "10100", "10010", "10001"),
-    "S": ("01111", "10000", "10000", "01110", "00001", "00001", "11110"),
-    "T": ("11111", "00100", "00100", "00100", "00100", "00100", "00100"),
-    "U": ("10001", "10001", "10001", "10001", "10001", "10001", "01110"),
-    "V": ("10001", "10001", "10001", "10001", "10001", "01010", "00100"),
-    "W": ("10001", "10001", "10001", "10101", "10101", "10101", "01010"),
-    "X": ("10001", "10001", "01010", "00100", "01010", "10001", "10001"),
-    "Y": ("10001", "10001", "01010", "00100", "00100", "00100", "00100"),
-    "Z": ("11111", "00001", "00010", "00100", "01000", "10000", "11111"),
+DEFAULT_TITLE_GLYPHS = {
+    " ": (5, (0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)),
+    ".": (2, (0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03)),
+    "A": (8, (0x7e, 0xff, 0xc3, 0xdf, 0xdf, 0xc3, 0xc3, 0xc3)),
+    "B": (8, (0xfe, 0xff, 0xc3, 0xfe, 0xff, 0xc3, 0xff, 0xfe)),
+    "C": (8, (0x7e, 0xff, 0xc0, 0xc0, 0xc0, 0xc0, 0xff, 0x7e)),
+    "D": (8, (0xfe, 0xff, 0xc3, 0xc3, 0xc3, 0xc3, 0xdf, 0xde)),
+    "E": (8, (0x7f, 0xff, 0xe0, 0xff, 0xff, 0xe0, 0xff, 0xff)),
+    "F": (8, (0x7f, 0xff, 0xe0, 0xff, 0xff, 0xe0, 0xe0, 0xe0)),
+    "G": (8, (0x7f, 0xff, 0xc0, 0xc0, 0xcf, 0xc3, 0xff, 0x7f)),
+    "H": (8, (0xc3, 0xc3, 0xc3, 0xff, 0xff, 0xc3, 0xc3, 0xc3)),
+    "I": (3, (0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07)),
+    "J": (8, (0x1f, 0x1f, 0x06, 0x06, 0xc6, 0xc6, 0xfe, 0x7c)),
+    "K": (8, (0xc3, 0xc6, 0xcc, 0xf8, 0xfc, 0xce, 0xc7, 0xc3)),
+    "L": (7, (0x70, 0x70, 0x70, 0x70, 0x70, 0x70, 0x7f, 0x7f)),
+    "M": (8, (0xfe, 0xff, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb)),
+    "N": (8, (0xfe, 0xff, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3)),
+    "O": (8, (0x7e, 0xff, 0xc3, 0xc3, 0xc3, 0xc3, 0xff, 0x7e)),
+    "P": (8, (0xfe, 0xff, 0xc3, 0xdf, 0xde, 0xc0, 0xc0, 0xc0)),
+    "Q": (8, (0x7e, 0xff, 0xc3, 0xc3, 0xdb, 0xcf, 0xff, 0x7b)),
+    "R": (8, (0xfe, 0xff, 0xc3, 0xdf, 0xde, 0xc3, 0xc3, 0xc3)),
+    "S": (8, (0x7f, 0xff, 0xc0, 0xfe, 0x7f, 0x03, 0xff, 0xfe)),
+    "T": (7, (0x7f, 0x7f, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c, 0x1c)),
+    "U": (8, (0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xc3, 0xff, 0x7e)),
+    "V": (10, (0x303, 0x303, 0x387, 0x1ce, 0x0cc, 0x0fc, 0x078, 0x030)),
+    "W": (8, (0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xdb, 0xff, 0x66)),
+    "X": (8, (0xc3, 0xe7, 0x7e, 0x3c, 0x3c, 0x7e, 0xe7, 0xc3)),
+    "Y": (8, (0xc3, 0xc3, 0xc3, 0xc3, 0xff, 0x7e, 0x18, 0x18)),
+    "Z": (8, (0xff, 0xff, 0x06, 0x0c, 0x18, 0x30, 0xff, 0xff)),
 }
 
 
@@ -103,26 +103,67 @@ def put_rect(rgb: bytearray, width: int, height: int, x: int, y: int, w: int, h:
             rgb[off:off + 3] = bytes(color)
 
 
-def text_size(text: str, scale: int) -> tuple[int, int]:
-    if not text:
-        return 0, 7 * scale
-    return (len(text) * 6 - 1) * scale, 7 * scale
+def load_glyphs(path: Path | None) -> dict[str, tuple[int, tuple[int, ...]]]:
+    glyphs = dict(DEFAULT_TITLE_GLYPHS)
+    if path is None or not path.is_file():
+        return glyphs
+    with path.open("rb") as f:
+        source = tomllib.load(f)
+    for entry in source.get("glyph", []):
+        char = str(entry["char"])
+        if len(char) != 1:
+            raise ValueError(f"{path}: only single-byte title glyphs are supported for now: {char!r}")
+        width = int(entry["width"])
+        rows = tuple(int(str(entry[f"row{i}"]), 16) for i in range(8))
+        if width < 1 or width > 16:
+            raise ValueError(f"{path}: glyph {char!r} has invalid width {width}")
+        glyphs[char.upper()] = (width, rows)
+    return glyphs
 
 
-def draw_text(rgb: bytearray, width: int, height: int, x: int, y: int, text: str, color: tuple[int, int, int], scale: int) -> None:
+def text_size(text: str, scale: int, glyphs: dict[str, tuple[int, tuple[int, ...]]]) -> tuple[int, int]:
+    width = 0
+    for index, char in enumerate(text.upper()):
+        try:
+            glyph_width, _ = glyphs[char]
+        except KeyError as exc:
+            raise ValueError(f"unsupported title-menu preview glyph {char!r}") from exc
+        if index:
+            width += scale
+        width += glyph_width * scale
+    return width, 8 * scale
+
+
+def draw_text(
+    rgb: bytearray,
+    width: int,
+    height: int,
+    x: int,
+    y: int,
+    text: str,
+    color: tuple[int, int, int],
+    scale: int,
+    glyphs: dict[str, tuple[int, tuple[int, ...]]],
+) -> None:
     cursor = x
     for char in text.upper():
-        glyph = FONT_5X7.get(char)
-        if glyph is None:
-            raise ValueError(f"unsupported title-menu preview glyph {char!r}")
-        for gy, row in enumerate(glyph):
-            for gx, bit in enumerate(row):
-                if bit == "1":
+        try:
+            glyph_width, rows = glyphs[char]
+        except KeyError as exc:
+            raise ValueError(f"unsupported title-menu preview glyph {char!r}") from exc
+        for gy, row in enumerate(rows):
+            for gx in range(glyph_width):
+                if row & (1 << (glyph_width - 1 - gx)):
                     put_rect(rgb, width, height, cursor + gx * scale, y + gy * scale, scale, scale, color)
-        cursor += 6 * scale
+        cursor += (glyph_width + 1) * scale
 
 
-def overlay_language(base: tuple[int, int, bytearray], source: dict, lang: str) -> tuple[int, int, bytearray]:
+def overlay_language(
+    base: tuple[int, int, bytearray],
+    source: dict,
+    lang: str,
+    glyphs: dict[str, tuple[int, tuple[int, ...]]],
+) -> tuple[int, int, bytearray]:
     width, height, base_rgb = base
     rgb = bytearray(base_rgb)
     palette = source["palette"]
@@ -137,15 +178,12 @@ def overlay_language(base: tuple[int, int, bytearray], source: dict, lang: str) 
         text_color = tuple(int(v) for v in palette["selected_text" if selected else "inactive_text"])
         shadow = tuple(int(v) for v in palette["selected_shadow" if selected else "inactive_shadow"])
         put_rect(rgb, width, height, x, y, w, h, fill)
-        scale = 2
-        tw, th = text_size(text, scale)
-        if tw > w - 4 or th > h - 2:
-            scale = 1
-            tw, th = text_size(text, scale)
+        scale = 1
+        tw, th = text_size(text, scale, glyphs)
         tx = x + max(0, (w - tw) // 2)
-        ty = y + max(0, (h - th) // 2)
-        draw_text(rgb, width, height, tx + scale, ty + scale, text, shadow, scale)
-        draw_text(rgb, width, height, tx, ty, text, text_color, scale)
+        ty = int(label.get("text_y", y + max(0, (h - th) // 2)))
+        draw_text(rgb, width, height, tx + scale, ty + scale, text, shadow, scale, glyphs)
+        draw_text(rgb, width, height, tx, ty, text, text_color, scale, glyphs)
     return width, height, rgb
 
 
@@ -154,6 +192,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("capture", help="capture directory containing mode_menu.bmp, or the BMP itself")
     parser.add_argument("--source", default=str(root / "translations" / "endless_duel_title_menu.toml"))
+    parser.add_argument("--glyphs", default=str(root / "translations" / "endless_duel_title_glyphs.toml"))
     parser.add_argument("--out", default=str(root / "translations" / "title_menu_previews"))
     parser.add_argument("--langs", default=",".join(LANGS))
     args = parser.parse_args()
@@ -162,12 +201,13 @@ def main() -> int:
     screenshot = capture if capture.suffix.lower() == ".bmp" else capture / "mode_menu.bmp"
     with Path(args.source).open("rb") as f:
         source = tomllib.load(f)
+    glyphs = load_glyphs(Path(args.glyphs) if args.glyphs else None)
     base = read_bmp(screenshot)
     out_dir = Path(args.out)
     for lang in [part.strip() for part in args.langs.split(",") if part.strip()]:
         if lang not in LANGS:
             raise ValueError(f"unsupported preview language {lang!r}")
-        width, height, rgb = overlay_language(base, source, lang)
+        width, height, rgb = overlay_language(base, source, lang, glyphs)
         out = out_dir / f"title_menu_{lang}.bmp"
         write_bmp(out, width, height, rgb)
         print(out)

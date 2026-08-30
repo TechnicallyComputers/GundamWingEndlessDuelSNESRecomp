@@ -150,14 +150,18 @@ The runtime implementation is `src/title_menu_overlay.c`. It reads the selected
 language from the localization mod, detects the real title mode menu in the
 presented PPU frame, reads the selected row from WRAM `$7E0504`, and draws the
 translated labels before presentation. The preview renderer reads the same
-`translations/endless_duel_title_menu.toml` geometry and writes ignored BMPs
-under `translations/title_menu_previews/` for quick fit checks. The current
-2026-08-30 evidence says the text is visible in the presented title frame,
-while the raw BG/OAM helper renderers only reproduce surrounding title art.
+`translations/endless_duel_title_menu.toml` geometry and
+`translations/endless_duel_title_glyphs.toml` glyph overrides, then writes
+ignored BMPs under `translations/title_menu_previews/` for quick fit checks.
+The current 2026-08-30 evidence says the text is visible in the presented title
+frame, while the raw BG/OAM helper renderers only reproduce surrounding title
+art.
 
 This is also the path for CJK. If the game has no Chinese/Korean glyph tiles,
 do not expose the language as a fallback-only option. Add real glyph assets,
-map strings to those assets, and validate screenshots first.
+map strings to those assets, and validate screenshots first. The current title
+glyph override format is ASCII-only; CJK will need the same idea extended to
+UTF-8 keyed glyph records or image-atlas labels.
 
 ## Visual Validation
 

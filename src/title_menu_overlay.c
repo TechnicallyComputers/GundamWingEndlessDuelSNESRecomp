@@ -58,6 +58,7 @@ static const TitleGlyph kNativeTitleGlyphs[26] = {
     /* Y */ { 8, { 0x00c3, 0x00c3, 0x00c3, 0x00c3, 0x00ff, 0x007e, 0x0018, 0x0018 } },
     /* Z */ { 8, { 0x00ff, 0x00ff, 0x0006, 0x000c, 0x0018, 0x0030, 0x00ff, 0x00ff } },
 };
+static TitleGlyph g_title_glyphs[128];
 
 static uint32_t rgb(unsigned r, unsigned g, unsigned b)
 {
@@ -198,16 +199,26 @@ static int language_supported(const char *language)
            strcmp(language, "it") == 0 || strcmp(language, "pt") == 0;
 }
 
+static void reset_title_glyphs(void)
+{
+    int i;
+    memset(g_title_glyphs, 0, sizeof(g_title_glyphs));
+    g_title_glyphs[(unsigned char)' '] = kSpaceGlyph;
+    g_title_glyphs[(unsigned char)'.'] = kDotGlyph;
+    for (i = 0; i < 26; i++) {
+        g_title_glyphs[(unsigned char)('A' + i)] = kNativeTitleGlyphs[i];
+        g_title_glyphs[(unsigned char)('a' + i)] = kNativeTitleGlyphs[i];
+    }
+}
+
 static const TitleGlyph *title_glyph(char c)
 {
-    if (c == ' ')
-        return &kSpaceGlyph;
-    if (c == '.')
-        return &kDotGlyph;
-    if (c >= 'A' && c <= 'Z')
-        return &kNativeTitleGlyphs[c - 'A'];
-    if (c >= 'a' && c <= 'z')
-        return &kNativeTitleGlyphs[c - 'a'];
+    const TitleGlyph *glyph;
+    if ((unsigned char)c >= 128)
+        return &kEmptyGlyph;
+    glyph = &g_title_glyphs[(unsigned char)c];
+    if (glyph->width)
+        return glyph;
     return &kEmptyGlyph;
 }
 
@@ -365,7 +376,91 @@ static void draw_label(uint32_t *pixels, int width, int height, int pitch_pixels
               label->text, text, scale);
 }
 
-int gwed_title_menu_overlay_load(const char *path, const char *language)
+static int parse_glyph_row(const char *value, unsigned short *out)
+{
+    char parsed[32];
+    char *end;
+    unsigned long row;
+
+    if (!parse_toml_string(value, parsed, sizeof(parsed)))
+        return 0;
+    row = strtoul(parsed, &end, 16);
+    if (*end || row > 0xfffful)
+        return 0;
+    *out = (unsigned short)row;
+    return 1;
+}
+
+static void store_loaded_glyph(char glyph_char, const TitleGlyph *glyph)
+{
+    if ((unsigned char)glyph_char >= 128 || glyph->width < 1 ||
+        glyph->width > 16)
+        return;
+    g_title_glyphs[(unsigned char)glyph_char] = *glyph;
+    if (glyph_char >= 'A' && glyph_char <= 'Z')
+        g_title_glyphs[(unsigned char)('a' + (glyph_char - 'A'))] = *glyph;
+    else if (glyph_char >= 'a' && glyph_char <= 'z')
+        g_title_glyphs[(unsigned char)('A' + (glyph_char - 'a'))] = *glyph;
+}
+
+static void load_title_glyphs(const char *path)
+{
+    FILE *f;
+    char line[512];
+    TitleGlyph glyph;
+    char glyph_char = 0;
+    int in_glyph = 0;
+    int row_count = 0;
+
+    if (!path)
+        return;
+    f = fopen(path, "rb");
+    if (!f)
+        return;
+
+    memset(&glyph, 0, sizeof(glyph));
+    while (fgets(line, sizeof(line), f)) {
+        char *s;
+        char *key;
+        char *value;
+        char parsed[128];
+
+        strip_comment(line);
+        s = trim(line);
+        if (!*s)
+            continue;
+        if (strcmp(s, "[[glyph]]") == 0) {
+            if (in_glyph && glyph_char && glyph.width && row_count == 8)
+                store_loaded_glyph(glyph_char, &glyph);
+            memset(&glyph, 0, sizeof(glyph));
+            glyph_char = 0;
+            row_count = 0;
+            in_glyph = 1;
+            continue;
+        }
+        if (!in_glyph || !parse_key_value(s, &key, &value))
+            continue;
+        if (strcmp(key, "char") == 0) {
+            if (parse_toml_string(value, parsed, sizeof(parsed)) &&
+                parsed[0] && !parsed[1]) {
+                glyph_char = parsed[0];
+            }
+        } else if (strcmp(key, "width") == 0) {
+            glyph.width = (unsigned char)atoi(value);
+        } else if (strncmp(key, "row", 3) == 0 && key[3] >= '0' &&
+                   key[3] <= '7' && key[4] == 0) {
+            int row = key[3] - '0';
+            if (parse_glyph_row(value, &glyph.rows[row]))
+                row_count++;
+        }
+    }
+    if (in_glyph && glyph_char && glyph.width && row_count == 8)
+        store_loaded_glyph(glyph_char, &glyph);
+    fclose(f);
+}
+
+int gwed_title_menu_overlay_load(const char *path, const char *glyph_path,
+                                 const char *language)
 {
     FILE *f;
     char line[512];
@@ -373,8 +468,10 @@ int gwed_title_menu_overlay_load(const char *path, const char *language)
     int i;
 
     gwed_title_menu_overlay_clear();
+    reset_title_glyphs();
     if (!path || !language || !language_supported(language))
         return 0;
+    load_title_glyphs(glyph_path);
 
     f = fopen(path, "rb");
     if (!f)

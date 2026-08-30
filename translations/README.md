@@ -87,11 +87,16 @@ length does not match the source patch width.
 
 The title-screen mode selector labels live in
 `endless_duel_title_menu.toml`. These are `STORY MODE`, `VS. MODE`,
-`TRIAL MODE`, and `OPTION` on the first selectable title menu. They are not
-plain option-menu strings and the current BG/OAM helper renders do not yet
-reproduce the exact source layer, so the live replacement is a screen-space
-host overlay keyed by the selected runtime language. It masks only the four
-configured title-label rectangles, reads the selected title row from WRAM
+`TRIAL MODE`, and `OPTION` on the first selectable title menu. Their title font
+is seeded from glyph masks extracted from native selected-row captures, and
+`endless_duel_title_glyphs.toml` contains authored overrides for translation
+letters that do not appear in the original English labels, starting with `H`
+and `C`.
+
+They are not plain option-menu strings and the current BG/OAM helper renders do
+not yet reproduce the exact source layer, so the live replacement is a
+screen-space host overlay keyed by the selected runtime language. It masks the
+original English source glyph pixels, reads the selected title row from WRAM
 `$7E0504` (`0,2,4,6` for rows 0-3), and then draws the translated labels into
 the PPU frame buffer before SDL presentation and TCP screenshots.
 
@@ -103,8 +108,9 @@ py -3 scripts\render_title_menu_overlay_preview.py `
 ```
 
 The generated BMPs are ignored under `translations/title_menu_previews/`. They
-use the same string/rectangle source as the runtime overlay, but they are review
-previews only; the actual in-game path is `src/title_menu_overlay.c`.
+use the same string/rectangle and title glyph source as the runtime overlay,
+but they are review previews only; the actual in-game path is
+`src/title_menu_overlay.c`.
 
 The battle and ending dialogue decoded from the English and Spanish IPS files
 lives in `endless_duel_dialogue.toml`, with a readable audit report in
