@@ -1011,7 +1011,7 @@ int main(int argc, char **argv)
 #if SNESRECOMP_ENABLE_MODS
     {
         char mods_dir[1024];
-        if (snesrecomp_exe_dir_path("mods", mods_dir, sizeof(mods_dir))) {
+        if (snesrecomp_exe_dir_path("mods/preloaded", mods_dir, sizeof(mods_dir))) {
             g_mods_ready = snes_mod_runtime_initialize_c(
                 mods_dir, "gwed-jp", kGameCodegenIdentity.expected_sha256);
             if (!g_mods_ready) {
