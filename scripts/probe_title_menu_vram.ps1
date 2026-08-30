@@ -117,10 +117,19 @@ function Take-Shot($Conn, [string]$Path) {
         if (-not $parsed.ok) {
             throw "screenshot failed: $json"
         }
+        return $parsed
     } catch {
         if ($json -notmatch '"ok":true') {
             throw "screenshot command returned unexpected response: $json"
         }
+        $fallback = [pscustomobject]@{
+            ok = $true
+            raw = $json
+        }
+        if ($json -match '"frame":([0-9]+)') {
+            $fallback | Add-Member -MemberType NoteProperty -Name frame -Value ([int]$Matches[1])
+        }
+        return $fallback
     }
 }
 
@@ -190,16 +199,34 @@ foreach ($lang in $Languages) {
         Tap-Button $conn "a" 150 1500
         Tap-Button $conn "start" 150 2600
 
+        $shotPath = Join-Path $langDir "mode_menu.bmp"
+        $shot = Take-Shot $conn $shotPath
+        $shot | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $langDir "screenshot_response.json") -Encoding ascii
+        $frame = $null
+        if ($shot -isnot [string] -and $null -ne $shot.frame) {
+            $frame = [int]$shot.frame
+            $presentedFrame = $frame - 1
+            if ($presentedFrame -lt 0) {
+                $presentedFrame = $frame
+            }
+            Save-TcpJson $conn ("dump_frame_vram {0} 0 65536" -f $presentedFrame) (Join-Path $langDir "vram.json") | Out-Null
+            Save-TcpJson $conn ("dump_frame_vram {0} 0 65536" -f $frame) (Join-Path $langDir "next_vram.json") | Out-Null
+        } else {
+            Save-TcpJson $conn "dump_vram 0 65536" (Join-Path $langDir "vram.json") | Out-Null
+        }
+        Save-TcpJson $conn "dump_vram 0 65536" (Join-Path $langDir "live_vram.json") | Out-Null
         Save-TcpJson $conn "xlate_stats" (Join-Path $langDir "xlate_stats.json") | Out-Null
         Save-TcpJson $conn "get_ppu_state" (Join-Path $langDir "ppu_state.json") | Out-Null
-        Save-TcpJson $conn "dump_vram 0 65536" (Join-Path $langDir "vram.json") | Out-Null
+        Save-TcpJson $conn "raster_journal" (Join-Path $langDir "raster_journal.json") | Out-Null
+        Save-TcpJson $conn "ppu_lines 120 205" (Join-Path $langDir "ppu_lines_menu.json") | Out-Null
         Save-TcpJson $conn "dump_cgram" (Join-Path $langDir "cgram.json") | Out-Null
         Save-TcpJson $conn "dump_oam" (Join-Path $langDir "oam.json") | Out-Null
-
-        $shotPath = Join-Path $langDir "mode_menu.bmp"
-        Take-Shot $conn $shotPath
         Add-ContactRow $rows $lang (Join-Path $lang "mode_menu.bmp")
-        $summary.Add(("{0}: wrote mode menu screenshot and VRAM/PPU dumps" -f $lang)) | Out-Null
+        if ($null -ne $frame) {
+            $summary.Add(("{0}: wrote mode menu screenshot from presented frame {1} and next frame {2} VRAM/PPU dumps" -f $lang, ($frame - 1), $frame)) | Out-Null
+        } else {
+            $summary.Add(("{0}: wrote mode menu screenshot and live VRAM/PPU dumps" -f $lang)) | Out-Null
+        }
     } finally {
         if ($null -ne $conn) {
             $conn.Reader.Dispose()

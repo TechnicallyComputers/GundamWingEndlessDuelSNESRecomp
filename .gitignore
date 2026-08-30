@@ -38,6 +38,7 @@ translations/reference_tilemaps/
 translations/reference_glyph_candidates/
 translations/reference_vram_tiles/
 translations/dialogue_previews/
+translations/title_menu_previews/
 analysis/oracle/scene.csv
 snes-diag.log
 snes-run.log

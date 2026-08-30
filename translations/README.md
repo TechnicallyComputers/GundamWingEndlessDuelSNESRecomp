@@ -85,6 +85,22 @@ python scripts\generate_option_patch.py --check
 The option generator fails on non-ASCII text or any translation whose byte
 length does not match the source patch width.
 
+The title-screen mode selector labels live in
+`endless_duel_title_menu.toml`. These are `STORY MODE`, `VS. MODE`,
+`TRIAL MODE`, and `OPTION` on the first selectable title menu. They are not
+plain option-menu strings and the current BG/OAM helper renders do not yet
+reproduce the exact source layer, so the first tooling pass is a screen-space
+overlay preview that uses editable label rectangles and per-language strings:
+
+```powershell
+py -3 scripts\render_title_menu_overlay_preview.py `
+  C:\path\to\title-menu-capture\en --langs es,fr,it,pt
+```
+
+The generated BMPs are ignored under `translations/title_menu_previews/`. Treat
+them as fit/positioning previews for a future runtime overlay or recovered
+tile-asset replacement, not as final SNES tile data.
+
 The battle and ending dialogue decoded from the English and Spanish IPS files
 lives in `endless_duel_dialogue.toml`, with a readable audit report in
 `reference_dialogue_decode.md`. The authored French, Italian, and Portuguese
@@ -191,11 +207,13 @@ python scripts\render_vram_bg_capture.py C:\path\to\capture\es --bg 3
 
 This confirmed the title/menu capture uses Mode 1, BG1 map base `0xd000`, BG2
 map base `0xe000`, BG3 map base `0xf000`, and BG1/BG2 tile base `0xc000`.
-The menu/title labels are therefore tile art uploaded to VRAM, not plain ASCII
-strings. Replacing them for languages beyond the existing reference patches
-requires an asset path: author replacement tiles, map each glyph to tile IDs,
-then patch the ROM-backed upload data or a language-gated VRAM upload at
-runtime.
+The visible mode labels are still not reached by the normal runtime text patch
+path. A later frame-keyed probe showed the simplified BG/OAM render helpers can
+draw surrounding logo/bracket art from the capture, but do not reproduce the
+visible label text itself. Replacing these labels therefore has two viable
+tracks: recover the missing upload/render path and patch its ROM or VRAM source,
+or add a language-gated host overlay using the rectangle/string data in
+`endless_duel_title_menu.toml`.
 
 ## External Reverse-Engineering Context
 

@@ -1,0 +1,74 @@
+# Source data for the title-screen mode selector labels.
+#
+# These labels are visible in the presented title frame but are not reproduced
+# by the current raw BG/OAM helper renders. The first replacement path is a
+# screen-space host overlay keyed by language; a later pass can replace this
+# with VRAM/tile assets if the exact upload path is recovered.
+
+schema = 1
+source_capture = "scripts/probe_title_menu_vram.ps1"
+source_surface = "presented title mode menu"
+
+[palette]
+selected_text = [252, 244, 156]
+selected_shadow = [56, 120, 96]
+selected_fill = [0, 40, 48]
+inactive_text = [64, 120, 88]
+inactive_shadow = [24, 56, 48]
+inactive_fill = [18, 48, 48]
+
+[[label]]
+id = "story_mode"
+source = "STORY MODE"
+x = 76
+y = 136
+width = 104
+height = 18
+selected = true
+en = "STORY MODE"
+es = "HISTORIA"
+fr = "HISTOIRE"
+it = "STORIA"
+pt = "HISTORIA"
+
+[[label]]
+id = "vs_mode"
+source = "VS. MODE"
+x = 76
+y = 152
+width = 104
+height = 16
+selected = false
+en = "VS. MODE"
+es = "MODO VS"
+fr = "MODE VS"
+it = "MODO VS"
+pt = "MODO VS"
+
+[[label]]
+id = "trial_mode"
+source = "TRIAL MODE"
+x = 76
+y = 166
+width = 104
+height = 16
+selected = false
+en = "TRIAL MODE"
+es = "PRUEBA"
+fr = "ESSAI"
+it = "PROVA"
+pt = "TREINO"
+
+[[label]]
+id = "option"
+source = "OPTION"
+x = 76
+y = 181
+width = 104
+height = 16
+selected = false
+en = "OPTION"
+es = "OPCIONES"
+fr = "OPTIONS"
+it = "OPZIONI"
+pt = "OPCOES"

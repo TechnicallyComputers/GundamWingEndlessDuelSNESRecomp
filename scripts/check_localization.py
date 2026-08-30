@@ -21,6 +21,7 @@ SCRIPT_CHECKS = (
     "scripts/generate_dialogue_patch.py",
     "scripts/audit_localization_coverage.py",
     "scripts/render_dialogue_previews.py",
+    "scripts/render_title_menu_overlay_preview.py",
     "scripts/render_vram_bg_capture.py",
     "scripts/render_oam_capture.py",
 )
