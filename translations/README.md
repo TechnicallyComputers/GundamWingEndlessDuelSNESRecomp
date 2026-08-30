@@ -45,6 +45,18 @@ python scripts\generate_crawl_patch.py --check
 The generator fails on unsupported glyphs or lines that do not fit their
 validated tilemap slots.
 
+The fixed-width option-menu and key-config labels live in
+`endless_duel_options.toml`. They are plain ASCII text entries that generate the
+matching byte patches in `endless_duel.toml`:
+
+```powershell
+python scripts\generate_option_patch.py --write
+python scripts\generate_option_patch.py --check
+```
+
+The option generator fails on non-ASCII text or any translation whose byte
+length does not match the source patch width.
+
 ## Visual QA Harness
 
 Use `scripts/validate_localization_tcp.ps1` with a trace build to verify runtime

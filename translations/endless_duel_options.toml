@@ -1,0 +1,319 @@
+# Text source for fixed-width ASCII option-menu patches.
+# Regenerate or verify the generated hex with:
+#   python scripts/generate_option_patch.py --check
+
+schema = 1
+
+# These are fixed-size byte patches into strings recovered from the English and
+# Spanish reference patches. A few visible labels are split across multiple
+# entries because unchanged source bytes sit between translated spans.
+
+[[text_patch]]
+address = 0x00c0d8
+source = "T"
+es = "C"
+it = "Z"
+pt = "C"
+
+[[text_patch]]
+address = 0x00c0d9
+source = "I"
+pt = "A"
+
+[[text_patch]]
+address = 0x00c0db
+source = "N"
+pt = " "
+
+[[text_patch]]
+address = 0x00c0ea
+source = " LEVEL"
+es = "NIVEL "
+fr = "NIVEAU"
+it = "LIVEL "
+pt = "NIVEL "
+
+[[text_patch]]
+address = 0x00c0fa
+source = " TI"
+es = "TIE"
+fr = "TEM"
+it = "TEM"
+pt = "TEM"
+
+[[text_patch]]
+address = 0x00c0fd
+source = "M"
+fr = "P"
+it = "P"
+pt = "P"
+
+[[text_patch]]
+address = 0x00c0fe
+source = "E"
+es = "P"
+fr = "S"
+it = "O"
+pt = "O"
+
+[[text_patch]]
+address = 0x00c109
+source = " SOUND"
+es = "SONIDO"
+fr = "SON   "
+it = "AUDIO "
+pt = "SOM   "
+
+[[text_patch]]
+address = 0x00c119
+source = " KEY CONFIG"
+es = "MANDO      "
+fr = "CONTROLES  "
+it = "COMANDI    "
+pt = "CONTROLES  "
+
+[[text_patch]]
+address = 0x00c12e
+source = " EX"
+es = "SAL"
+fr = " FI"
+it = "ESC"
+pt = "SAI"
+
+[[text_patch]]
+address = 0x00c131
+source = "I"
+fr = "N"
+pt = "R"
+
+[[text_patch]]
+address = 0x00c132
+source = "T"
+es = "R"
+fr = " "
+it = " "
+pt = " "
+
+[[text_patch]]
+address = 0x00c17a
+source = " LEVEL"
+es = "NIVEL "
+fr = "NIVEAU"
+it = "LIVEL "
+pt = "NIVEL "
+
+[[text_patch]]
+address = 0x00c1a7
+source = " LEVEL"
+es = "NIVEL "
+fr = "NIVEAU"
+it = "LIVEL "
+pt = "NIVEL "
+
+[[text_patch]]
+address = 0x00c1d7
+source = " EASY"
+es = "FACIL"
+fr = "FACIL"
+it = "FACIL"
+pt = "FACIL"
+
+[[text_patch]]
+address = 0x00c1f9
+source = " HARD"
+es = "DIFIC"
+fr = "DUR  "
+it = "DIFF."
+pt = "DIFIC"
+
+[[text_patch]]
+address = 0x00c225
+source = " TI"
+es = "TIE"
+fr = "TEM"
+it = "TEM"
+pt = "TEM"
+
+[[text_patch]]
+address = 0x00c228
+source = "M"
+fr = "P"
+it = "P"
+pt = "P"
+
+[[text_patch]]
+address = 0x00c229
+source = "E"
+es = "P"
+fr = "S"
+it = "O"
+pt = "O"
+
+[[text_patch]]
+address = 0x00c251
+source = " TI"
+es = "TIE"
+fr = "TEM"
+it = "TEM"
+pt = "TEM"
+
+[[text_patch]]
+address = 0x00c254
+source = "M"
+fr = "P"
+it = "P"
+pt = "P"
+
+[[text_patch]]
+address = 0x00c255
+source = "E"
+es = "P"
+fr = "S"
+it = "O"
+pt = "O"
+
+[[text_patch]]
+address = 0x00c2c2
+source = " SOUND"
+es = "SONIDO"
+fr = "SON   "
+it = "AUDIO "
+pt = "SOM   "
+
+[[text_patch]]
+address = 0x00c2ef
+source = " SOUND"
+es = "SONIDO"
+fr = "SON   "
+it = "AUDIO "
+pt = "SOM   "
+
+[[text_patch]]
+address = 0x00c3d4
+source = " KEY CONFIG"
+es = "MANDO      "
+fr = "CONTROLES  "
+it = "COMANDI    "
+pt = "CONTROLES  "
+
+[[text_patch]]
+address = 0x00c406
+source = " KEY CONFIG"
+es = "MANDO      "
+fr = "CONTROLES  "
+it = "COMANDI    "
+pt = "CONTROLES  "
+
+[[text_patch]]
+address = 0x00c439
+source = " EX"
+es = "SAL"
+fr = " FI"
+it = "ESC"
+pt = "SAI"
+
+[[text_patch]]
+address = 0x00c43c
+source = "I"
+fr = "N"
+pt = "R"
+
+[[text_patch]]
+address = 0x00c43d
+source = "T"
+es = "R"
+fr = " "
+it = " "
+pt = " "
+
+[[text_patch]]
+address = 0x00c465
+source = " EX"
+es = "SAL"
+fr = " FI"
+it = "ESC"
+pt = "SAI"
+
+[[text_patch]]
+address = 0x00c468
+source = "I"
+fr = "N"
+pt = "R"
+
+[[text_patch]]
+address = 0x00c469
+source = "T"
+es = "R"
+fr = " "
+it = " "
+pt = " "
+
+[[text_patch]]
+address = 0x00c4b2
+source = "KEY CONFIG"
+es = "  MANDO   "
+fr = "CONTROLES "
+it = "COMANDI   "
+pt = "CONTROLES "
+
+[[text_patch]]
+address = 0x00c4e7
+source = "WEAK"
+es = "PUNO"
+fr = "COUP"
+it = "COLP"
+pt = "SOCO"
+
+[[text_patch]]
+address = 0x00c4ec
+source = "  PUNCH"
+es = "DEBIL  "
+fr = "FAIBLE "
+it = "DEBOLE "
+pt = "FRACO  "
+
+[[text_patch]]
+address = 0x00c500
+source = "STR"
+es = "PUN"
+fr = "COU"
+it = "COL"
+pt = "SOC"
+
+[[text_patch]]
+address = 0x00c503
+source = "O"
+fr = "P"
+it = "P"
+
+[[text_patch]]
+address = 0x00c504
+source = "NG PUNCH"
+es = " FUERTE "
+fr = " FORT   "
+it = " FORTE  "
+pt = " FORTE  "
+
+[[text_patch]]
+address = 0x00c519
+source = "WEAK"
+es = "ARMA"
+fr = "ARME"
+it = "ARMA"
+pt = "ARMA"
+
+[[text_patch]]
+address = 0x00c51e
+source = "  WEAPON"
+es = "DEBIL   "
+fr = "FAIBLE  "
+it = "DEBOLE  "
+pt = "FRACA   "
+
+[[text_patch]]
+address = 0x00c533
+source = "STRONG WEAPON"
+es = "ARMA FUERTE  "
+fr = "ARME FORTE   "
+it = "ARMA FORTE   "
+pt = "ARMA FORTE   "
