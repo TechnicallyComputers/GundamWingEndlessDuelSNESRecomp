@@ -33,6 +33,7 @@
 #include "common_rtl.h"
 #include "cpu_state.h"
 #include "snes/interp_bridge.h"
+#include "snes/saveload.h"
 #include "snes/dma.h"
 #include "snes/ppu.h"
 #include "snes/snes.h"
@@ -524,14 +525,70 @@ void GameDrawPpuFrame(void)
     }
 }
 
+static void GameStateSaveExtra(SaveLoadInfo *sli);
+static void GameStateLoadExtra(SaveLoadInfo *sli, uint32_t version);
+
 const RtlGameInfo kGameInfo = {
     .title = "gundamwingendlessduel",
     .initialize = &GameInitialize,
     .run_frame = &GameRunOneFrame,
     .session_reset = &GameSessionReset,
     .draw_ppu_frame = &GameDrawPpuFrame,
+    .state_save_extra = &GameStateSaveExtra,
+    .state_load_extra = &GameStateLoadExtra,
     .save_name_prefix = "save",
 };
+
+/*
+ * Host execution cursor. g_resume_pc / g_booted live here, not in the guest
+ * blob snes_saveload writes, so nothing but these hooks can carry them across
+ * a state load. Rollback goes through the same path
+ * (RtlRollbackSaveToMemory -> RtlSaveSnapshotToMemory -> state_save_extra),
+ * and without them a rewind restored WRAM and g_cpu but left the resume PC on
+ * the timeline it had just discarded: measured as the netplay FOLLOWER
+ * wedging at reset PPU state (inidisp=$80, bgmode 0) from its first episode
+ * onward while its sim tick kept advancing — the "guest stayed on a black
+ * screen while the host kept simulating" report. MetalWarriorsSNESRecomp
+ * carries the same chunk for the same reason (mw_rtl.c MwStateSaveExtra).
+ *
+ * Not included: the scanout latch (presentation, not simulation — rendering
+ * is disabled during resim) and g_q22_at_nmi (a diagnostic ring).
+ */
+#define GAME_LLE_CHUNK_MAGIC 0x4C4C4757u  /* 'GWLL' */
+
+typedef struct {
+    uint32_t magic;
+    uint32_t resume_pc;
+    uint32_t booted;
+    uint32_t reserved;
+} GameLleChunk;
+
+static void GameStateSaveExtra(SaveLoadInfo *sli)
+{
+    GameLleChunk c;
+    memset(&c, 0, sizeof(c));
+    c.magic     = GAME_LLE_CHUNK_MAGIC;
+    c.resume_pc = g_resume_pc;
+    c.booted    = (uint32_t)(g_booted ? 1 : 0);
+    sli->func(sli, &c, sizeof(c));
+}
+
+static void GameStateLoadExtra(SaveLoadInfo *sli, uint32_t version)
+{
+    GameLleChunk c;
+    (void)version;
+    memset(&c, 0, sizeof(c));
+    sli->func(sli, &c, sizeof(c));
+    if (c.magic != GAME_LLE_CHUNK_MAGIC) {
+        /* Refusing loudly beats resuming at a PC we did not write: a silently
+         * ignored chunk is exactly the wedge this hook exists to prevent. */
+        fprintf(stderr, "game: state extra chunk bad magic $%08X — ignored\n",
+                (unsigned)c.magic);
+        return;
+    }
+    g_resume_pc = c.resume_pc;
+    g_booted    = c.booted ? 1 : 0;
+}
 
 void GameSessionReset(void)
 {
