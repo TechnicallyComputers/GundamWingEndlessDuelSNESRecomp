@@ -288,6 +288,38 @@ static int title_source_label_hits(const uint32_t *pixels, int width,
     return hits;
 }
 
+static int option_source_label_hits(const uint32_t *pixels, int width,
+                                    int height, int pitch_pixels, int screen)
+{
+    int hits = 0;
+    int i;
+
+    for (i = 0; i < g_option_label_count; i++) {
+        const TitleMenuLabel *label = &g_option_labels[i];
+        int x0, x1, y0, y1, x, y;
+
+        if (!label->present || label->screen != screen || !label->source[0])
+            continue;
+        x0 = label->source_x ? label->source_x : label->x;
+        y0 = label->source_y ? label->source_y : label->y;
+        x1 = x0 + (int)strlen(label->source) * 10 + 8;
+        y1 = y0 + label->h + 4;
+        if (x0 < 0) x0 = 0;
+        if (y0 < 0) y0 = 0;
+        if (x1 > width) x1 = width;
+        if (y1 > height) y1 = height;
+        for (y = y0; y < y1; y++) {
+            const uint32_t *row = pixels + y * pitch_pixels;
+            for (x = x0; x < x1; x++) {
+                if (is_menu_text_pixel(row[x]) ||
+                    is_dim_title_label_pixel(row[x]))
+                    hits++;
+            }
+        }
+    }
+    return hits;
+}
+
 static int is_title_menu_or_transition(const uint32_t *pixels, int width,
                                        int height, int pitch_pixels)
 {
@@ -781,6 +813,76 @@ static void draw_option_cursor(uint32_t *pixels, int width, int height,
     draw_option_arrow(pixels, width, height, pitch_pixels, 49, y);
 }
 
+static void erase_option_source_labels(uint32_t *pixels, int width, int height,
+                                       int pitch_pixels, int screen)
+{
+    int i;
+
+    for (i = 0; i < g_option_label_count; i++)
+        if (g_option_labels[i].screen == screen)
+            erase_source_label(pixels, width, height, pitch_pixels,
+                               &g_option_labels[i]);
+}
+
+static int option_selected_index(const uint32_t *pixels, int width, int height,
+                                 int pitch_pixels, int *selected_y)
+{
+    int i;
+
+    for (i = 0; i < g_option_label_count; i++) {
+        if (g_option_labels[i].screen == OPTION_SCREEN_MAIN &&
+            g_option_labels[i].selectable &&
+            has_cursor_near(pixels, width, height, pitch_pixels,
+                            &g_option_labels[i])) {
+            *selected_y = g_option_labels[i].source_y ?
+                          g_option_labels[i].source_y :
+                          g_option_labels[i].y;
+            return i;
+        }
+    }
+    for (i = 0; i < g_option_label_count; i++) {
+        if (g_option_labels[i].screen == OPTION_SCREEN_MAIN &&
+            g_option_labels[i].selectable) {
+            *selected_y = g_option_labels[i].source_y ?
+                          g_option_labels[i].source_y :
+                          g_option_labels[i].y;
+            return i;
+        }
+    }
+    return -1;
+}
+
+static void draw_option_screen_labels(uint32_t *pixels, int width, int height,
+                                      int pitch_pixels, int screen)
+{
+    int i;
+
+    erase_option_source_labels(pixels, width, height, pitch_pixels, screen);
+    if (screen == OPTION_SCREEN_KEY_CONFIG) {
+        draw_option_arrow(pixels, width, height, pitch_pixels, 156, 84);
+        draw_option_arrow(pixels, width, height, pitch_pixels, 207, 84);
+        for (i = 0; i < g_option_label_count; i++)
+            if (g_option_labels[i].screen == OPTION_SCREEN_KEY_CONFIG)
+                draw_option_label(pixels, width, height, pitch_pixels,
+                                  &g_option_labels[i], 0);
+        return;
+    }
+
+    if (screen == OPTION_SCREEN_MAIN) {
+        int selected_y = 64;
+        int selected_index = option_selected_index(pixels, width, height,
+                                                   pitch_pixels, &selected_y);
+
+        if (selected_index >= 0)
+            draw_option_cursor(pixels, width, height, pitch_pixels,
+                               selected_y);
+        for (i = 0; i < g_option_label_count; i++)
+            if (g_option_labels[i].screen == OPTION_SCREEN_MAIN)
+                draw_option_label(pixels, width, height, pitch_pixels,
+                                  &g_option_labels[i], i == selected_index);
+    }
+}
+
 static int parse_glyph_row(const char *value, unsigned short *out)
 {
     char parsed[32];
@@ -1119,6 +1221,9 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
     int title_menu_visible;
     int title_background_visible;
     int title_logo_visible;
+    int option_main_hits = 0;
+    int option_key_hits = 0;
+    int option_transition_screen = OPTION_SCREEN_NONE;
     int i;
 
     if ((!g_title_menu_active && !g_option_menu_active) || !pixels ||
@@ -1134,8 +1239,23 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
     title_logo_visible =
         g_title_menu_active &&
         has_title_logo_art(pixels, width, height, pitch_pixels);
+    if (g_option_menu_active) {
+        option_main_hits = option_source_label_hits(pixels, width, height,
+                                                    pitch_pixels,
+                                                    OPTION_SCREEN_MAIN);
+        option_key_hits = option_source_label_hits(pixels, width, height,
+                                                   pitch_pixels,
+                                                   OPTION_SCREEN_KEY_CONFIG);
+        if (option_main_hits >= 18 || option_key_hits >= 18)
+            option_transition_screen =
+                option_key_hits > option_main_hits ? OPTION_SCREEN_KEY_CONFIG :
+                                                     OPTION_SCREEN_MAIN;
+        if (!title_background_visible || title_logo_visible)
+            option_transition_screen = OPTION_SCREEN_NONE;
+    }
 
     if (g_title_menu_active &&
+        option_transition_screen == OPTION_SCREEN_NONE &&
         (title_menu_visible ||
          (g_title_overlay_hold_frames > 0 && title_background_visible &&
           title_logo_visible))) {
@@ -1162,24 +1282,28 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
                    selected == 3, 1);
         return;
     }
-    if (!title_logo_visible)
+    if (!title_logo_visible ||
+        option_transition_screen != OPTION_SCREEN_NONE)
         g_title_overlay_hold_frames = 0;
 
     if (g_option_menu_active) {
         int option_panel = is_option_panel(pixels, width, height, pitch_pixels);
-        if (!option_panel) {
-            g_option_overlay_screen = OPTION_SCREEN_NONE;
-            g_option_overlay_hold_frames = 0;
-        } else if (is_key_config_menu(pixels, width, height, pitch_pixels)) {
+        if (option_panel &&
+            is_key_config_menu(pixels, width, height, pitch_pixels)) {
             g_option_overlay_screen = OPTION_SCREEN_KEY_CONFIG;
             g_option_overlay_hold_frames = OPTION_SCREEN_HOLD_FRAMES;
-        } else if (is_option_menu(pixels, width, height, pitch_pixels)) {
+        } else if (option_panel &&
+                   is_option_menu(pixels, width, height, pitch_pixels)) {
             g_option_overlay_screen = OPTION_SCREEN_MAIN;
             g_option_overlay_hold_frames = OPTION_SCREEN_HOLD_FRAMES;
-        } else if (g_option_overlay_hold_frames > 0) {
+        } else if (option_transition_screen != OPTION_SCREEN_NONE) {
+            g_option_overlay_screen = option_transition_screen;
+            g_option_overlay_hold_frames = 2;
+        } else if (option_panel && g_option_overlay_hold_frames > 0) {
             g_option_overlay_hold_frames--;
         } else {
             g_option_overlay_screen = OPTION_SCREEN_NONE;
+            g_option_overlay_hold_frames = 0;
         }
     }
 
@@ -1189,13 +1313,11 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
         uint32_t bg = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) ?
                       rgb(8, 57, 8) : rgb(8, 8, 16);
 
-        fill_rect(pixels, width, height, pitch_pixels, 16, 18, 220, 193, bg);
-        draw_option_arrow(pixels, width, height, pitch_pixels, 156, 84);
-        draw_option_arrow(pixels, width, height, pitch_pixels, 207, 84);
-        for (i = 0; i < g_option_label_count; i++)
-            if (g_option_labels[i].screen == OPTION_SCREEN_KEY_CONFIG)
-                draw_option_label(pixels, width, height, pitch_pixels,
-                                  &g_option_labels[i], 0);
+        if (is_option_panel(pixels, width, height, pitch_pixels))
+            fill_rect(pixels, width, height, pitch_pixels, 16, 18, 220, 193,
+                      bg);
+        draw_option_screen_labels(pixels, width, height, pitch_pixels,
+                                  OPTION_SCREEN_KEY_CONFIG);
         return;
     }
 
@@ -1204,42 +1326,11 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
         g_option_overlay_screen == OPTION_SCREEN_MAIN) {
         uint32_t bg = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) ?
                       rgb(8, 57, 8) : rgb(8, 8, 16);
-        int selected_index = -1;
-        int selected_y = 64;
-        for (i = 0; i < g_option_label_count; i++) {
-            if (g_option_labels[i].screen == OPTION_SCREEN_MAIN &&
-                g_option_labels[i].selectable &&
-                has_cursor_near(pixels, width, height, pitch_pixels,
-                                &g_option_labels[i])) {
-                selected_index = i;
-                selected_y = g_option_labels[i].source_y ?
-                             g_option_labels[i].source_y :
-                             g_option_labels[i].y;
-                break;
-            }
-        }
-        fill_rect(pixels, width, height, pitch_pixels, 16, 18, 220, 193, bg);
-        if (selected_index >= 0)
-            draw_option_cursor(pixels, width, height, pitch_pixels,
-                               selected_y);
-        else {
-            for (i = 0; i < g_option_label_count; i++) {
-                if (g_option_labels[i].screen == OPTION_SCREEN_MAIN &&
-                    g_option_labels[i].selectable) {
-                    selected_index = i;
-                    selected_y = g_option_labels[i].source_y ?
-                                 g_option_labels[i].source_y :
-                                 g_option_labels[i].y;
-                    draw_option_cursor(pixels, width, height, pitch_pixels,
-                                       selected_y);
-                    break;
-                }
-            }
-        }
-        for (i = 0; i < g_option_label_count; i++)
-            if (g_option_labels[i].screen == OPTION_SCREEN_MAIN)
-                draw_option_label(pixels, width, height, pitch_pixels,
-                                  &g_option_labels[i], i == selected_index);
+        if (is_option_panel(pixels, width, height, pitch_pixels))
+            fill_rect(pixels, width, height, pitch_pixels, 16, 18, 220, 193,
+                      bg);
+        draw_option_screen_labels(pixels, width, height, pitch_pixels,
+                                  OPTION_SCREEN_MAIN);
         return;
     }
 }
