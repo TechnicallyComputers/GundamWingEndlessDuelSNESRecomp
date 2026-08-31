@@ -33,7 +33,7 @@
 #include "snes/ppu.h"
 #include "snes/snes.h"       /* snes_free on session reboot */
 #include "debug_server.h"
-#include "snes_savestate_menu.h" /* Select+R save-state overlay */
+#include "snes_savestate_menu.h" /* Select+R / F7 save-state overlay */
 #include "cpu_trace.h"
 #include "desktop/sdl_compat.h"
 #include "host_paths.h"      /* snesrecomp_exe_dir_path */
@@ -658,6 +658,7 @@ static uint16_t read_keyboard(void)
 
 #define GAME_FAST_FORWARD_DEFAULT_FRAMES 6
 #define GAME_FAST_FORWARD_MAX_FRAMES 30
+#define GAME_SAVESTATE_MENU_GESTURE ((1u << 2) | (1u << 11))
 
 static int game_env_flag(const char *name)
 {
@@ -1252,6 +1253,7 @@ session_reboot:
     while (running) {
         SDL_Event event;
         uint32 inputs;
+        int savestate_menu_hotkey = 0;
 
         while (SDL_PollEvent(&event)) {
             /* SDL2 spellings: sdl_compat.h defines SDL_ENABLE_OLD_NAMES for
@@ -1281,6 +1283,11 @@ session_reboot:
                 }
 #endif
                 running = 0;
+            }
+            if (event.type == SDL_KEYDOWN &&
+                !event.key.repeat &&
+                SNESRECOMP_SDL_EVENT_KEY(event) == SDLK_F7) {
+                savestate_menu_hotkey = 1;
             }
             /* Hotplug: a pad connected after launch must still work, and one
              * unplugged mid-game must not leave a dangling handle. */
@@ -1351,7 +1358,10 @@ session_reboot:
          * word before the seat-1 shift, because the overlay is a player-1
          * facility. */
         inputs = snes_savestate_menu_filter_guest_input(inputs);
-        if (snes_savestate_menu_poll_open(inputs)) {
+        if (savestate_menu_hotkey && !snes_savestate_menu_is_open())
+            (void)snes_savestate_menu_poll_open(GAME_SAVESTATE_MENU_GESTURE);
+        if (snes_savestate_menu_poll_open(inputs) ||
+            snes_savestate_menu_is_open()) {
             game_savestate_menu_loop(renderer, texture, &running);
             continue;   /* guest was frozen: no frame to run or present */
         }
