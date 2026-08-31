@@ -153,19 +153,31 @@ translated labels before presentation. The preview renderer reads the same
 `translations/endless_duel_title_menu.toml` geometry and
 `translations/endless_duel_title_glyphs.toml` glyph overrides, then writes
 ignored BMPs under `translations/title_menu_previews/` for quick fit checks.
-The current 2026-08-30 evidence says the text is visible in the presented title
-frame, while the raw BG/OAM helper renderers only reproduce surrounding title
-art.
+The current evidence says the text is visible in the presented title frame,
+while the raw BG/OAM helper renderers only reproduce surrounding title art.
 
 This is also the path for CJK. If the game has no Chinese/Korean glyph tiles,
 do not expose the language as a fallback-only option. Add real glyph assets,
 map strings to those assets, and validate screenshots first. The title glyph
-override format now accepts single-byte `char = "H"` entries and Unicode
+override format accepts single-byte `char = "H"` entries and Unicode
 `codepoint = "U+5267"` entries with 1-16 pixel masks. Run
 `scripts/generate_title_glyphs.py --check` to verify generated Chinese/Korean
-title glyphs remain in sync with `translations/endless_duel_title_menu.toml`.
-The current Chinese/Korean title labels are a proof of the external glyph path,
-not a complete language release.
+title and option glyphs remain in sync with
+`translations/endless_duel_title_menu.toml` and
+`translations/endless_duel_option_menu.toml`.
+
+The attract crawl has two paths:
+
+- Latin languages use `translations/endless_duel_crawl.toml` and
+  `scripts/generate_crawl_patch.py`.
+- Chinese and Korean use compact 16x16 external glyph tiles from
+  `translations/endless_duel_cjk_candidates.toml` and
+  `translations/endless_duel_cjk_glyphs.toml`, emitted by
+  `scripts/generate_cjk_glyph_tiles.ps1` and
+  `scripts/generate_cjk_crawl_patch.py`.
+
+The CJK crawl glyph generator preserves original VRAM source bytes by tile so
+asset regeneration does not invalidate runtime `[[vram_patch]]` guards.
 
 ## Visual Validation
 
@@ -174,10 +186,13 @@ have. Use visible mode when launching probes for manual observation:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate_localization_tcp.ps1 `
-  -RomPath C:\path\to\gwedj.smc -Languages fr,it,pt -Visible
+  -RomPath C:\path\to\gwedj.smc -Languages fr,it,pt,zh,ko -Visible
 
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\probe_title_menu_vram.ps1 `
-  -RomPath C:\path\to\gwedj.smc -Languages off,en,es,fr,it,pt -Visible
+  -RomPath C:\path\to\gwedj.smc -Languages off,en,es,fr,it,pt,zh,ko -Visible
+
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate_localization_crawl_tcp.ps1 `
+  -RomPath C:\path\to\gwedj.smc -Languages fr,it,pt,zh,ko -Turbo -TurboFrames 8
 ```
 
 The capture bundles are local derived artifacts and are intentionally ignored by

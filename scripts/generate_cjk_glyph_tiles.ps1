@@ -171,16 +171,32 @@ function Read-ExistingSourceHex([string]$Path) {
 
     $currentLang = ""
     $currentChar = ""
+    $currentTiles = @{}
     foreach ($line in [System.IO.File]::ReadAllLines($Path, [System.Text.Encoding]::UTF8)) {
         if ($line -match '^\[glyph\.([^\.]+)\."(.*)"\]$') {
             $currentLang = $Matches[1]
             $currentChar = $Matches[2]
+            $currentTiles = @{}
+            continue
+        }
+        if ($currentLang -and
+            $line -match '^(top_left|top_right|bottom_left|bottom_right)_tile = (0x[0-9a-fA-F]+|\d+)$') {
+            $tileText = $Matches[2]
+            if ($tileText.StartsWith("0x")) {
+                $currentTiles[$Matches[1]] = [Convert]::ToInt32($tileText.Substring(2), 16)
+            } else {
+                $currentTiles[$Matches[1]] = [int]$tileText
+            }
             continue
         }
         if ($currentLang -and
             $line -match '^(top_left|top_right|bottom_left|bottom_right)_source_hex = "([0-9a-fA-F]*)"$') {
             $key = "{0}`0{1}`0{2}" -f $currentLang, $currentChar, $Matches[1]
             $result[$key] = $Matches[2]
+            if ($currentTiles.ContainsKey($Matches[1])) {
+                $tileKey = "tile`0{0}" -f $currentTiles[$Matches[1]]
+                $result[$tileKey] = $Matches[2]
+            }
         }
     }
     return $result
@@ -193,6 +209,10 @@ function Resolve-SourceHex([hashtable]$Existing, [string]$Lang, [string]$Char,
         return Read-VramSourceHex $Vram $TileBaseWord $Tile
     }
 
+    $tileKey = "tile`0{0}" -f $Tile
+    if ($Existing.ContainsKey($tileKey)) {
+        return $Existing[$tileKey]
+    }
     $key = "{0}`0{1}`0{2}" -f $Lang, $Char, $Part
     if ($Existing.ContainsKey($key)) {
         return $Existing[$key]
@@ -216,6 +236,7 @@ if ($VramJson) {
 }
 $existingSourceHex = Read-ExistingSourceHex $outPath
 $langSpecs = @(
+    [pscustomobject]@{ Lang = "zh"; Section = "prototype.zh_compact"; Font = "Microsoft YaHei"; FontSize = 13; GlyphWidth = 2 },
     [pscustomobject]@{ Lang = "ko"; Section = "pending.ko"; Font = "Malgun Gothic"; FontSize = 13; GlyphWidth = 2 }
 )
 

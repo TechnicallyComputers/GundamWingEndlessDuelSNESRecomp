@@ -12,7 +12,7 @@ import tomllib
 from pathlib import Path
 
 
-LANGS = ("en", "es", "fr", "it", "pt")
+LANGS = ("en", "es", "fr", "it", "pt", "zh", "ko")
 PATCH_KINDS = ("rom_patch", "ram_patch", "vram_patch", "glyph_label", "entry")
 SCRIPT_CHECKS = (
     "scripts/check_localization.py",

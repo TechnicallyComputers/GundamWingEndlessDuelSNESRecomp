@@ -14,6 +14,7 @@ from pathlib import Path
 BEGIN_MARKER = "# BEGIN GENERATED CJK CRAWL VRAM PATCHES"
 END_MARKER = "# END GENERATED CJK CRAWL VRAM PATCHES"
 LANG_SPECS = {
+    "zh": ("prototype", "zh_compact", 2),
     "ko": ("pending", "ko", 2),
 }
 CJK_PATCH_LANGS = ("zh", "ko")

@@ -19,6 +19,7 @@ source_y = 32
 width = 72
 height = 14
 style = "value"
+zh = "\u9009\u9879"
 ko = "\uc124\uc815"
 
 [[label]]
@@ -32,6 +33,7 @@ source_y = 64
 width = 54
 height = 13
 style = "selectable"
+zh = "\u96be\u5ea6"
 ko = "\ub09c\uc774\ub3c4"
 
 [[label]]
@@ -45,6 +47,7 @@ source_y = 64
 width = 56
 height = 13
 style = "value"
+zh = "\u666e\u901a"
 ko = "\ubcf4\ud1b5"
 
 [[label]]
@@ -58,6 +61,7 @@ source_y = 88
 width = 36
 height = 13
 style = "selectable"
+zh = "\u65f6\u95f4"
 ko = "\uc2dc\uac04"
 
 [[label]]
@@ -71,6 +75,7 @@ source_y = 88
 width = 48
 height = 13
 style = "value"
+zh = "\u9650\u65f6"
 ko = "\uc81c\ud55c"
 
 [[label]]
@@ -84,6 +89,7 @@ source_y = 112
 width = 48
 height = 13
 style = "selectable"
+zh = "\u97f3\u6548"
 ko = "\uc0ac\uc6b4\ub4dc"
 
 [[label]]
@@ -97,6 +103,7 @@ source_y = 112
 width = 60
 height = 13
 style = "value"
+zh = "\u7acb\u4f53\u58f0"
 ko = "\uc2a4\ud14c\ub808\uc624"
 
 [[label]]
@@ -110,6 +117,7 @@ source_y = 144
 width = 96
 height = 13
 style = "selectable"
+zh = "\u6309\u952e\u8bbe\u7f6e"
 ko = "\uc870\uc791\uc124\uc815"
 
 [[label]]
@@ -123,6 +131,7 @@ source_y = 176
 width = 42
 height = 13
 style = "selectable"
+zh = "\u9000\u51fa"
 ko = "\ub098\uac00\uae30"
 
 [[label]]
@@ -137,6 +146,7 @@ source_y = 32
 width = 88
 height = 14
 style = "value"
+zh = "\u6309\u952e\u8bbe\u7f6e"
 ko = "\ud0a4 \uc124\uc815"
 
 [[label]]
@@ -151,6 +161,7 @@ source_y = 64
 width = 22
 height = 13
 style = "value"
+zh = "1P"
 ko = "1P"
 
 [[label]]
@@ -165,6 +176,7 @@ source_y = 64
 width = 22
 height = 13
 style = "value"
+zh = "2P"
 ko = "2P"
 
 [[label]]
@@ -179,6 +191,7 @@ source_y = 84
 width = 64
 height = 13
 style = "value"
+zh = "\u8f7b\u62f3"
 ko = "\uc57d\ud380\uce58"
 
 [[label]]
@@ -193,6 +206,7 @@ source_y = 116
 width = 64
 height = 13
 style = "value"
+zh = "\u91cd\u62f3"
 ko = "\uac15\ud380\uce58"
 
 [[label]]
@@ -207,6 +221,7 @@ source_y = 148
 width = 64
 height = 13
 style = "value"
+zh = "\u8f7b\u6b66\u5668"
 ko = "\uc57d\ubb34\uae30"
 
 [[label]]
@@ -221,6 +236,7 @@ source_y = 180
 width = 64
 height = 13
 style = "value"
+zh = "\u91cd\u6b66\u5668"
 ko = "\uac15\ubb34\uae30"
 
 [[label]]
@@ -235,6 +251,7 @@ source_y = 84
 width = 13
 height = 13
 style = "value"
+zh = "Y"
 ko = "Y"
 
 [[label]]
@@ -249,6 +266,7 @@ source_y = 84
 width = 13
 height = 13
 style = "value"
+zh = "Y"
 ko = "Y"
 
 [[label]]
@@ -262,6 +280,7 @@ source_x = 174
 source_y = 116
 width = 13
 height = 13
+zh = "X"
 ko = "X"
 
 [[label]]
@@ -275,6 +294,7 @@ source_x = 225
 source_y = 116
 width = 13
 height = 13
+zh = "X"
 ko = "X"
 
 [[label]]
@@ -288,6 +308,7 @@ source_x = 174
 source_y = 148
 width = 13
 height = 13
+zh = "B"
 ko = "B"
 
 [[label]]
@@ -301,6 +322,7 @@ source_x = 225
 source_y = 148
 width = 13
 height = 13
+zh = "B"
 ko = "B"
 
 [[label]]
@@ -314,6 +336,7 @@ source_x = 174
 source_y = 180
 width = 13
 height = 13
+zh = "A"
 ko = "A"
 
 [[label]]
@@ -327,4 +350,5 @@ source_x = 225
 source_y = 180
 width = 13
 height = 13
+zh = "A"
 ko = "A"

@@ -925,7 +925,8 @@ int gwed_option_menu_overlay_load(const char *path, const char *language)
     g_option_menu_active = 0;
     g_option_overlay_screen = OPTION_SCREEN_NONE;
     g_option_overlay_hold_frames = 0;
-    if (!path || !language || strcmp(language, "ko") != 0)
+    if (!path || !language ||
+        (strcmp(language, "zh") != 0 && strcmp(language, "ko") != 0))
         return 0;
 
     f = fopen(path, "rb");

@@ -10,7 +10,7 @@ from collections import Counter
 from pathlib import Path
 
 
-LANGS = ("en", "es", "fr", "it", "pt")
+LANGS = ("en", "es", "fr", "it", "pt", "zh", "ko")
 PATCH_KINDS = ("rom_patch", "ram_patch", "vram_patch", "glyph_label", "entry")
 
 
@@ -75,6 +75,34 @@ def dialogue_langs(source: dict) -> Counter[str]:
     return counts
 
 
+def label_langs(source: dict) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for entry in source.get("label", []):
+        for lang in LANGS:
+            if lang in entry and str(entry[lang]):
+                counts[lang] += 1
+    return counts
+
+
+def cjk_crawl_langs(source: dict) -> dict[str, int]:
+    result: dict[str, int] = {}
+    zh_lines = (
+        source.get("prototype", {})
+        .get("zh_compact", {})
+        .get("lines", [])
+    )
+    ko_lines = (
+        source.get("pending", {})
+        .get("ko", {})
+        .get("lines", [])
+    )
+    if isinstance(zh_lines, list):
+        result["zh"] = len([line for line in zh_lines if str(line)])
+    if isinstance(ko_lines, list):
+        result["ko"] = len([line for line in ko_lines if str(line)])
+    return result
+
+
 def main() -> int:
     root = repo_root()
     parser = argparse.ArgumentParser()
@@ -97,6 +125,21 @@ def main() -> int:
         "--dialogue-targets",
         default=str(root / "translations" / "endless_duel_dialogue_targets.toml"),
         help="source-backed dialogue target-language text table",
+    )
+    parser.add_argument(
+        "--title-menu",
+        default=str(root / "translations" / "endless_duel_title_menu.toml"),
+        help="source-backed title-menu overlay text table",
+    )
+    parser.add_argument(
+        "--option-menu",
+        default=str(root / "translations" / "endless_duel_option_menu.toml"),
+        help="source-backed option-menu overlay text table",
+    )
+    parser.add_argument(
+        "--cjk-candidates",
+        default=str(root / "translations" / "endless_duel_cjk_candidates.toml"),
+        help="source-backed compact CJK crawl text table",
     )
     args = parser.parse_args()
 
@@ -124,9 +167,15 @@ def main() -> int:
     option_source = load_toml(Path(args.options))
     crawl_source = load_toml(Path(args.crawl))
     dialogue_source = load_toml(Path(args.dialogue_targets))
+    title_menu_source = load_toml(Path(args.title_menu))
+    option_menu_source = load_toml(Path(args.option_menu))
+    cjk_crawl_source = load_toml(Path(args.cjk_candidates))
     option_counts = text_patch_langs(option_source)
     crawl_counts = crawl_langs(crawl_source)
+    cjk_crawl_counts = cjk_crawl_langs(cjk_crawl_source)
     dialogue_counts = dialogue_langs(dialogue_source)
+    title_menu_counts = label_langs(title_menu_source)
+    option_menu_counts = label_langs(option_menu_source)
 
     print("Endless Duel localization coverage")
     print(f"  default_lang: {table.get('default_lang', 'en')}")
@@ -151,6 +200,9 @@ def main() -> int:
         print(
             f"  {lang}: option_entries={option_counts[lang]} "
             f"crawl_lines={crawl_counts.get(lang, 0)} "
+            f"cjk_crawl_lines={cjk_crawl_counts.get(lang, 0)} "
+            f"title_labels={title_menu_counts[lang]} "
+            f"option_overlay_labels={option_menu_counts[lang]} "
             f"dialogue_lines={dialogue_counts[lang]}"
         )
     print()
