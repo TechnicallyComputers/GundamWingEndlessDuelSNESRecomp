@@ -34,6 +34,7 @@ def generate_language_hex(source: dict, lang: str) -> str:
     lang_data = source["languages"][lang]
     slots = [dict(slot) for slot in source["line_slot"]]
     lines = lang_data["lines"]
+    slot_offset = int(lang_data.get("slot_offset", 0))
     for override in lang_data.get("line_slot", []):
         line_index = int(override["line"]) - 1
         if line_index < 0 or line_index >= len(slots):
@@ -42,8 +43,12 @@ def generate_language_hex(source: dict, lang: str) -> str:
             "top": override["top"],
             "bottom": override["bottom"],
         }
-    if len(lines) != len(slots):
-        raise ValueError(f"{lang}: expected {len(slots)} lines, got {len(lines)}")
+    if slot_offset < 0 or slot_offset + len(lines) > len(slots):
+        raise ValueError(
+            f"{lang}: slot_offset {slot_offset} with {len(lines)} lines "
+            f"exceeds {len(slots)} line slots"
+        )
+    active_slots = slots[slot_offset:slot_offset + len(lines)]
 
     glyphs = {
         key: (
@@ -56,7 +61,7 @@ def generate_language_hex(source: dict, lang: str) -> str:
     space = glyphs[" "][0]
     grid = [[space for _ in range(row_width)] for _ in range(rows)]
 
-    for line_number, (line, slot) in enumerate(zip(lines, slots), 1):
+    for line_number, (line, slot) in enumerate(zip(lines, active_slots), 1):
         top_row, top_col = [int(x) for x in slot["top"]]
         bottom_row, bottom_col = [int(x) for x in slot["bottom"]]
         for row, col, name in ((top_row, top_col, "top"), (bottom_row, bottom_col, "bottom")):

@@ -50,8 +50,8 @@ top = [10, 37]
 bottom = [11, 5]
 
 [glyph." "]
-top = "2100"
-bottom = "2100"
+top = "2000"
+bottom = "2000"
 
 [glyph.A]
 top = "2120"
@@ -257,43 +257,37 @@ raw_tile = [
 ]
 
 [languages.fr]
+slot_offset = 2
 lines = [
-  "Cinq jeunes,comme etoiles",
+  "Cinq jeunes etoiles",
   "tombent sur Terre.",
-  "Pilotant des Gundams,ils",
-  "recoivent mission secrete",
-  "detruire les Mobile Suits",
-  "de l'Alliance",
-  "et tuer toute menace a la",
-  "mission....",
-  "Puissent ils liberer la",
-  "Sphere terrestre...",
+  "Pilotent Gundams",
+  "mission secrete",
+  "detruire MS ennemis",
+  "et toute menace.",
+  "liberer Terre...",
 ]
 
 [languages.it]
+slot_offset = 2
 lines = [
-  "Stelle cadenti,cinque",
-  "giovani a Terra.",
-  "Pilotando Gundams,hanno",
+  "Cinque stelle cadono",
+  "sulla Terra.",
+  "Con Gundam hanno",
   "missione segreta",
-  "di distruggere Mobile Suit",
-  "dell'Alliance",
-  "e uccidere chi minaccia",
-  "il compito....",
-  "Possano portare liberta",
-  "alla Sfera terrestre...",
+  "distruggere MS nemici",
+  "e ogni minaccia.",
+  "liberare la Terra...",
 ]
 
 [languages.pt]
+slot_offset = 2
 lines = [
-  "Estrelas cadentes,cinco",
-  "jovens a Terra.",
-  "Pilotando Gundams,recebem",
-  "uma missao secreta",
-  "destruir Mobile Suits da",
-  "Alianca",
-  "e matar quem ameaca a",
-  "missao....",
-  "que tragam liberdade a",
-  "Esfera terrestre...",
+  "Cinco jovens caem",
+  "como estrelas.",
+  "Com seus Gundams",
+  "tem missao secreta",
+  "destruir MS inimigos",
+  "e qualquer ameaca.",
+  "libertar a Terra...",
 ]

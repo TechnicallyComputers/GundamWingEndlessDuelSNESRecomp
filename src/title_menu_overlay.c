@@ -1,6 +1,7 @@
 #include "title_menu_overlay.h"
 
 #include "common_rtl.h"
+#include "snes/ppu.h"
 
 #include <stdio.h>
 #include <stddef.h>
@@ -35,15 +36,24 @@ typedef struct TitleGlyphEntry {
 #define OPTION_SCREEN_NONE -1
 #define OPTION_SCREEN_MAIN 0
 #define OPTION_SCREEN_KEY_CONFIG 1
+#define TITLE_MENU_HOLD_FRAMES 96
 #define OPTION_SCREEN_HOLD_FRAMES 4
+#define CRAWL_ACTIVE_FILL_PIXELS 800
+#define CRAWL_STALE_FILL_PIXELS 700
 
 static TitleMenuLabel g_title_labels[4];
 static TitleMenuLabel g_option_labels[MAX_OPTION_LABELS];
 static int g_option_label_count;
 static int g_title_menu_active;
 static int g_option_menu_active;
+static int g_title_overlay_hold_frames;
+static int g_crawl_edge_cleanup_active;
+static int g_crawl_seen_active_text;
+static int g_crawl_remove_bg3_next_frame;
+static int g_crawl_fight_hud_recent_frames;
 static int g_option_overlay_screen = OPTION_SCREEN_NONE;
 static int g_option_overlay_hold_frames;
+static uint32_t g_crawl_bg3_capture[256 * 224];
 
 static const TitleGlyph kEmptyGlyph = { 8, 8, { 0 } };
 static const TitleGlyph kSpaceGlyph = { 5, 8, { 0 } };
@@ -182,11 +192,349 @@ static int is_menu_text_pixel(uint32_t p)
     int r, g, b;
     unpack(p, &r, &g, &b);
 
-    if (r >= 135 && g >= 135 && b <= 210)
+    if (r >= 135 && g >= 135 && b <= 210 && r + 24 >= g)
         return 1;
     if (g >= 70 && g >= r + 12 && b <= 150)
         return 1;
     return 0;
+}
+
+static int is_dim_title_label_pixel(uint32_t p)
+{
+    int r, g, b;
+    unpack(p, &r, &g, &b);
+
+    if (r + g + b < 50)
+        return 0;
+    if (r >= 24 && g >= 24 && b <= g + 44 && r + 28 >= g)
+        return 1;
+    if (g >= 28 && g >= r + 4 && b <= g + 36)
+        return 1;
+    return 0;
+}
+
+static int is_title_background_pixel(uint32_t p)
+{
+    int r, g, b;
+    unpack(p, &r, &g, &b);
+
+    if (near_color(p, 8, 16, 41, 40))
+        return 1;
+    return r <= 40 && g <= 72 && b >= 32 && b <= 128 &&
+           b >= r + 10 && b >= g + 4;
+}
+
+static int is_crawl_bg3_wrap_state(void)
+{
+    if (!g_ppu)
+        return 0;
+    if ((g_ppu->bgmode & 7) != 1)
+        return 0;
+    if (!(g_ppu->screenEnabled[0] & (1 << kPpuOverlaySource_Bg3)))
+        return 0;
+    if (g_ppu->bgTileAdr != 0x3300 || g_ppu->bgXsc[2] != 0x63)
+        return 0;
+    return g_ppu->vScroll[2] >= 512;
+}
+
+static int should_remove_stale_crawl_bg3(void)
+{
+    if (!g_crawl_edge_cleanup_active)
+        return 0;
+    if (g_crawl_fight_hud_recent_frames <= 0)
+        return 0;
+    if (is_crawl_bg3_wrap_state())
+        return 1;
+    return g_crawl_remove_bg3_next_frame && g_ppu &&
+           g_ppu->vScroll[2] >= 224;
+}
+
+static int has_title_scene_background(const uint32_t *pixels, int width,
+                                      int height, int pitch_pixels)
+{
+    static const unsigned char sample_points[][2] = {
+        { 16, 213 }, { 33, 210 }, { 220, 180 },
+        { 240, 40 }, { 20, 20 }, { 190, 135 }
+    };
+    int hits = 0;
+    int i;
+
+    if (width < 256 || height < 224)
+        return 0;
+
+    for (i = 0; i < (int)(sizeof(sample_points) / sizeof(sample_points[0])); i++) {
+        uint32_t p = pixels[sample_points[i][1] * pitch_pixels +
+                            sample_points[i][0]];
+        if (is_title_background_pixel(p))
+            hits++;
+    }
+    return hits >= 4;
+}
+
+static int title_source_label_hits(const uint32_t *pixels, int width,
+                                   int height, int pitch_pixels)
+{
+    int hits = 0;
+    int i;
+
+    for (i = 0; i < 4; i++) {
+        const TitleMenuLabel *label = &g_title_labels[i];
+        int x0, x1, y0, y1, x, y;
+
+        if (!label->present)
+            continue;
+        x0 = label->source_x ? label->source_x : label->x;
+        y0 = label->source_y ? label->source_y : label->y;
+        x1 = x0 + (int)strlen(label->source) * 10 + 8;
+        y1 = y0 + label->h + 4;
+        if (x0 < 0) x0 = 0;
+        if (y0 < 0) y0 = 0;
+        if (x1 > width) x1 = width;
+        if (y1 > height) y1 = height;
+        for (y = y0; y < y1; y++) {
+            const uint32_t *row = pixels + y * pitch_pixels;
+            for (x = x0; x < x1; x++) {
+                if (is_menu_text_pixel(row[x]) ||
+                    is_dim_title_label_pixel(row[x]))
+                    hits++;
+            }
+        }
+    }
+    return hits;
+}
+
+static int is_title_menu_or_transition(const uint32_t *pixels, int width,
+                                       int height, int pitch_pixels)
+{
+    int label_hits = title_source_label_hits(pixels, width, height,
+                                             pitch_pixels);
+
+    if (label_hits < 18)
+        return 0;
+    return is_title_menu(pixels, width, height, pitch_pixels) ||
+           has_title_scene_background(pixels, width, height, pitch_pixels);
+}
+
+static int is_fight_hud(const uint32_t *pixels, int width, int height,
+                        int pitch_pixels)
+{
+    static const unsigned char sample_points[][2] = {
+        { 40, 38 }, { 80, 38 }, { 160, 38 }, { 210, 38 }
+    };
+    int hits = 0;
+    int i;
+
+    if (width < 256 || height < 224)
+        return 0;
+
+    for (i = 0; i < (int)(sizeof(sample_points) / sizeof(sample_points[0])); i++) {
+        uint32_t p = pixels[sample_points[i][1] * pitch_pixels +
+                            sample_points[i][0]];
+        if (near_color(p, 132, 222, 24, 42) ||
+            near_color(p, 231, 255, 123, 42))
+            hits++;
+    }
+    return hits >= 3;
+}
+
+static int is_crawl_fill_pixel(uint32_t p)
+{
+    int r, g, b;
+    unpack(p, &r, &g, &b);
+
+    if (near_color(p, 231, 57, 115, 40))
+        return 1;
+    if (r >= 220 && g <= 70 && b <= 85)
+        return 1;
+    return 0;
+}
+
+static int count_crawl_fill_pixels(const uint32_t *pixels, int width,
+                                   int height, int pitch_pixels)
+{
+    int x, y, count = 0;
+    int x0 = 0, x1 = width, y0 = 40, y1 = height;
+
+    if (y1 > 216)
+        y1 = 216;
+    for (y = y0; y < y1; y++) {
+        const uint32_t *row = pixels + y * pitch_pixels;
+        for (x = x0; x < x1; x++) {
+            if (is_crawl_fill_pixel(row[x]))
+                count++;
+        }
+    }
+    return count;
+}
+
+static int is_crawl_outline_pixel(uint32_t p)
+{
+    int r, g, b;
+    unpack(p, &r, &g, &b);
+
+    return r >= 230 && g >= 230 && b >= 230;
+}
+
+static int is_crawl_shifted_edge_pixel(uint32_t p)
+{
+    return near_color(p, 99, 173, 255, 24) ||
+           near_color(p, 156, 181, 255, 24) ||
+           near_color(p, 181, 206, 247, 24) ||
+           near_color(p, 231, 247, 255, 18) ||
+           near_color(p, 255, 0, 0, 30);
+}
+
+static int is_stale_crawl_overlay_pixel(uint32_t p)
+{
+    int r, g, b;
+    unpack(p, &r, &g, &b);
+
+    return b >= 150 && g >= 105 && r <= 210 && b >= r + 16;
+}
+
+static uint32_t crawl_overlay_replacement_pixel(uint32_t *pixels,
+                                                const uint32_t *overlay,
+                                                int width, int height,
+                                                int pitch_pixels,
+                                                int x, int y)
+{
+    static const signed char probes[] = {
+        -4, 4, -8, 8, -12, 12, -16, 16
+    };
+    int i;
+
+    for (i = 0; i < (int)(sizeof(probes) / sizeof(probes[0])); i++) {
+        int py = y + probes[i];
+        uint32_t p, o;
+        if (py < 0 || py >= height)
+            continue;
+        o = overlay[py * 256 + x] & 0x00ffffffu;
+        if (is_stale_crawl_overlay_pixel(o))
+            continue;
+        p = pixels[py * pitch_pixels + x];
+        if (!is_crawl_fill_pixel(p) && !is_crawl_outline_pixel(p))
+            return p;
+    }
+    return pixels[y * pitch_pixels + x];
+}
+
+static void clean_crawl_overlay_artifacts(uint32_t *pixels, int width,
+                                          int height, int pitch_pixels)
+{
+    int x, y;
+
+    if (width > 256)
+        width = 256;
+    if (height > 224)
+        height = 224;
+    for (y = 40; y < height; y++) {
+        for (x = 0; x < width; x++) {
+            uint32_t overlay = g_crawl_bg3_capture[y * 256 + x] & 0x00ffffffu;
+            uint32_t pixel = pixels[y * pitch_pixels + x];
+            if (!is_stale_crawl_overlay_pixel(overlay))
+                continue;
+            if (!near_color(pixel, (int)((overlay >> 16) & 0xffu),
+                            (int)((overlay >> 8) & 0xffu),
+                            (int)(overlay & 0xffu), 18))
+                continue;
+            pixels[y * pitch_pixels + x] =
+                crawl_overlay_replacement_pixel(pixels, g_crawl_bg3_capture,
+                                                width, height, pitch_pixels,
+                                                x, y);
+        }
+    }
+}
+
+static int has_crawl_fill_neighbor(const uint32_t *pixels, int width,
+                                   int height, int pitch_pixels, int x, int y)
+{
+    int dy, dx;
+
+    for (dy = -2; dy <= 2; dy++) {
+        int py = y + dy;
+        if (py < 0 || py >= height)
+            continue;
+        for (dx = -2; dx <= 2; dx++) {
+            int px = x + dx;
+            if (px < 0 || px >= width)
+                continue;
+            if (is_crawl_fill_pixel(pixels[py * pitch_pixels + px]))
+                return 1;
+        }
+    }
+    return 0;
+}
+
+static int is_crawl_edge_glyph_pixel(const uint32_t *pixels, int width,
+                                     int height, int pitch_pixels,
+                                     int x, int y, int shifted)
+{
+    uint32_t p = pixels[y * pitch_pixels + x];
+
+    if (is_crawl_fill_pixel(p))
+        return 1;
+    if (shifted && is_crawl_shifted_edge_pixel(p))
+        return 1;
+    return is_crawl_outline_pixel(p) &&
+           has_crawl_fill_neighbor(pixels, width, height, pitch_pixels, x, y);
+}
+
+static uint32_t crawl_edge_replacement_pixel(uint32_t *pixels, int width,
+                                             int height, int pitch_pixels,
+                                             int x, int y)
+{
+    static const signed char probes[] = {
+        -4, 4, -7, 7, -10, 10, -14, 14
+    };
+    int i;
+
+    (void)width;
+    for (i = 0; i < (int)(sizeof(probes) / sizeof(probes[0])); i++) {
+        int py = y + probes[i];
+        uint32_t p;
+        if (py < 0 || py >= height)
+            continue;
+        p = pixels[py * pitch_pixels + x];
+        if (!is_crawl_fill_pixel(p) && !is_crawl_outline_pixel(p) &&
+            !is_crawl_shifted_edge_pixel(p))
+            return p;
+    }
+    return pixels[y * pitch_pixels + x];
+}
+
+static void clean_crawl_edge_band(uint32_t *pixels, int width, int height,
+                                  int pitch_pixels, int x0, int x1,
+                                  int y0, int y1, int shifted)
+{
+    int x, y;
+
+    if (x0 < 0) x0 = 0;
+    if (x1 > width) x1 = width;
+    if (y0 < 0) y0 = 0;
+    if (y1 > height) y1 = height;
+    for (y = y0; y < y1; y++) {
+        for (x = x0; x < x1; x++) {
+            if (is_crawl_edge_glyph_pixel(pixels, width, height,
+                                          pitch_pixels, x, y, shifted)) {
+                pixels[y * pitch_pixels + x] =
+                    crawl_edge_replacement_pixel(pixels, width, height,
+                                                 pitch_pixels, x, y);
+            }
+        }
+    }
+}
+
+static void clean_crawl_edges(uint32_t *pixels, int width, int height,
+                              int pitch_pixels)
+{
+    clean_crawl_edge_band(pixels, width, height, pitch_pixels, 0, width,
+                          44, 70, 0);
+    clean_crawl_edge_band(pixels, width, height, pitch_pixels, 90, 170,
+                          44, 122, 1);
+    clean_crawl_edge_band(pixels, width, height, pitch_pixels, 0, width,
+                          210, 224, 0);
+    clean_crawl_edge_band(pixels, width, height, pitch_pixels, 48, 224,
+                          210, 224, 1);
 }
 
 static char *trim(char *s)
@@ -453,16 +801,6 @@ static int text_height(const char *text, int scale)
     return height * scale;
 }
 
-static int text_has_non_ascii(const char *text)
-{
-    while (text && *text) {
-        if ((unsigned char)*text >= 128)
-            return 1;
-        text++;
-    }
-    return 0;
-}
-
 static uint32_t row_background(const uint32_t *pixels, int width, int height,
                                int pitch_pixels, const TitleMenuLabel *label)
 {
@@ -502,37 +840,23 @@ static void erase_source_label(uint32_t *pixels, int width, int height,
                                int pitch_pixels, const TitleMenuLabel *label)
 {
     uint32_t bg = row_background(pixels, width, height, pitch_pixels, label);
-    int scale = 1;
-    int cursor = label->source_x ? label->source_x :
-                 label->x + (label->w - text_width(label->source, scale) + 1) / 2;
-    int y = label->source_y ? label->source_y :
-            (label->text_y ? label->text_y : label->y);
-    const char *source = label->source;
-    int source_x = cursor;
+    int x0 = label->x - 10;
+    int x1 = label->x + label->w + 16;
+    int y0 = label->y - 4;
+    int y1 = label->y + 34;
+    int x, y;
 
-    while (source && *source) {
-        const TitleGlyph *glyph = next_title_glyph(&source);
-        int gy, gx;
-
-        if (!glyph)
-            break;
-        for (gy = 0; gy < glyph->height; gy++) {
-            for (gx = 0; gx < glyph->width; gx++) {
-                int px;
-                int py;
-                if (!(glyph->rows[gy] & (1u << (glyph->width - 1 - gx))))
-                    continue;
-                px = cursor + gx * scale;
-                py = y + gy * scale;
-                if (px >= 0 && px < width && py >= 0 && py < height)
-                    pixels[py * pitch_pixels + px] = bg;
-                px += scale;
-                py += scale;
-                if (px >= 0 && px < width && py >= 0 && py < height)
-                    pixels[py * pitch_pixels + px] = bg;
-            }
+    if (x0 < 0) x0 = 0;
+    if (x1 > width) x1 = width;
+    if (y0 < 0) y0 = 0;
+    if (y1 > height) y1 = height;
+    for (y = y0; y < y1; y++) {
+        uint32_t *row = pixels + y * pitch_pixels;
+        for (x = x0; x < x1; x++) {
+            if (is_menu_text_pixel(row[x]) ||
+                is_dim_title_label_pixel(row[x]))
+                row[x] = bg;
         }
-        cursor += (glyph->width + 1) * scale;
     }
 }
 
@@ -910,6 +1234,14 @@ int gwed_title_menu_overlay_load(const char *path, const char *glyph_path,
         }
     }
     g_title_menu_active = 1;
+    g_title_overlay_hold_frames = 0;
+    g_crawl_edge_cleanup_active =
+        strcmp(language, "fr") == 0 || strcmp(language, "it") == 0 ||
+        strcmp(language, "pt") == 0 || strcmp(language, "zh") == 0 ||
+        strcmp(language, "ko") == 0;
+    g_crawl_seen_active_text = 0;
+    g_crawl_remove_bg3_next_frame = 0;
+    g_crawl_fight_hud_recent_frames = 0;
     return 1;
 }
 
@@ -923,6 +1255,7 @@ int gwed_option_menu_overlay_load(const char *path, const char *language)
     memset(g_option_labels, 0, sizeof(g_option_labels));
     g_option_label_count = 0;
     g_option_menu_active = 0;
+    g_title_overlay_hold_frames = 0;
     g_option_overlay_screen = OPTION_SCREEN_NONE;
     g_option_overlay_hold_frames = 0;
     if (!path || !language ||
@@ -1014,43 +1347,96 @@ void gwed_title_menu_overlay_clear(void)
     g_option_label_count = 0;
     g_title_menu_active = 0;
     g_option_menu_active = 0;
+    g_title_overlay_hold_frames = 0;
+    g_crawl_edge_cleanup_active = 0;
+    g_crawl_seen_active_text = 0;
+    g_crawl_remove_bg3_next_frame = 0;
+    g_crawl_fight_hud_recent_frames = 0;
     g_option_overlay_screen = OPTION_SCREEN_NONE;
     g_option_overlay_hold_frames = 0;
+}
+
+void gwed_title_menu_overlay_prepare_frame(void)
+{
+    if (!g_ppu)
+        return;
+
+    PpuClearOverlayCaptures(g_ppu);
+    if (!g_crawl_edge_cleanup_active)
+        return;
+
+    PpuBindOverlaySurface(g_ppu, kPpuOverlaySource_Bg3,
+                          (uint8_t *)g_crawl_bg3_capture, 256 * 4);
+    PpuSetOverlayCapture(g_ppu, kPpuOverlaySource_Bg3, 0, 0, 256, 224,
+                         should_remove_stale_crawl_bg3()
+                             ? kPpuOverlayFlag_RemoveFromGame : 0);
 }
 
 void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
                                    int pitch_pixels)
 {
     int selected;
-    int skip_source_erase;
+    int title_menu_visible;
+    int title_background_visible;
     int i;
 
     if ((!g_title_menu_active && !g_option_menu_active) || !pixels ||
         pitch_pixels <= 0)
         return;
 
-    if (g_title_menu_active && is_title_menu(pixels, width, height,
-                                             pitch_pixels)) {
+    title_menu_visible =
+        g_title_menu_active &&
+        is_title_menu_or_transition(pixels, width, height, pitch_pixels);
+    title_background_visible =
+        g_title_menu_active &&
+        has_title_scene_background(pixels, width, height, pitch_pixels);
+
+    if (g_title_menu_active &&
+        (title_menu_visible ||
+         (g_title_overlay_hold_frames > 0 && title_background_visible))) {
+        if (title_menu_visible)
+            g_title_overlay_hold_frames = TITLE_MENU_HOLD_FRAMES;
+        else
+            g_title_overlay_hold_frames--;
         g_option_overlay_screen = OPTION_SCREEN_NONE;
         g_option_overlay_hold_frames = 0;
         selected = (int)(g_ram[0x0504] / 2);
         if (selected < 0 || selected > 3)
             selected = 0;
 
-        skip_source_erase = text_has_non_ascii(g_title_labels[0].text) ||
-                            text_has_non_ascii(g_title_labels[1].text) ||
-                            text_has_non_ascii(g_title_labels[2].text) ||
-                            text_has_non_ascii(g_title_labels[3].text);
-
+        for (i = 0; i < 4; i++)
+            erase_source_label(pixels, width, height, pitch_pixels,
+                               &g_title_labels[i]);
         draw_label(pixels, width, height, pitch_pixels, &g_title_labels[0],
-                   selected == 0, skip_source_erase);
+                   selected == 0, 1);
         draw_label(pixels, width, height, pitch_pixels, &g_title_labels[1],
-                   selected == 1, skip_source_erase);
+                   selected == 1, 1);
         draw_label(pixels, width, height, pitch_pixels, &g_title_labels[2],
-                   selected == 2, skip_source_erase);
+                   selected == 2, 1);
         draw_label(pixels, width, height, pitch_pixels, &g_title_labels[3],
-                   selected == 3, skip_source_erase);
+                   selected == 3, 1);
         return;
+    }
+
+    if (g_crawl_edge_cleanup_active) {
+        if (is_fight_hud(pixels, width, height, pitch_pixels)) {
+            int crawl_fill = count_crawl_fill_pixels(pixels, width, height,
+                                                     pitch_pixels);
+            g_crawl_fight_hud_recent_frames = 2;
+            clean_crawl_overlay_artifacts(pixels, width, height, pitch_pixels);
+            if (crawl_fill >= CRAWL_ACTIVE_FILL_PIXELS) {
+                g_crawl_seen_active_text = 1;
+                g_crawl_remove_bg3_next_frame = 0;
+            } else if (g_crawl_seen_active_text &&
+                       crawl_fill < CRAWL_STALE_FILL_PIXELS) {
+                g_crawl_remove_bg3_next_frame = 1;
+            }
+        } else {
+            if (g_crawl_fight_hud_recent_frames > 0)
+                g_crawl_fight_hud_recent_frames--;
+            g_crawl_seen_active_text = 0;
+            g_crawl_remove_bg3_next_frame = 0;
+        }
     }
 
     if (g_option_menu_active) {
