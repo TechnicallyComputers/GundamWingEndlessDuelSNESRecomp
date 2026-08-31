@@ -17,6 +17,7 @@ PATCH_KINDS = ("rom_patch", "ram_patch", "vram_patch", "glyph_label", "entry")
 SCRIPT_CHECKS = (
     "scripts/check_localization.py",
     "scripts/generate_crawl_patch.py",
+    "scripts/generate_cjk_crawl_patch.py",
     "scripts/generate_title_glyphs.py",
     "scripts/generate_option_patch.py",
     "scripts/generate_dialogue_patch.py",
@@ -92,6 +93,7 @@ def main() -> int:
     os.environ.setdefault("PYTHONPYCACHEPREFIX", str(env_prefix))
 
     run(root, [sys.executable, "scripts/generate_crawl_patch.py", "--check"])
+    run(root, [sys.executable, "scripts/generate_cjk_crawl_patch.py", "--check"])
     run(root, [sys.executable, "scripts/generate_title_glyphs.py", "--check"])
     run(root, [sys.executable, "scripts/generate_option_patch.py", "--check"])
     run(root, [sys.executable, "scripts/generate_dialogue_patch.py"])

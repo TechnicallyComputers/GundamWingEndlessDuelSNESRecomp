@@ -14,9 +14,9 @@ map of current assets, commands, and open surfaces.
 - `fr`, `it`, `pt`: native opening/fight crawl tilemap overlays, option-menu
   labels, and decoded battle/ending dialogue tilemap rows. Remaining title/menu
   graphics and still-undecoded reference spans fall back to English patch data.
-- `ko`, `zh`: not exposed in the launcher. Korean and Chinese crawl drafts live
-  in `endless_duel_cjk_candidates.toml`, but they are research input only until
-  native glyph assets exist and pass screenshot validation.
+- `ko`, `zh`: not exposed in the launcher. Korean now has native title/menu,
+  option-screen, key-config, and opening/fight crawl prototype coverage through
+  generated runtime glyph/tile patches. Chinese remains research input.
 
 English and Spanish are broader because they were imported from existing full
 fan-translation ROM hacks as binary reference diffs. The runtime table applies
@@ -24,20 +24,18 @@ those byte ranges to the in-memory cartridge image after boot. For languages
 without full reference hacks, we currently add mapped surfaces by hand or by
 source-backed generators.
 
-The opening crawl is encoded as a 64-tile-wide BG tilemap strip. Each visible
-glyph uses a top tile entry and a bottom tile entry, with the bottom half stored
-32 tile indices after the top half. The current native crawl overlays reuse the
-Latin glyph set recovered from the English and Spanish references; the supported
-set is intentionally limited and avoids accents, `x`, and CJK glyphs until new
-font/tile assets are added. Korean and Chinese therefore still need native CJK
-assets before readable non-fallback text can be rendered safely.
+The opening crawl is encoded as a 64-tile-wide BG tilemap strip. Latin glyphs
+use a top tile entry and a bottom tile entry, with the bottom half stored 32
+tile indices after the top half. The Latin crawl overlays reuse the glyph set
+recovered from the English and Spanish references; the supported Latin set is
+intentionally limited and avoids accents and `x` until new font/tile assets are
+added.
 
 `scripts/generate_cjk_glyph_tiles.ps1` and
-`scripts/generate_cjk_crawl_patch.py` are experimental helpers for producing
-language-gated CJK crawl tile patches from authored candidate text. A 2026-08-30
-TCP validation pass confirmed the generated VRAM patches applied, but the
-Chinese/Korean crawl was visually unreadable in-game, so those patches are not
-checked into `endless_duel.toml` as active runtime data.
+`scripts/generate_cjk_crawl_patch.py` produce language-gated CJK crawl tile
+patches from authored candidate text. Korean uses authored 16x16 Hangul cells
+encoded as BG3 2bpp tiles and validated with TCP screenshots. Chinese remains a
+prototype input until its glyph set and screenshots are validated.
 
 ## Adding Native Language Data
 

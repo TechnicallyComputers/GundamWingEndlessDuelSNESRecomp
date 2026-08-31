@@ -61,40 +61,34 @@ function Get-GlyphChars([string[]]$Lines) {
     return [string[]]$chars
 }
 
-function Encode-Snes4bppTile([int[,]]$Pixels, [int]$Y0) {
-    $bytes = New-Object byte[] 32
+function Encode-Snes2bppTile([int[,]]$Pixels, [int]$Y0) {
+    $bytes = New-Object byte[] 16
     for ($y = 0; $y -lt 8; $y++) {
         $p0 = 0
         $p1 = 0
-        $p2 = 0
-        $p3 = 0
         for ($x = 0; $x -lt 8; $x++) {
             $bit = 7 - $x
             $v = $Pixels[$x, ($Y0 + $y)]
             if (($v -band 1) -ne 0) { $p0 = $p0 -bor (1 -shl $bit) }
             if (($v -band 2) -ne 0) { $p1 = $p1 -bor (1 -shl $bit) }
-            if (($v -band 4) -ne 0) { $p2 = $p2 -bor (1 -shl $bit) }
-            if (($v -band 8) -ne 0) { $p3 = $p3 -bor (1 -shl $bit) }
         }
         $bytes[$y * 2] = [byte]$p0
         $bytes[$y * 2 + 1] = [byte]$p1
-        $bytes[16 + $y * 2] = [byte]$p2
-        $bytes[16 + $y * 2 + 1] = [byte]$p3
     }
     return -join ($bytes | ForEach-Object { $_.ToString("x2") })
 }
 
-function Render-Glyph([string]$Char, [string]$FontName) {
+function Render-Glyph([string]$Char, [string]$FontName, [int]$FontSize, [int]$GlyphWidth) {
     $bmp = [System.Drawing.Bitmap]::new(16, 16, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.Clear([System.Drawing.Color]::Black)
     $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::SingleBitPerPixelGridFit
     $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
-    $font = [System.Drawing.Font]::new($FontName, 15, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
+    $font = [System.Drawing.Font]::new($FontName, $FontSize, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
     $format = [System.Drawing.StringFormat]::new()
     $format.Alignment = [System.Drawing.StringAlignment]::Center
     $format.LineAlignment = [System.Drawing.StringAlignment]::Center
-    $rect = [System.Drawing.RectangleF]::new(-1.0, -1.0, 18.0, 18.0)
+    $rect = [System.Drawing.RectangleF]::new(0.0, 0.0, 16.0, 16.0)
     $g.DrawString($Char, $font, [System.Drawing.Brushes]::White, $rect, $format)
 
     $pixels = New-Object 'int[,]' 16,16
@@ -102,7 +96,7 @@ function Render-Glyph([string]$Char, [string]$FontName) {
         for ($x = 0; $x -lt 16; $x++) {
             $c = $bmp.GetPixel($x, $y)
             $lum = [int](($c.R + $c.G + $c.B) / 3)
-            $pixels[$x, $y] = if ($lum -gt 220) { 3 } elseif ($lum -gt 120) { 2 } elseif ($lum -gt 16) { 1 } else { 0 }
+            $pixels[$x, $y] = if ($lum -gt 48) { 3 } else { 0 }
         }
     }
 
@@ -110,14 +104,23 @@ function Render-Glyph([string]$Char, [string]$FontName) {
     $rightPixels = New-Object 'int[,]' 8,16
     for ($y = 0; $y -lt 16; $y++) {
         for ($x = 0; $x -lt 8; $x++) {
-            $leftPixels[$x, $y] = $pixels[$x, $y]
-            $rightPixels[$x, $y] = $pixels[($x + 8), $y]
+            if ($GlyphWidth -eq 1) {
+                $srcX0 = $x * 2
+                $srcX1 = $srcX0 + 1
+                $sample0 = $pixels[$srcX0, $y]
+                $sample1 = $pixels[$srcX1, $y]
+                $leftPixels[$x, $y] = [Math]::Max($sample0, $sample1)
+                $rightPixels[$x, $y] = 0
+            } else {
+                $leftPixels[$x, $y] = $pixels[$x, $y]
+                $rightPixels[$x, $y] = $pixels[($x + 8), $y]
+            }
         }
     }
-    $topLeft = Encode-Snes4bppTile $leftPixels 0
-    $topRight = Encode-Snes4bppTile $rightPixels 0
-    $bottomLeft = Encode-Snes4bppTile $leftPixels 8
-    $bottomRight = Encode-Snes4bppTile $rightPixels 8
+    $topLeft = Encode-Snes2bppTile $leftPixels 0
+    $topRight = Encode-Snes2bppTile $rightPixels 0
+    $bottomLeft = Encode-Snes2bppTile $leftPixels 8
+    $bottomRight = Encode-Snes2bppTile $rightPixels 8
     $font.Dispose()
     $format.Dispose()
     $g.Dispose()
@@ -134,11 +137,11 @@ function Read-VramSourceHex([byte[]]$Vram, [int]$TileBaseWord, [int]$Tile) {
     if ($null -eq $Vram -or $Vram.Length -eq 0) {
         return ""
     }
-    $offset = (($TileBaseWord + ($Tile * 16)) -band 0x7fff) * 2
-    if ($offset -lt 0 -or $offset + 32 -gt $Vram.Length) {
+    $offset = (($TileBaseWord + ($Tile * 8)) -band 0x7fff) * 2
+    if ($offset -lt 0 -or $offset + 16 -gt $Vram.Length) {
         throw ("tile 0x{0:x4}: source VRAM offset out of range" -f $Tile)
     }
-    $bytes = $Vram[$offset..($offset + 31)]
+    $bytes = $Vram[$offset..($offset + 15)]
     return -join ($bytes | ForEach-Object { $_.ToString("x2") })
 }
 
@@ -157,12 +160,11 @@ if ($VramJson) {
     }
 }
 $langSpecs = @(
-    [pscustomobject]@{ Lang = "zh"; Section = "prototype.zh_compact"; Font = "Microsoft YaHei" },
-    [pscustomobject]@{ Lang = "ko"; Section = "pending.ko"; Font = "Malgun Gothic" }
+    [pscustomobject]@{ Lang = "ko"; Section = "pending.ko"; Font = "Malgun Gothic"; FontSize = 12; GlyphWidth = 2 }
 )
 
 $outLines = New-Object System.Collections.Generic.List[string]
-$outLines.Add("# Generated compact 16x16 CJK glyph tiles for the Endless Duel crawl.") | Out-Null
+$outLines.Add("# Generated CJK glyph tiles for the Endless Duel BG3 crawl.") | Out-Null
 $outLines.Add("# Regenerate with:") | Out-Null
 $outLines.Add("#   powershell -ExecutionPolicy Bypass -File scripts\generate_cjk_glyph_tiles.ps1 -VramJson <crawl vram.json>") | Out-Null
 $outLines.Add("") | Out-Null
@@ -177,10 +179,12 @@ foreach ($spec in $langSpecs) {
     $tile = $TileStart
     $outLines.Add(("[languages.{0}]" -f $spec.Lang)) | Out-Null
     $outLines.Add(("font = ""{0}""" -f $spec.Font)) | Out-Null
+    $outLines.Add(("font_size = {0}" -f $spec.FontSize)) | Out-Null
+    $outLines.Add(("glyph_width = {0}" -f $spec.GlyphWidth)) | Out-Null
     $outLines.Add(("chars = ""{0}""" -f (-join $chars))) | Out-Null
     $outLines.Add("") | Out-Null
     foreach ($char in $chars) {
-        $glyph = Render-Glyph $char $spec.Font
+        $glyph = Render-Glyph $char $spec.Font $spec.FontSize $spec.GlyphWidth
         $outLines.Add(("[glyph.{0}.""{1}""]" -f $spec.Lang, $char.Replace("\", "\\").Replace("""", "\"""))) | Out-Null
         $outLines.Add(("top_left_tile = 0x{0:x4}" -f $tile)) | Out-Null
         $outLines.Add(("top_right_tile = 0x{0:x4}" -f ($tile + 1))) | Out-Null
@@ -202,6 +206,6 @@ foreach ($spec in $langSpecs) {
 $outDir = Split-Path -Parent $outPath
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-[System.IO.File]::WriteAllLines($outPath, [string[]]$outLines, $utf8NoBom)
+[System.IO.File]::WriteAllText($outPath, (($outLines -join "`n") + "`n"), $utf8NoBom)
 
 Write-Host "Wrote CJK glyph tiles to $outPath"

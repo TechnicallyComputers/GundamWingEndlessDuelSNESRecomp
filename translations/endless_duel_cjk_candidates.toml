@@ -1,10 +1,9 @@
-# Pending CJK crawl translations.
+# CJK crawl translation candidates and active Korean source text.
 #
-# These are intentionally not consumed by generate_crawl_patch.py yet. The
-# current runtime table has no authored Hangul/Chinese tile assets, so emitting
-# these lines as tilemap bytes would render garbage. Use
-# scripts/audit_cjk_feasibility.py to inspect missing glyph coverage before
-# moving either language into the runtime crawl generator.
+# Korean is consumed by scripts/generate_cjk_glyph_tiles.ps1 and
+# scripts/generate_cjk_crawl_patch.py to build the active BG3 2bpp runtime
+# crawl patches. Chinese remains prototype/pending input until its generated
+# glyph assets pass screenshot validation.
 
 schema = 1
 
@@ -46,7 +45,7 @@ lines = [
 
 [pending.ko]
 name = "Korean"
-status = "candidate for authored 16x16 Hangul crawl tiles"
+status = "active authored 16x16 Hangul crawl tiles"
 lines = [
   "다섯 소년",
   "유성처럼 지구로",

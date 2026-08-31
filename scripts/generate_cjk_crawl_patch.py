@@ -14,9 +14,9 @@ from pathlib import Path
 BEGIN_MARKER = "# BEGIN GENERATED CJK CRAWL VRAM PATCHES"
 END_MARKER = "# END GENERATED CJK CRAWL VRAM PATCHES"
 LANG_SPECS = {
-    "zh": ("prototype", "zh_compact"),
-    "ko": ("pending", "ko"),
+    "ko": ("pending", "ko", 2),
 }
+CJK_PATCH_LANGS = ("zh", "ko")
 
 
 def repo_root() -> Path:
@@ -45,7 +45,7 @@ def tile_word_hex(tile: int) -> str:
     return f"{0x2000 | tile:04x}"
 
 
-def text_width(line: str, glyphs: dict) -> int:
+def text_width(line: str, glyphs: dict, glyph_width: int) -> int:
     width = 0
     for char in line:
         if char == " " or char.isascii() or unicodedata.category(char).startswith("P"):
@@ -53,12 +53,12 @@ def text_width(line: str, glyphs: dict) -> int:
             continue
         if char not in glyphs:
             raise ValueError(f"missing generated CJK glyph for {char!r}")
-        width += 2
+        width += glyph_width
     return width
 
 
 def generate_language_hex(crawl: dict, candidates: dict, glyphs: dict, lang: str) -> str:
-    group, key = LANG_SPECS[lang]
+    group, key, glyph_width = LANG_SPECS[lang]
     lines = list(candidates[group][key]["lines"])
     slots = crawl["line_slot"]
     row_width = int(crawl["row_width"])
@@ -74,7 +74,7 @@ def generate_language_hex(crawl: dict, candidates: dict, glyphs: dict, lang: str
         slot = slots[line_number - 1]
         top_row, top_col = [int(x) for x in slot["top"]]
         bottom_row, bottom_col = [int(x) for x in slot["bottom"]]
-        width = text_width(line, lang_glyphs)
+        width = text_width(line, lang_glyphs, glyph_width)
         for row, col, name in ((top_row, top_col, "top"), (bottom_row, bottom_col, "bottom")):
             if row < 0 or row >= rows:
                 raise ValueError(f"{lang} line {line_number}: {name} row {row} outside 0..{rows - 1}")
@@ -93,25 +93,32 @@ def generate_language_hex(crawl: dict, candidates: dict, glyphs: dict, lang: str
             else:
                 glyph = lang_glyphs[char]
                 top_left = tile_word_hex(int(glyph["top_left_tile"]))
-                top_right = tile_word_hex(int(glyph["top_right_tile"]))
                 bottom_left = tile_word_hex(int(glyph["bottom_left_tile"]))
-                bottom_right = tile_word_hex(int(glyph["bottom_right_tile"]))
                 grid[top_row][top_col + cursor] = top_left
-                grid[top_row][top_col + cursor + 1] = top_right
                 grid[bottom_row][bottom_col + cursor] = bottom_left
-                grid[bottom_row][bottom_col + cursor + 1] = bottom_right
-                cursor += 2
+                if glyph_width == 2:
+                    top_right = tile_word_hex(int(glyph["top_right_tile"]))
+                    bottom_right = tile_word_hex(int(glyph["bottom_right_tile"]))
+                    grid[top_row][top_col + cursor + 1] = top_right
+                    grid[bottom_row][bottom_col + cursor + 1] = bottom_right
+                cursor += glyph_width
 
     return "".join(entry for row in grid for entry in row)
 
 
 def parse_rom_patch_blocks(table_text: str) -> list[tuple[int, int, str]]:
-    all_sections = [m.start() for m in re.finditer(r"(?m)^\[\[[^\]]+\]\]\s*$", table_text)]
+    all_boundaries = [
+        m.start()
+        for m in re.finditer(
+            r"(?m)^(?:\[\[[^\]]+\]\]|# BEGIN GENERATED .+|# END GENERATED .+)\s*$",
+            table_text,
+        )
+    ]
     rom_starts = [m.start() for m in re.finditer(r"(?m)^\[\[rom_patch\]\]\s*$", table_text)]
     blocks: list[tuple[int, int, str]] = []
     for start in rom_starts:
-        later_sections = [section for section in all_sections if section > start]
-        end = later_sections[0] if later_sections else len(table_text)
+        later_boundaries = [section for section in all_boundaries if section > start]
+        end = later_boundaries[0] if later_boundaries else len(table_text)
         blocks.append((start, end, table_text[start:end]))
     return blocks
 
@@ -133,10 +140,13 @@ def find_crawl_block(table_text: str, address: int, byte_len: int) -> tuple[int,
 
 def update_crawl_block(block: str, generated: dict[str, str]) -> str:
     out = block
+    for lang in CJK_PATCH_LANGS:
+        if lang not in generated:
+            out = re.sub(rf'(?m)^{lang}_hex[ \t]*=[ \t]*"[0-9a-fA-F]*"[ \t]*\n?', "", out)
     for lang, hex_value in generated.items():
         key = f"{lang}_hex"
         line = f'{key} = "{hex_value}"'
-        pattern = re.compile(rf'(?m)^{key}\s*=\s*"[0-9a-fA-F]*"\s*$')
+        pattern = re.compile(rf'(?m)^{key}[ \t]*=[ \t]*"[0-9a-fA-F]*"[ \t]*$')
         if pattern.search(out):
             out = pattern.sub(line, out, count=1)
         else:
@@ -145,18 +155,22 @@ def update_crawl_block(block: str, generated: dict[str, str]) -> str:
 
 
 def tile_address(tile_base_word: int, tile: int) -> int:
-    return ((tile_base_word + tile * 16) & 0x7fff) * 2
+    return ((tile_base_word + tile * 8) & 0x7fff) * 2
 
 
 def generated_vram_blocks(glyphs: dict) -> list[str]:
     tile_base_word = int(glyphs["tile_base_word"])
     by_tile: dict[int, dict[str, str]] = {}
     for lang in LANG_SPECS:
+        glyph_width = int(glyphs.get("languages", {}).get(lang, {}).get("glyph_width", 2))
         for glyph in glyphs["glyph"][lang].values():
-            for part in ("top_left", "top_right", "bottom_left", "bottom_right"):
+            parts = ["top_left", "bottom_left"]
+            if glyph_width == 2:
+                parts.extend(["top_right", "bottom_right"])
+            for part in parts:
                 tile = int(glyph[f"{part}_tile"])
-                source = validate_hex(str(glyph[f"{part}_source_hex"]), f"{lang} {tile:#x} source", 32)
-                target = validate_hex(str(glyph[f"{part}_hex"]), f"{lang} {tile:#x}", 32)
+                source = validate_hex(str(glyph[f"{part}_source_hex"]), f"{lang} {tile:#x} source", 16)
+                target = validate_hex(str(glyph[f"{part}_hex"]), f"{lang} {tile:#x}", 16)
                 entry = by_tile.setdefault(tile, {"source_hex": source})
                 if entry["source_hex"] != source:
                     raise ValueError(f"source mismatch for shared tile {tile:#x}")
@@ -183,11 +197,20 @@ def generated_vram_blocks(glyphs: dict) -> list[str]:
 
 def replace_generated_section(table_text: str, section_text: str) -> str:
     pattern = re.compile(
-        rf"(?ms)^# BEGIN GENERATED CJK CRAWL VRAM PATCHES\n.*?^# END GENERATED CJK CRAWL VRAM PATCHES\n?"
+        rf"(?ms)^# BEGIN GENERATED CJK CRAWL VRAM PATCHES\n.*?^# END GENERATED CJK CRAWL VRAM PATCHES\n*"
     )
     if pattern.search(table_text):
         return pattern.sub(section_text.rstrip() + "\n", table_text, count=1)
-    return table_text.rstrip() + "\n\n" + section_text
+    return table_text.rstrip() + "\n\n" + section_text.rstrip() + "\n"
+
+
+def normalize_embedded_markers(table_text: str) -> str:
+    """Repair old generated output that missed a newline before a marker."""
+    return re.sub(
+        r'("[0-9a-fA-F]*")# BEGIN GENERATED ([^\r\n]+)',
+        r'\1\n# BEGIN GENERATED \2',
+        table_text,
+    )
 
 
 def table_targets(block: str) -> dict[str, str]:
@@ -218,7 +241,7 @@ def main() -> int:
     vram_section = "\n".join(generated_vram_blocks(glyphs))
 
     table_path = Path(args.table)
-    table_text = table_path.read_text(encoding="utf-8")
+    table_text = normalize_embedded_markers(table_path.read_text(encoding="utf-8"))
     aggregate_len = int(crawl["row_width"]) * int(crawl["rows"]) * 2
     start, end, block = find_crawl_block(table_text, int(crawl["patch_address"]), aggregate_len)
     updated_block = update_crawl_block(block, generated)
@@ -227,7 +250,7 @@ def main() -> int:
 
     if args.write:
         if updated != table_text:
-            table_path.write_text(updated, encoding="utf-8")
+            table_path.write_text(updated, encoding="utf-8", newline="\n")
             print(f"updated {table_path} with compact CJK crawl patches")
         else:
             print(f"compact CJK crawl patches already match {table_path}")

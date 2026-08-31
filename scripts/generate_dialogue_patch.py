@@ -115,10 +115,25 @@ def generated_blocks(dialogue: dict, targets: dict[int, dict[str, str]]) -> list
 
 
 def replace_generated_section(table_text: str, generated: str) -> str:
-    pattern = rf"(?ms)^{re.escape(BEGIN_MARKER)}\n.*?^{re.escape(END_MARKER)}\n?"
-    if re.search(pattern, table_text):
-        return re.sub(pattern, generated, table_text)
+    pattern = re.compile(rf"(?ms)^{re.escape(BEGIN_MARKER)}\n.*?^{re.escape(END_MARKER)}\n?")
+    matches = list(pattern.finditer(table_text))
+    if matches:
+        pieces = [table_text[:matches[0].start()], generated]
+        cursor = matches[0].end()
+        for match in matches[1:]:
+            pieces.append(table_text[cursor:match.start()])
+            cursor = match.end()
+        pieces.append(table_text[cursor:])
+        return "".join(pieces)
     return table_text.rstrip() + "\n\n" + generated
+
+
+def normalize_embedded_markers(table_text: str) -> str:
+    return re.sub(
+        r'("[0-9a-fA-F]*")# BEGIN GENERATED ([^\r\n]+)',
+        r'\1\n# BEGIN GENERATED \2',
+        table_text,
+    )
 
 
 def main() -> int:
@@ -150,11 +165,11 @@ def main() -> int:
         formatted = ", ".join(f"0x{address:06x}" for address in unknown_targets)
         raise ValueError(f"target dialogue address not present in decoded source: {formatted}")
     generated = "\n".join(generated_blocks(dialogue, targets))
-    table_text = table_path.read_text(encoding="utf-8")
+    table_text = normalize_embedded_markers(table_path.read_text(encoding="utf-8"))
     updated = replace_generated_section(table_text, generated)
 
     if args.write:
-        table_path.write_text(updated, encoding="utf-8")
+        table_path.write_text(updated, encoding="utf-8", newline="\n")
         print(f"updated {table_path}")
         return 0
 
