@@ -14,9 +14,10 @@ map of current assets, commands, and open surfaces.
 - `fr`, `it`, `pt`: native opening/fight crawl tilemap overlays, option-menu
   labels, and decoded battle/ending dialogue tilemap rows. Remaining title/menu
   graphics and still-undecoded reference spans fall back to English patch data.
-- `ko`, `zh`: not exposed in the launcher. Korean now has native title/menu,
-  option-screen, key-config, and opening/fight crawl prototype coverage through
-  generated runtime glyph/tile patches. Chinese remains research input.
+- `ko`: exposed as a prototype. Korean has native title/menu, option-screen,
+  key-config, and opening/fight crawl coverage through generated runtime
+  glyph/tile patches.
+- `zh`: not exposed in the launcher. Chinese remains research input.
 
 English and Spanish are broader because they were imported from existing full
 fan-translation ROM hacks as binary reference diffs. The runtime table applies
@@ -91,8 +92,9 @@ is seeded from glyph masks extracted from native selected-row captures, and
 letters that do not appear in the original English labels, starting with `H`
 and `C`. It also supports `codepoint = "U+...."` entries for UTF-8 labels.
 The checked-in Chinese and Korean title-menu strings are prototype data for
-validating this external glyph path; they are not exposed in the launcher until
-the broader CJK experience has been visually validated beyond this one screen.
+validating this external glyph path. Korean is exposed in the launcher now that
+the title/options/crawl path has screenshot validation; Chinese remains hidden
+until the broader CJK experience has been visually validated.
 
 They are not plain option-menu strings and the current BG/OAM helper renders do
 not yet reproduce the exact source layer, so the live replacement is a
@@ -264,9 +266,10 @@ python scripts\audit_cjk_feasibility.py
 ```
 
 The audit reports both pending drafts and any runtime prototype text. Korean
-needs authored Hangul tiles; the full Chinese draft needs additional Chinese
-glyph tiles beyond the original Japanese crawl set; the compact Chinese
-prototype still needs a visually acceptable tile-art pass before it can ship.
+uses authored Hangul tiles for the current crawl prototype; the full Chinese
+draft needs additional Chinese glyph tiles beyond the original Japanese crawl
+set, and the compact Chinese prototype still needs a visually acceptable
+tile-art pass before it can ship.
 
 ## Visual QA Harness
 

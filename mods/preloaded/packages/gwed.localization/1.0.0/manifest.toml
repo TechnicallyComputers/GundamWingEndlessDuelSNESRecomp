@@ -3,7 +3,7 @@ id = "gwed.localization"
 version = "1.0.0"
 name = "Gundam Wing Endless Duel Localization"
 author = "Aeon Genesis; Max1323; runtime integration by mstan"
-description = "Runtime localization using in-memory patches, title-menu overlays, and text/glyph data derived from supplied reference translation patches. English and Spanish use reference patch data. French, Italian, and Portuguese include native opening-crawl tilemap overlays, title mode selector labels, option-menu labels, and decoded dialogue rows, then fall back to English elsewhere. Korean and Chinese are not exposed until native CJK tile assets are authored and visually validated. The game ROM file is not modified."
+description = "Runtime localization using in-memory patches, title-menu overlays, and text/glyph data derived from supplied reference translation patches. English and Spanish use reference patch data. French, Italian, and Portuguese include native opening-crawl tilemap overlays, title mode selector labels, option-menu labels, and decoded dialogue rows, then fall back to English elsewhere. Korean is a validated prototype for title-menu, option-menu, key-config, and opening/fight crawl text. Chinese remains hidden until native CJK tile assets are authored and visually validated. The game ROM file is not modified."
 license = "Fan translation reference material; runtime integration MIT"
 resolver = "declarative"
 save_compatibility = "shared"
@@ -47,6 +47,10 @@ label = "Italian (partial)"
 [[option.choice]]
 value = "pt"
 label = "Portuguese (partial)"
+
+[[option.choice]]
+value = "ko"
+label = "Korean (prototype)"
 
 [[option.choice]]
 value = "off"
