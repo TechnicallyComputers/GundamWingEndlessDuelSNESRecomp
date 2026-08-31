@@ -32,6 +32,7 @@ typedef struct TitleGlyphEntry {
 } TitleGlyphEntry;
 
 #define MAX_OPTION_LABELS 32
+#define OPTION_SCREEN_NONE -1
 #define OPTION_SCREEN_MAIN 0
 #define OPTION_SCREEN_KEY_CONFIG 1
 
@@ -40,6 +41,7 @@ static TitleMenuLabel g_option_labels[MAX_OPTION_LABELS];
 static int g_option_label_count;
 static int g_title_menu_active;
 static int g_option_menu_active;
+static int g_option_overlay_screen = OPTION_SCREEN_NONE;
 
 static const TitleGlyph kEmptyGlyph = { 8, 8, { 0 } };
 static const TitleGlyph kSpaceGlyph = { 5, 8, { 0 } };
@@ -128,25 +130,36 @@ static int is_title_menu(const uint32_t *pixels, int width, int height,
     return 1;
 }
 
-static int is_option_menu(const uint32_t *pixels, int width, int height,
-                          int pitch_pixels)
+static int is_option_panel(const uint32_t *pixels, int width, int height,
+                           int pitch_pixels)
 {
-    int green_panel;
-    int dark_panel;
+    static const unsigned char sample_points[][2] = {
+        { 20, 20 }, { 220, 20 }, { 30, 120 },
+        { 220, 120 }, { 30, 200 }, { 220, 200 }
+    };
+    int hits = 0;
+    int i;
 
     if (width < 256 || height < 224)
         return 0;
 
-    green_panel = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) &&
-                  near_color(pixels[30 * pitch_pixels + 128], 8, 57, 8, 18);
-    dark_panel = near_color(pixels[20 * pitch_pixels + 20], 8, 8, 16, 18) &&
-                 near_color(pixels[30 * pitch_pixels + 128], 8, 8, 16, 18);
-    if (!green_panel && !dark_panel)
+    for (i = 0; i < (int)(sizeof(sample_points) / sizeof(sample_points[0])); i++) {
+        uint32_t p = pixels[sample_points[i][1] * pitch_pixels +
+                            sample_points[i][0]];
+        if (near_color(p, 8, 57, 8, 24) ||
+            near_color(p, 8, 8, 16, 24))
+            hits++;
+    }
+    return hits >= 4;
+}
+
+static int is_option_menu(const uint32_t *pixels, int width, int height,
+                          int pitch_pixels)
+{
+    if (!is_option_panel(pixels, width, height, pitch_pixels))
         return 0;
     if (!near_color(pixels[32 * pitch_pixels + 112], 132, 181, 123, 70) &&
         !near_color(pixels[32 * pitch_pixels + 112], 255, 255, 255, 70))
-        return 0;
-    if (!near_color(pixels[210 * pitch_pixels + 240], 8, 8, 16, 18))
         return 0;
     return 1;
 }
@@ -154,22 +167,10 @@ static int is_option_menu(const uint32_t *pixels, int width, int height,
 static int is_key_config_menu(const uint32_t *pixels, int width, int height,
                               int pitch_pixels)
 {
-    int green_panel;
-    int dark_panel;
-
-    if (width < 256 || height < 224)
-        return 0;
-
-    green_panel = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) &&
-                  near_color(pixels[30 * pitch_pixels + 128], 8, 57, 8, 18);
-    dark_panel = near_color(pixels[20 * pitch_pixels + 20], 8, 8, 16, 18) &&
-                 near_color(pixels[30 * pitch_pixels + 128], 8, 8, 16, 18);
-    if (!green_panel && !dark_panel)
+    if (!is_option_panel(pixels, width, height, pitch_pixels))
         return 0;
     if (!near_color(pixels[33 * pitch_pixels + 94], 132, 181, 123, 70) &&
         !near_color(pixels[33 * pitch_pixels + 94], 255, 255, 255, 70))
-        return 0;
-    if (!near_color(pixels[210 * pitch_pixels + 240], 8, 8, 16, 18))
         return 0;
     return 1;
 }
@@ -920,6 +921,7 @@ int gwed_option_menu_overlay_load(const char *path, const char *language)
     memset(g_option_labels, 0, sizeof(g_option_labels));
     g_option_label_count = 0;
     g_option_menu_active = 0;
+    g_option_overlay_screen = OPTION_SCREEN_NONE;
     if (!path || !language || strcmp(language, "ko") != 0)
         return 0;
 
@@ -996,6 +998,7 @@ int gwed_option_menu_overlay_load(const char *path, const char *language)
         }
     }
     g_option_menu_active = g_option_label_count > 0;
+    g_option_overlay_screen = OPTION_SCREEN_NONE;
     return g_option_menu_active;
 }
 
@@ -1006,6 +1009,7 @@ void gwed_title_menu_overlay_clear(void)
     g_option_label_count = 0;
     g_title_menu_active = 0;
     g_option_menu_active = 0;
+    g_option_overlay_screen = OPTION_SCREEN_NONE;
 }
 
 void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
@@ -1021,6 +1025,7 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
 
     if (g_title_menu_active && is_title_menu(pixels, width, height,
                                              pitch_pixels)) {
+        g_option_overlay_screen = OPTION_SCREEN_NONE;
         selected = (int)(g_ram[0x0504] / 2);
         if (selected < 0 || selected > 3)
             selected = 0;
@@ -1041,8 +1046,18 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
         return;
     }
 
-    if (g_option_menu_active && is_key_config_menu(pixels, width, height,
-                                                   pitch_pixels)) {
+    if (g_option_menu_active) {
+        int option_panel = is_option_panel(pixels, width, height, pitch_pixels);
+        if (!option_panel)
+            g_option_overlay_screen = OPTION_SCREEN_NONE;
+        else if (is_key_config_menu(pixels, width, height, pitch_pixels))
+            g_option_overlay_screen = OPTION_SCREEN_KEY_CONFIG;
+        else if (is_option_menu(pixels, width, height, pitch_pixels))
+            g_option_overlay_screen = OPTION_SCREEN_MAIN;
+    }
+
+    if (g_option_menu_active &&
+        g_option_overlay_screen == OPTION_SCREEN_KEY_CONFIG) {
         uint32_t bg = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) ?
                       rgb(8, 57, 8) : rgb(8, 8, 16);
 
@@ -1056,8 +1071,8 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
         return;
     }
 
-    if (g_option_menu_active && is_option_menu(pixels, width, height,
-                                               pitch_pixels)) {
+    if (g_option_menu_active &&
+        g_option_overlay_screen == OPTION_SCREEN_MAIN) {
         uint32_t bg = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) ?
                       rgb(8, 57, 8) : rgb(8, 8, 16);
         int selected_index = -1;
