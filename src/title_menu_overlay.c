@@ -605,10 +605,12 @@ static void erase_source_label(uint32_t *pixels, int width, int height,
                                int pitch_pixels, const TitleMenuLabel *label)
 {
     uint32_t bg = row_background(pixels, width, height, pitch_pixels, label);
-    int x0 = label->x - 10;
-    int x1 = label->x + label->w + 16;
-    int y0 = label->y - 4;
-    int y1 = label->y + 34;
+    int x0 = (label->source_x ? label->source_x : label->x) - 4;
+    int x1 = (label->source_x ? label->source_x : label->x) +
+             (int)strlen(label->source) * 9 + 4;
+    int y0 = (label->source_y ? label->source_y : label->y) - 3;
+    int y1 = (label->source_y ? label->source_y : label->y) +
+             label->h + 6;
     int x, y;
 
     if (x0 < 0) x0 = 0;
