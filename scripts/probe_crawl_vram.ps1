@@ -4,9 +4,7 @@ param(
     [string[]]$Languages = @("en", "es", "fr", "it", "pt", "off"),
     [int]$CaptureSecond = 60,
     [string]$OutDir = "",
-    [int]$BasePort = 5270,
-    [switch]$Turbo,
-    [int]$TurboFrames = 6
+    [int]$BasePort = 5270
 )
 
 $ErrorActionPreference = "Stop"
@@ -44,8 +42,7 @@ language = "$Language"
 "@ | Set-Content -LiteralPath $StatePath -NoNewline -Encoding ascii
 }
 
-function Start-Game([string]$ExePath, [string]$WorkDir, [string]$Rom, [int]$Port,
-                    [int]$FastForwardFrames) {
+function Start-Game([string]$ExePath, [string]$WorkDir, [string]$Rom, [int]$Port) {
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = $ExePath
     $psi.WorkingDirectory = $WorkDir
@@ -55,10 +52,6 @@ function Start-Game([string]$ExePath, [string]$WorkDir, [string]$Rom, [int]$Port
     $psi.Environment["SDL_VIDEODRIVER"] = "dummy"
     $psi.Environment["SDL_AUDIODRIVER"] = "dummy"
     $psi.Environment["SNESRECOMP_DEBUG_PORT"] = [string]$Port
-    if ($FastForwardFrames -gt 1) {
-        $psi.Environment["SNESRECOMP_TURBO"] = "1"
-        $psi.Environment["SNESRECOMP_TURBO_FRAMES"] = [string]$FastForwardFrames
-    }
     return [System.Diagnostics.Process]::Start($psi)
 }
 
@@ -124,14 +117,6 @@ function Stop-Game($Proc) {
 if (-not $RomPath) {
     throw "Pass -RomPath or set SNESRECOMP_ROM to an extracted .sfc/.smc ROM path."
 }
-if ($TurboFrames -lt 1) {
-    throw "TurboFrames must be at least 1."
-}
-
-$waitScale = 1.0
-if ($Turbo) {
-    $waitScale = [double]$TurboFrames
-}
 
 $buildPath = Resolve-RepoPath $BuildDir
 $exePath = Join-Path $buildPath "GundamWingEndlessDuelSNESRecomp.exe"
@@ -165,13 +150,9 @@ foreach ($lang in $Languages) {
     $conn = $null
     try {
         $start = Get-Date
-        $fastForwardFrames = 1
-        if ($Turbo) {
-            $fastForwardFrames = $TurboFrames
-        }
-        $proc = Start-Game $exePath $buildPath $romFull $port $fastForwardFrames
+        $proc = Start-Game $exePath $buildPath $romFull $port
         $conn = Connect-Tcp $port
-        $remaining = ([double]$CaptureSecond / $waitScale) - ((Get-Date) - $start).TotalSeconds
+        $remaining = [double]$CaptureSecond - ((Get-Date) - $start).TotalSeconds
         if ($remaining -gt 0) {
             Start-Sleep -Milliseconds ([int]($remaining * 1000.0))
         }

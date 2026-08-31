@@ -158,7 +158,6 @@ void RtlDrawPpuFrame(uint8 *pixel_buffer, size_t pitch, uint32 render_flags)
     /* Render the frame before presenting it. Nothing else in a production
      * build calls draw_ppu_frame — common_rtl.c's call is inside SNES_COSIM —
      * so a host that omits it presents an untouched texture forever. */
-    gwed_title_menu_overlay_prepare_frame();
     g_rtl_game_info->draw_ppu_frame();
     gwed_title_menu_overlay_apply((uint32_t *)g_ppu->renderBuffer,
                                   GAME_WIDTH, GAME_HEIGHT,

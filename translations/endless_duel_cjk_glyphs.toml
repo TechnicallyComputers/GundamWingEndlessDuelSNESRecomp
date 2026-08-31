@@ -10,9 +10,9 @@ tile_base_word = 0x3000
 font = "Microsoft YaHei"
 font_size = 13
 glyph_width = 2
-chars = "临为五他们任务名地奋如威密少年战执排摧敌方星极毁流球由胁自行达降除驶驾高"
+chars = "与临为了五他们任到务名和地奋如密少平年底战执排摧星极毁流球由盟碍者联自般行达阻降除驶驾高"
 
-[glyph.zh."临"]
+[glyph.zh."与"]
 top_left_tile = 0x0120
 top_right_tile = 0x0121
 bottom_left_tile = 0x0122
@@ -21,12 +21,12 @@ top_left_source_hex = "00003c007e187e247e247e247e247e3c"
 top_right_source_hex = "00007c007e387e247e247e247e247e38"
 bottom_left_source_hex = "00003c007e187e247e247e247e207020"
 bottom_right_source_hex = "00007c007e387e247e247e247e247e24"
-top_left_hex = "08083d357f567f547f557e527f577f54"
-top_right_hex = "8080c040fcfcfe02fcdc3828f8f8fc04"
-bottom_left_hex = "7f557f557f557f543f350a0a00000000"
-bottom_right_hex = "fcb4fcb4fcb4fc04fcf4080800000000"
+top_left_hex = "101038283f2f3f203f2f3f2f3f201f1f"
+top_right_hex = "00000000fcfcfe02fcfcf8f8fc04fcf4"
+bottom_left_hex = "7f7fff807f7f01010302010100000000"
+bottom_right_hex = "fcf4fc14fcf4fcf4f808f0f000000000"
 
-[glyph.zh."为"]
+[glyph.zh."临"]
 top_left_tile = 0x0124
 top_right_tile = 0x0125
 bottom_left_tile = 0x0126
@@ -35,12 +35,12 @@ top_left_source_hex = "00007e007e3c7e20702070207c207c38"
 top_right_source_hex = "00007e007e3c7e20702070207c207c38"
 bottom_left_source_hex = "00003c007e187e247e247e247e207020"
 bottom_right_source_hex = "00007e007e247e247e247e247e247e3c"
-top_left_hex = "11113b2a1f160f0a3f3e7f403f3e0302"
-top_right_hex = "0000808080808080f8f8fc04fcf4dcd4"
-bottom_left_hex = "070507051e1a3c247949303000000000"
-bottom_right_hex = "fc34fc947c74fcf4f808f0f000000000"
+top_left_hex = "08083d357f567f547f557e527f577f54"
+top_right_hex = "8080c040fcfcfe02fcdc3828f8f8fc04"
+bottom_left_hex = "7f557f557f557f543f350a0a00000000"
+bottom_right_hex = "fcb4fcb4fcb4fc04fcf4080800000000"
 
-[glyph.zh."五"]
+[glyph.zh."为"]
 top_left_tile = 0x0128
 top_right_tile = 0x0129
 bottom_left_tile = 0x012a
@@ -49,12 +49,12 @@ top_left_source_hex = "00003800381038103810381038103810"
 top_right_source_hex = "00000e000e040e040e040e040e040e04"
 bottom_left_source_hex = "00007e007e247e247e287c287c307c30"
 bottom_right_source_hex = "00007000702070207020702070207020"
-top_left_hex = "7f7fff807f7b0e0a3f3b7f403f3b1c14"
-top_right_hex = "f8f8fc04f8f80000f0f0f808f8e83828"
-bottom_left_hex = "1c141c141c147f77ff807f7f00000000"
-bottom_right_hex = "382838283828fcecfe02fcfc00000000"
+top_left_hex = "11113b2a1f160f0a3f3e7f403f3e0302"
+top_right_hex = "0000808080808080f8f8fc04fcf4dcd4"
+bottom_left_hex = "070507051e1a3c247949303000000000"
+bottom_right_hex = "fc34fc947c74fcf4f808f0f000000000"
 
-[glyph.zh."他"]
+[glyph.zh."了"]
 top_left_tile = 0x012c
 top_right_tile = 0x012d
 bottom_left_tile = 0x012e
@@ -63,12 +63,12 @@ top_left_source_hex = "0000ee00fe44fe6cfe54fe54fe54fe54"
 top_right_source_hex = "00007e007e247e247e347e347e347e2c"
 bottom_left_source_hex = "00003c007e187e247e247e247e247e24"
 bottom_right_source_hex = "00007c007e387e247e247e247e247e38"
-top_left_hex = "08081e163f253f2d3f2d7f48ff8dffad"
-top_right_hex = "4040e0a0e0a0f8b8fc04fcb4fcb4fcb4"
-bottom_left_hex = "7f6d3f2d3f2d3f2d3f2c131300000000"
-bottom_right_hex = "fc84fcb4eeaafefafc04f8f800000000"
+top_left_hex = "3f3f7f403f3f00000101030203020302"
+top_right_hex = "f8f8fc04fce4f898e020c04080808080"
+bottom_left_hex = "0302030203020f0e1f100f0f00000000"
+bottom_right_hex = "80808080808080808080000000000000"
 
-[glyph.zh."们"]
+[glyph.zh."五"]
 top_left_tile = 0x0130
 top_right_tile = 0x0131
 bottom_left_tile = 0x0132
@@ -77,12 +77,12 @@ top_left_source_hex = "7e247e247e247e247e247e0000000000"
 top_right_source_hex = "7e247e247e247e247e387c0000000000"
 bottom_left_source_hex = "7e207e247e247e247e183c0000000000"
 bottom_right_source_hex = "7e247e247e247e247e387c0000000000"
-top_left_hex = "0a0a1f153f263f2d3f2d7f4dff8dffad"
-top_right_hex = "00007878fc847c741c141c141c141c14"
-bottom_left_hex = "7f6d3f2d3f2d3f2d3f2d121200000000"
-bottom_right_hex = "1c141c141c147c74fc84787800000000"
+top_left_hex = "7f7fff807f7b0e0a3f3b7f403f3b1c14"
+top_right_hex = "f8f8fc04f8f80000f0f0f808f8e83828"
+bottom_left_hex = "1c141c141c147f77ff807f7f00000000"
+bottom_right_hex = "382838283828fcecfe02fcfc00000000"
 
-[glyph.zh."任"]
+[glyph.zh."他"]
 top_left_tile = 0x0134
 top_right_tile = 0x0135
 bottom_left_tile = 0x0136
@@ -91,12 +91,12 @@ top_left_source_hex = "7c20702070207e207e3c7e0000000000"
 top_right_source_hex = "7c207020702070207020700000000000"
 bottom_left_source_hex = "7e2c7e247e247e247e1c3e0000000000"
 bottom_right_source_hex = "7e247e247e247e247e247e0000000000"
-top_left_hex = "08081f173f203f2f38287848ff8fffa8"
-top_right_hex = "3838fcc4f838e0a0e0a0e0a0fcbcfe02"
-bottom_left_hex = "7f6f382838283f2f3f28171700000000"
-bottom_right_hex = "fcbce0a0e0a0fcbcfe02fcfc00000000"
+top_left_hex = "08081e163f253f2d3f2d7f48ff8dffad"
+top_right_hex = "4040e0a0e0a0f8b8fc04fcb4fcb4fcb4"
+bottom_left_hex = "7f6d3f2d3f2d3f2d3f2c131300000000"
+bottom_right_hex = "fc84fcb4eeaafefafc04f8f800000000"
 
-[glyph.zh."务"]
+[glyph.zh."们"]
 top_left_tile = 0x0138
 top_right_tile = 0x0139
 bottom_left_tile = 0x013a
@@ -105,12 +105,12 @@ top_left_source_hex = "38103810381038103810380000000000"
 top_right_source_hex = "0e047e047e247e247e183c0000000000"
 bottom_left_source_hex = "7c287e287e247e247e247e0000000000"
 bottom_right_source_hex = "7020702070207e207e3c7e0000000000"
-top_left_hex = "04040f0b3f307f47ff997f78ff877f7d"
-top_right_hex = "0000f0f0f808f0d0e020fc3cfec2fcfc"
-bottom_left_hex = "7f403f3d0e0a3d357b4a313100000000"
-bottom_right_hex = "f808f8e83828f8e8f010e0e000000000"
+top_left_hex = "0a0a1f153f263f2d3f2d7f4dff8dffad"
+top_right_hex = "00007878fc847c741c141c141c141c14"
+bottom_left_hex = "7f6d3f2d3f2d3f2d3f2d121200000000"
+bottom_right_hex = "1c141c141c147c74fc84787800000000"
 
-[glyph.zh."名"]
+[glyph.zh."任"]
 top_left_tile = 0x013c
 top_right_tile = 0x013d
 bottom_left_tile = 0x013e
@@ -119,12 +119,12 @@ top_left_source_hex = "fe54fe54fe54fe54fe54fe0000000000"
 top_right_source_hex = "7e2c7e2c7e247e247e247e0000000000"
 bottom_left_source_hex = "7e247e247e247e247e183c0000000000"
 bottom_right_source_hex = "7c207020702070207020700000000000"
-top_left_hex = "020207050f0b3f307f4ffe9a67650f0c"
-top_right_hex = "00000000f8f8fc04f8e8f0d0e020f8f8"
-bottom_left_hex = "7f70ff877f771f101f17080800000000"
-bottom_right_hex = "fc04fcf4fcf4fc04fcf4080800000000"
+top_left_hex = "08081f173f203f2f38287848ff8fffa8"
+top_right_hex = "3838fcc4f838e0a0e0a0e0a0fcbcfe02"
+bottom_left_hex = "7f6f382838283f2f3f28171700000000"
+bottom_right_hex = "fcbce0a0e0a0fcbcfe02fcfc00000000"
 
-[glyph.zh."地"]
+[glyph.zh."到"]
 top_left_tile = 0x0140
 top_right_tile = 0x0141
 bottom_left_tile = 0x0142
@@ -133,12 +133,12 @@ top_left_source_hex = "00003c007e187e247e247e247e247e24"
 top_right_source_hex = "00007c007e387e247e247e247e247e38"
 bottom_left_source_hex = "00003c007e187e247e247e207c207e18"
 bottom_right_source_hex = "0000fe00fe7cfe103810381038103810"
-top_left_hex = "10103a2a3f2d7f6dff847f693f2d3f2d"
-top_right_hex = "4040e0a0f8b8fc84fc14fcb4fcb4fcb4"
-bottom_left_hex = "3f2d3f257f4df7b54744030300000000"
-bottom_right_hex = "fc84febaeeaafefafc04f8f800000000"
+top_left_hex = "3f3f7f403f373f2d3f2e7f403f3f3f3b"
+top_right_hex = "0808dcd4fcb4fcb4fcb4fc34fcb4fcb4"
+bottom_left_hex = "7f403f3b0f0b3f387f47383800000000"
+bottom_right_hex = "fc34fcb45c54fcf4fc84787800000000"
 
-[glyph.zh."奋"]
+[glyph.zh."务"]
 top_left_tile = 0x0144
 top_right_tile = 0x0145
 bottom_left_tile = 0x0146
@@ -147,12 +147,12 @@ top_left_source_hex = "00007e007e247e247e247e247e247e24"
 top_right_source_hex = "0000ee00ee44ee44ee44ee44fe44fe28"
 bottom_left_source_hex = "0000fe00fe54fe54fe54fe54fe54fe54"
 bottom_right_source_hex = "0000ee00ee44fe44fe287c287c103810"
-top_left_hex = "01013f3e7f403f391e123c247f4fff80"
-top_right_hex = "0000f8f8fc04f838f0b07848fce4fc04"
-bottom_left_hex = "7f6e3f2e3f203f2e3f2e3f201f1f0000"
-bottom_right_hex = "f8e8f8e8f808f8e8f8e8f808f0f00000"
+top_left_hex = "04040f0b3f307f47ff997f78ff877f7d"
+top_right_hex = "0000f0f0f808f0d0e020fc3cfec2fcfc"
+bottom_left_hex = "7f403f3d0e0a3d357b4a313100000000"
+bottom_right_hex = "f808f8e83828f8e8f010e0e000000000"
 
-[glyph.zh."如"]
+[glyph.zh."名"]
 top_left_tile = 0x0148
 top_right_tile = 0x0149
 bottom_left_tile = 0x014a
@@ -161,12 +161,12 @@ top_left_source_hex = "0000ee00ee44ee44fe44fe287c287c28"
 top_right_source_hex = "00007e007e3c7e041e081e083c083c10"
 bottom_left_source_hex = "00000000000000003c007e187e247e04"
 bottom_right_source_hex = "00007000702070207c207e287e347e24"
-top_left_hex = "1010382838287f6fff817f5d77557f5b"
-top_right_hex = "00000000f8f8fc04fc74dc54dc54dc54"
-bottom_left_hex = "7f4b3f333f237f4df3b3404000000000"
-bottom_right_hex = "dc54fc74fc04fc74dc54888800000000"
+top_left_hex = "020207050f0b3f307f4ffe9a67650f0c"
+top_right_hex = "00000000f8f8fc04f8e8f0d0e020f8f8"
+bottom_left_hex = "7f70ff877f771f101f17080800000000"
+bottom_right_hex = "fc04fcf4fcf4fc04fcf4080800000000"
 
-[glyph.zh."威"]
+[glyph.zh."和"]
 top_left_tile = 0x014c
 top_right_tile = 0x014d
 bottom_left_tile = 0x014e
@@ -175,12 +175,12 @@ top_left_source_hex = "00000000000000003c007e187e247e20"
 top_right_source_hex = "00000e000e040e043e047e147e2c7e24"
 bottom_left_source_hex = "00000000000000003c007e187e247e24"
 bottom_right_source_hex = "00001e003e0c3e103c103c107e107e3c"
-top_left_hex = "000000003f3f7f407f5f7f407f5b7f40"
-top_right_hex = "5050f8a8fcb4fe02fcbcfcb4fcb4f8c8"
-bottom_left_hex = "7f567f557f59ffb2ffae515100000000"
-bottom_right_hex = "f8c87454fe9afe2afc64989800000000"
+top_left_hex = "06063f397f473d353f377f413f373f23"
+top_right_hex = "0000f8f8fc04fc74dc54dc54dc54dc54"
+bottom_left_hex = "3f237f557f573d351d15080800000000"
+bottom_right_hex = "dc54dc54fc74fc04fc74888800000000"
 
-[glyph.zh."密"]
+[glyph.zh."地"]
 top_left_tile = 0x0150
 top_right_tile = 0x0151
 bottom_left_tile = 0x0152
@@ -189,12 +189,12 @@ top_left_source_hex = "7e247e247e247e2c7e1e3e0600000000"
 top_right_source_hex = "7e287e247e247e247e247e0000000000"
 bottom_left_source_hex = "3e047e047e247e247e183c0000000000"
 bottom_right_source_hex = "38103810381038103810380000000000"
-top_left_hex = "01013f3e7f407f5e3f2b7f5a3f317f48"
-top_right_hex = "8080fc7cfe02feeafc14ee2afedaf414"
-bottom_left_hex = "f7b77b6a3f2e3f201f1f000000000000"
-bottom_right_hex = "e8e89c94fcf4fc04fcf4080800000000"
+top_left_hex = "10103a2a3f2d7f6dff847f693f2d3f2d"
+top_right_hex = "4040e0a0f8b8fc84fc14fcb4fcb4fcb4"
+bottom_left_hex = "3f2d3f257f4df7b54744030300000000"
+bottom_right_hex = "fc84febaeeaafefafc04f8f800000000"
 
-[glyph.zh."少"]
+[glyph.zh."奋"]
 top_left_tile = 0x0154
 top_right_tile = 0x0155
 bottom_left_tile = 0x0156
@@ -203,12 +203,12 @@ top_left_source_hex = "7e247e247e247e247e183c0000000000"
 top_right_source_hex = "7c287c287c2838103810380000000000"
 bottom_left_source_hex = "fe54fe54fe54fe287c287c0000000000"
 bottom_right_source_hex = "7c107c28fe28fe44ee44ee0000000000"
-top_left_hex = "010103020b0a1f163b2a3b2a73527352"
-top_right_hex = "0000c0c0e0a0f0d0b8a89c949e9abcac"
-bottom_left_hex = "e1a141410f0e7f71fe8e707000000000"
-bottom_right_hex = "f0d0e020c04080800000000000000000"
+top_left_hex = "01013f3e7f403f391e123c247f4fff80"
+top_right_hex = "0000f8f8fc04f838f0b07848fce4fc04"
+bottom_left_hex = "7f6e3f2e3f203f2e3f2e3f201f1f0000"
+bottom_right_hex = "f8e8f8e8f808f8e8f8e8f808f0f00000"
 
-[glyph.zh."年"]
+[glyph.zh."如"]
 top_left_tile = 0x0158
 top_right_tile = 0x0159
 bottom_left_tile = 0x015a
@@ -217,12 +217,12 @@ top_left_source_hex = "7c103810381038103810380000000000"
 top_right_source_hex = "3810381078207e207e3c7e0000000000"
 bottom_left_source_hex = "3e1c7e347e247e2c7e143e0000000000"
 bottom_right_source_hex = "7e247e247e247e347e287c0000000000"
-top_left_hex = "08081c143f273f207f4f7f5fffa07f6f"
-top_right_hex = "00000000f8f8fc04f878f878fc04f878"
-bottom_left_hex = "7f6fff807f7f01010101000000000000"
-bottom_right_hex = "fc7cfe02fc7cc040c040808000000000"
+top_left_hex = "1010382838287f6fff817f5d77557f5b"
+top_right_hex = "00000000f8f8fc04fc74dc54dc54dc54"
+bottom_left_hex = "7f4b3f333f237f4df3b3404000000000"
+bottom_right_hex = "dc54fc74fc04fc74dc54888800000000"
 
-[glyph.zh."战"]
+[glyph.zh."密"]
 top_left_tile = 0x015c
 top_right_tile = 0x015d
 bottom_left_tile = 0x015e
@@ -231,12 +231,12 @@ top_left_source_hex = "7e207e207e247e247e183c0000000000"
 top_right_source_hex = "7e247e247e247e2c7e143e0000000000"
 bottom_left_source_hex = "7e3c7e207e247e247e183c0000000000"
 bottom_right_source_hex = "7e103810381038103810380000000000"
-top_left_hex = "08081c141f171f101f171f163f377f41"
-top_right_hex = "5050f8a8fcb4f8b8fc84f838fcb4fcb4"
-bottom_left_hex = "7f5d77557f5d7f407f5d222200000000"
-bottom_right_hex = "f8a8f4d4fe1afe6abca4181800000000"
+top_left_hex = "01013f3e7f407f5e3f2b7f5a3f317f48"
+top_right_hex = "8080fc7cfe02feeafc14ee2afedaf414"
+bottom_left_hex = "f7b77b6a3f2e3f201f1f000000000000"
+bottom_right_hex = "e8e89c94fcf4fc04fcf4080800000000"
 
-[glyph.zh."执"]
+[glyph.zh."少"]
 top_left_tile = 0x0160
 top_right_tile = 0x0161
 bottom_left_tile = 0x0162
@@ -245,12 +245,12 @@ top_left_source_hex = "00000000000000003c007e147e2c7e24"
 top_right_source_hex = "00007000702070207c207e287e347e24"
 bottom_left_source_hex = "00003800381038103800381038103810"
 bottom_right_source_hex = "00001c001c081c081c001c081c081c08"
-top_left_hex = "11113b2a7f6eff807f6e3f267f4affac"
-top_right_hex = "00008080f0f0f808f8e8b8a8b8a8b8a8"
-bottom_left_hex = "7b6a3f2c3f2d7f69fe8a747400000000"
-bottom_right_hex = "fc6cfeaa7e6a3e2a1c14080800000000"
+top_left_hex = "010103020b0a1f163b2a3b2a73527352"
+top_right_hex = "0000c0c0e0a0f0d0b8a89c949e9abcac"
+bottom_left_hex = "e1a141410f0e7f71fe8e707000000000"
+bottom_right_hex = "f0d0e020c04080800000000000000000"
 
-[glyph.zh."排"]
+[glyph.zh."平"]
 top_left_tile = 0x0164
 top_right_tile = 0x0165
 bottom_left_tile = 0x0166
@@ -259,12 +259,12 @@ top_left_source_hex = "00007000702070207e207e247e287c30"
 top_right_source_hex = "00003800381038103810381038103810"
 bottom_left_source_hex = "0000000000000000fc00fe68fe54fe54"
 bottom_right_source_hex = "00000000000000003c007e287e347e24"
-top_left_hex = "101039297b6bff847b6b3b2b3f247b4b"
-top_right_hex = "a0a0f050fc5cfe42fc5cf858fc44f858"
-bottom_left_hex = "ffaf7f683f2f7969f989707000000000"
-bottom_right_hex = "fc5cfe42fc5cf050f050a0a000000000"
+top_left_hex = "3f3f7f403f3e3b2a1f160f0a3f3e7f40"
+top_right_hex = "f8f8fc04f8f8b8a8f0d0e0a0f8f8fc04"
+bottom_left_hex = "3f3e0302030203020302010100000000"
+bottom_right_hex = "f8f88080808080808080000000000000"
 
-[glyph.zh."摧"]
+[glyph.zh."年"]
 top_left_tile = 0x0168
 top_right_tile = 0x0169
 bottom_left_tile = 0x016a
@@ -273,12 +273,12 @@ top_left_source_hex = "00000000000000003c007e187e247e24"
 top_right_source_hex = "00000000000000003c007e287e347e24"
 bottom_left_source_hex = "00000000000000003c007e147e2c7e24"
 bottom_right_source_hex = "00000000000000007c007c287c307820"
-top_left_hex = "12123f2d7f6dff847b6a3f2c3f297f40"
-top_right_hex = "4848fcb4fcb4fc04fc3cfe02fcbcfe02"
-bottom_left_hex = "ffad7f6c3f2d3f2c7f4d323200000000"
-bottom_right_hex = "fcbcfe02fcbcfe02fcfc000000000000"
+top_left_hex = "08081c143f273f207f4f7f5fffa07f6f"
+top_right_hex = "00000000f8f8fc04f878f878fc04f878"
+bottom_left_hex = "7f6fff807f7f01010101000000000000"
+bottom_right_hex = "fc7cfe02fc7cc040c040808000000000"
 
-[glyph.zh."敌"]
+[glyph.zh."底"]
 top_left_tile = 0x016c
 top_right_tile = 0x016d
 bottom_left_tile = 0x016e
@@ -287,12 +287,12 @@ top_left_source_hex = "00000000000000003c007e187e247e20"
 top_right_source_hex = "00003800381038107e107e3c7e103810"
 bottom_left_source_hex = "00000000000000007e007e247e247e24"
 bottom_right_source_hex = "0000000000000000ee00ee44ee44fe44"
-top_left_hex = "06067f79fe827d757f77ff817f763f37"
-top_right_hex = "4040e0a0fcbcfe02fc74dc54dc54f8a8"
-bottom_left_hex = "7f417f5d7f5d7f417f5e212100000000"
-bottom_right_hex = "f8a87050f888fc24deda040400000000"
+top_left_hex = "01013f3e7f407f5f7f587f5b7f5b7f58"
+top_right_hex = "8080fc7cfe02fcfcf808f0b0fcbcfe02"
+bottom_left_hex = "7f5b7f5b7f58efaafdb5484800000000"
+bottom_right_hex = "fcbce424fedafe4afca4585800000000"
 
-[glyph.zh."方"]
+[glyph.zh."战"]
 top_left_tile = 0x0170
 top_right_tile = 0x0171
 bottom_left_tile = 0x0172
@@ -301,12 +301,12 @@ top_left_source_hex = "7e247e247e247e2c7e147e047c387c00"
 top_right_source_hex = "7e247e247e247e247e247e0000000000"
 bottom_left_source_hex = "38103810381038103810380000000000"
 bottom_right_source_hex = "1c081c081c081c081c087c087c307800"
-top_left_hex = "010103027f7fff807f7b0f0b0f080f0b"
-top_right_hex = "00008080fc7cfe02fcfcf0f0f808f8e8"
-bottom_left_hex = "0e0a1c143c247949f392616100000000"
-bottom_right_hex = "382838283828f8c8f010e0e000000000"
+top_left_hex = "08081c141f171f101f171f163f377f41"
+top_right_hex = "5050f8a8fcb4f8b8fc84f838fcb4fcb4"
+bottom_left_hex = "7f5d77557f5d7f407f5d222200000000"
+bottom_right_hex = "f8a8f4d4fe1afe6abca4181800000000"
 
-[glyph.zh."星"]
+[glyph.zh."执"]
 top_left_tile = 0x0174
 top_right_tile = 0x0175
 bottom_left_tile = 0x0176
@@ -315,12 +315,12 @@ top_left_source_hex = "7c287e287e287e247e247e0000000000"
 top_right_source_hex = "38103810381038103810380000000000"
 bottom_left_source_hex = "fe54fe54fe54fe54fe54fe0000000000"
 bottom_right_source_hex = "7e247e247e247e247e247e0000000000"
-top_left_hex = "1f1f3f203f2f3f203f2f3f201f1f1f16"
-top_right_hex = "f0f0f808f8e8f808f8e8f808f8e8f8f8"
-bottom_left_hex = "3f207f5effa07f7eff807f7f00000000"
-bottom_right_hex = "fc04f8f8f808f8f8fc04f8f800000000"
+top_left_hex = "11113b2a7f6eff807f6e3f267f4affac"
+top_right_hex = "00008080f0f0f808f8e8b8a8b8a8b8a8"
+bottom_left_hex = "7b6a3f2c3f2d7f69fe8a747400000000"
+bottom_right_hex = "fc6cfeaa7e6a3e2a1c14080800000000"
 
-[glyph.zh."极"]
+[glyph.zh."排"]
 top_left_tile = 0x0178
 top_right_tile = 0x0179
 bottom_left_tile = 0x017a
@@ -329,12 +329,12 @@ top_left_source_hex = "7e247e247e247e247e183c0000000000"
 top_right_source_hex = "7e247e247e247e347e287c2070207000"
 bottom_left_source_hex = "7e247e247e247e2c7e143e040e040e00"
 bottom_right_source_hex = "70207020702070207020700000000000"
-top_left_hex = "13133f2c7f6eff827f6e3f267f4affaa"
-top_right_hex = "f0f0f808f8e8f8c8f8d8fc44fc74fc64"
-bottom_left_hex = "ffadffad7f6d3f2b3f26191900000000"
-bottom_right_hex = "f8a87848f8a8fc24deda040400000000"
+top_left_hex = "101039297b6bff847b6b3b2b3f247b4b"
+top_right_hex = "a0a0f050fc5cfe42fc5cf858fc44f858"
+bottom_left_hex = "ffaf7f683f2f7969f989707000000000"
+bottom_right_hex = "fc5cfe42fc5cf050f050a0a000000000"
 
-[glyph.zh."毁"]
+[glyph.zh."摧"]
 top_left_tile = 0x017c
 top_right_tile = 0x017d
 bottom_left_tile = 0x017e
@@ -343,12 +343,12 @@ top_left_source_hex = "7e187e047e247e247e183c0000000000"
 top_right_source_hex = "3810381038103e103e0c1e0000000000"
 bottom_left_source_hex = "7e247e247e247e2c7e143e0000000000"
 bottom_right_source_hex = "fe287c287c287c103810380000000000"
-top_left_hex = "18183e267f4977557f497f5d7f413f3f"
-top_right_hex = "00007878fc84fcb4fcb4de52fcfcfc04"
-bottom_left_hex = "7f413f371e163f317f4c333300000000"
-bottom_right_hex = "fc74f868f090fc0cfef20c0c00000000"
+top_left_hex = "12123f2d7f6dff847b6a3f2c3f297f40"
+top_right_hex = "4848fcb4fcb4fc04fc3cfe02fcbcfe02"
+bottom_left_hex = "ffad7f6c3f2d3f2c7f4d323200000000"
+bottom_right_hex = "fcbcfe02fcbcfe02fcfc000000000000"
 
-[glyph.zh."流"]
+[glyph.zh."星"]
 top_left_tile = 0x0180
 top_right_tile = 0x0181
 bottom_left_tile = 0x0182
@@ -357,12 +357,12 @@ top_left_source_hex = "0000000000000000fe00fe54fe54fe54"
 top_right_source_hex = "0000000000000000ee00ee44fe44fe28"
 bottom_left_source_hex = "0000000000000000ee00ee44ee44fe44"
 bottom_right_source_hex = "00000000000000007e007e3c7e041e08"
-top_left_hex = "30307f4f3f302f2e73523f2d1f181717"
-top_right_hex = "c0c0fc3cfe02fc7cb8a8f8e8fc04fcf4"
-bottom_left_hex = "3f2d3f2d3f2d7f5b7d55282800000000"
-bottom_right_hex = "f868fc6cfe6afe6afe629c9c00000000"
+top_left_hex = "1f1f3f203f2f3f203f2f3f201f1f1f16"
+top_right_hex = "f0f0f808f8e8f808f8e8f808f8e8f8f8"
+bottom_left_hex = "3f207f5effa07f7eff807f7f00000000"
+bottom_right_hex = "fc04f8f8f808f8f8fc04f8f800000000"
 
-[glyph.zh."球"]
+[glyph.zh."极"]
 top_left_tile = 0x0184
 top_right_tile = 0x0185
 bottom_left_tile = 0x0186
@@ -371,12 +371,12 @@ top_left_source_hex = "00003c007e187e247e247e247e247e24"
 top_right_source_hex = "00001c003c083c183c081c081c081c08"
 bottom_left_source_hex = "00003c007e187e247e247e041e083c08"
 bottom_right_source_hex = "00003c007e187e247e247e043e043e18"
-top_left_hex = "7c7cfe827f6f3f2c7f6fff817f6e3b2a"
-top_right_hex = "5050f8a8fcb4fc04f8b8fcb4f8a8f888"
-bottom_left_hex = "39293f2e7f61ff9f6362010100000000"
-bottom_right_hex = "f010f8a8fcb4eeaae424c0c000000000"
+top_left_hex = "13133f2c7f6eff827f6e3f267f4affaa"
+top_right_hex = "f0f0f808f8e8f8c8f8d8fc44fc74fc64"
+bottom_left_hex = "ffadffad7f6d3f2b3f26191900000000"
+bottom_right_hex = "f8a87848f8a8fc24deda040400000000"
 
-[glyph.zh."由"]
+[glyph.zh."毁"]
 top_left_tile = 0x0188
 top_right_tile = 0x0189
 bottom_left_tile = 0x018a
@@ -385,12 +385,12 @@ top_left_source_hex = "00003c003c187c187c287c287c287c28"
 top_right_source_hex = "00007e007e3c7e2070207c207e387e24"
 bottom_left_source_hex = "00003c007e187e247e247e207e387e24"
 bottom_right_source_hex = "00007e007e3c7e040e041e041e081c08"
-top_left_hex = "010103023f3e7f407f5e73527f5e7f40"
-top_right_hex = "00008080f8f8fc04fcf49c94fcf4fc04"
-bottom_left_hex = "7f5e73527f5e7f407f5f202000000000"
-bottom_right_hex = "fcf49c94fcf4fc04fcf4080800000000"
+top_left_hex = "18183e267f4977557f497f5d7f413f3f"
+top_right_hex = "00007878fc84fcb4fcb4de52fcfcfc04"
+bottom_left_hex = "7f413f371e163f317f4c333300000000"
+bottom_right_hex = "fc74f868f090fc0cfef20c0c00000000"
 
-[glyph.zh."胁"]
+[glyph.zh."流"]
 top_left_tile = 0x018c
 top_right_tile = 0x018d
 bottom_left_tile = 0x018e
@@ -399,12 +399,12 @@ top_left_source_hex = "00003c007e187e247e247e247e247e18"
 top_right_source_hex = "00003c007e187e247e247e247e247e24"
 bottom_left_source_hex = "00003800381038103810381038103810"
 bottom_right_source_hex = "00007c00fe38fe44fe44fe44fe44fe08"
-top_left_hex = "3c3c7f437f5b7f5a7f437f5a7f5a7f59"
-top_right_hex = "8080c040f070f808f868f868fc64fe6a"
-bottom_left_hex = "7f417f5b7f5aff9affa15e5e00000000"
-bottom_right_hex = "fc6cf868b8a8f8e8f888707000000000"
+top_left_hex = "30307f4f3f302f2e73523f2d1f181717"
+top_right_hex = "c0c0fc3cfe02fc7cb8a8f8e8fc04fcf4"
+bottom_left_hex = "3f2d3f2d3f2d7f5b7d55282800000000"
+bottom_right_hex = "f868fc6cfe6afe6afe629c9c00000000"
 
-[glyph.zh."自"]
+[glyph.zh."球"]
 top_left_tile = 0x0190
 top_right_tile = 0x0191
 bottom_left_tile = 0x0192
@@ -413,12 +413,12 @@ top_left_source_hex = "fe54fe54fe54fe54fe68fc0000000000"
 top_right_source_hex = "7c107c28fe28fe44ee44ee0000000000"
 bottom_left_source_hex = "fe287c287c287c103810f810f860f000"
 bottom_right_source_hex = "3c083c1078107e207e3c7e0000000000"
-top_left_hex = "020207051f1d3f203f2f3f2f3f203f2f"
-top_right_hex = "00000000f8f8fc04fcf4fcf4fc04fcf4"
-bottom_left_hex = "3f203f2f3f2f3f203f2f101000000000"
-bottom_right_hex = "fc04fcf4fcf4fc04fcf4080800000000"
+top_left_hex = "7c7cfe827f6f3f2c7f6fff817f6e3b2a"
+top_right_hex = "5050f8a8fcb4fc04f8b8fcb4f8a8f888"
+bottom_left_hex = "39293f2e7f61ff9f6362010100000000"
+bottom_right_hex = "f010f8a8fcb4eeaae424c0c000000000"
 
-[glyph.zh."行"]
+[glyph.zh."由"]
 top_left_tile = 0x0194
 top_right_tile = 0x0195
 bottom_left_tile = 0x0196
@@ -427,12 +427,12 @@ top_left_source_hex = "7e247e247e247e247e183c0000000000"
 top_right_source_hex = "1c081c081c081c081c081c0000000000"
 bottom_left_source_hex = "3c10781078207e207e3c7e0000000000"
 bottom_right_source_hex = "3e047e047e247e247e183c0000000000"
-top_left_hex = "0b0b1f143b2b7858ffb77f603f2f7848"
-top_right_hex = "f0f0f808f0f00000f8f8fc04f8d87050"
-bottom_left_hex = "f8a87868382839293b2a111100000000"
-bottom_right_hex = "705070507050f0d0f010e0e000000000"
+top_left_hex = "010103023f3e7f407f5e73527f5e7f40"
+top_right_hex = "00008080f8f8fc04fcf49c94fcf4fc04"
+bottom_left_hex = "7f5e73527f5e7f407f5f202000000000"
+bottom_right_hex = "fcf49c94fcf4fc04fcf4080800000000"
 
-[glyph.zh."达"]
+[glyph.zh."盟"]
 top_left_tile = 0x0198
 top_right_tile = 0x0199
 bottom_left_tile = 0x019a
@@ -441,12 +441,12 @@ top_left_source_hex = "7e287e3c7e081c081c081c0000000000"
 top_right_source_hex = "3e047e047e047e247e183c0000000000"
 bottom_left_source_hex = "7e247e247e247e247e183c0000000000"
 bottom_right_source_hex = "3c083c10381038103810380000000000"
-top_left_hex = "2020715139291f173f387f4f39293b2a"
-top_right_hex = "8080c040c040f878fc04f878c040e020"
-bottom_left_hex = "3b2a3f2d3e2a7f47ffb04f4f00000000"
-bottom_right_hex = "f0d038281c14fcfcfe02fcfc00000000"
+top_left_hex = "3c3c7f437f5b7f437f5b7f437f5e2725"
+top_right_hex = "f8f8fc04fc74fc04fc74fc04fcf47c44"
+bottom_left_hex = "1f1f3f203f2d7f6dff807f7f00000000"
+bottom_right_hex = "f8f8f808f868fc6cfe02fcfc00000000"
 
-[glyph.zh."降"]
+[glyph.zh."碍"]
 top_left_tile = 0x019c
 top_right_tile = 0x019d
 bottom_left_tile = 0x019e
@@ -455,12 +455,12 @@ top_left_source_hex = "7e247e247e247e247e183c0000000000"
 top_right_source_hex = "7e1c7e047e247e247e183c0000000000"
 bottom_left_source_hex = "38103810380038103810380000000000"
 bottom_right_source_hex = "3c103810380038103810380000000000"
-top_left_hex = "3c3c7f437f5a7f547f577f547f577f58"
-top_right_hex = "8080f878fc04f868fc9cfe62fcdcfe02"
-bottom_left_hex = "7f5b7f5a7f447b5b7050202000000000"
-bottom_right_hex = "fcdcfcdcfe02fcdc7050202000000000"
+top_left_hex = "03037f7cff817f6c7f5d7f447f57ff94"
+top_right_hex = "f8f8fc04fcf4fc04fcf4fc04fcfcfe02"
+bottom_left_hex = "ff977f547f467d552828000000000000"
+bottom_right_hex = "fcecfe02fcec7868f888707000000000"
 
-[glyph.zh."除"]
+[glyph.zh."者"]
 top_left_tile = 0x01a0
 top_right_tile = 0x01a1
 bottom_left_tile = 0x01a2
@@ -469,12 +469,12 @@ top_left_source_hex = "00000000000000000000000000000000"
 top_right_source_hex = "00000000000000000000000000000000"
 bottom_left_source_hex = "00000000000000000000000000000000"
 bottom_right_source_hex = "00000000f000f060f060f020f040e000"
-top_left_hex = "3c3c7f437f5b7f567f547f507f5b7f58"
-top_right_hex = "c0c0e020f010f8d8fce4fe0afcbcfe02"
-bottom_left_hex = "7f5b7f427f5d7f5b7756212100000000"
-bottom_right_hex = "fcbcf8a8fcb4eeaae424c0c000000000"
+top_left_hex = "020207051f1d3f207f7dff807f7c7f70"
+top_right_hex = "00000808fcf4f808fc9cfe02fcfcf808"
+bottom_left_hex = "ff877f701f171f101f17080800000000"
+bottom_right_hex = "f8e8f808f8e8f808f8e8101000000000"
 
-[glyph.zh."驶"]
+[glyph.zh."联"]
 top_left_tile = 0x01a4
 top_right_tile = 0x01a5
 bottom_left_tile = 0x01a6
@@ -483,12 +483,12 @@ top_left_source_hex = "00000000000000000000000000000000"
 top_right_source_hex = "00000000000000000000000000000000"
 bottom_left_source_hex = "00000000000000000000000000000000"
 bottom_right_source_hex = "00000000000000000000000000000000"
-top_left_hex = "38387c443d357f567f567f567f567f43"
-top_right_hex = "4040e0a0f8b8fc04fcb4fcb4fc04fcb4"
-bottom_left_hex = "3f3a7f62ff9b7f7a7f403f3f00000000"
-bottom_right_hex = "e8a8e0a0e020fc1cfee21c1c00000000"
+top_left_hex = "7f7fff807f5b7f5b7f427f5b7f5b7f40"
+top_right_hex = "8888dc54fca4fcecfe02fcdcfcdcfe02"
+bottom_left_hex = "7f5b7f51ff8b7f7a0f08070700000000"
+bottom_right_hex = "fcdcf8a8f8a8dc548e8a040400000000"
 
-[glyph.zh."驾"]
+[glyph.zh."自"]
 top_left_tile = 0x01a8
 top_right_tile = 0x01a9
 bottom_left_tile = 0x01aa
@@ -497,16 +497,128 @@ top_left_source_hex = "00000000000000000000000000000000"
 top_right_source_hex = "00000000000000000000000000000000"
 bottom_left_source_hex = "00000000000000000000000000000000"
 bottom_right_source_hex = "00000000000000000000000000000000"
+top_left_hex = "020207051f1d3f203f2f3f2f3f203f2f"
+top_right_hex = "00000000f8f8fc04fcf4fcf4fc04fcf4"
+bottom_left_hex = "3f203f2f3f2f3f203f2f101000000000"
+bottom_right_hex = "fc04fcf4fcf4fc04fcf4080800000000"
+
+[glyph.zh."般"]
+top_left_tile = 0x01ac
+top_right_tile = 0x01ad
+bottom_left_tile = 0x01ae
+bottom_right_tile = 0x01af
+top_left_source_hex = "00000000000000000000000000000000"
+top_right_source_hex = "00000000000000000000000000000000"
+bottom_left_source_hex = "00000000000000000000000000000000"
+bottom_right_source_hex = "00000000000000000000000000000000"
+top_left_hex = "10103c2c7f437f5b7f4a7f507f5bff80"
+top_right_hex = "0000f0f0f808f868fc6cbea2fcfcfc04"
+bottom_left_hex = "7f5b7f4b7e527f5bffa05f5f00000000"
+bottom_right_hex = "fc74f868f090fc0cfef20c0c00000000"
+
+[glyph.zh."行"]
+top_left_tile = 0x01b0
+top_right_tile = 0x01b1
+bottom_left_tile = 0x01b2
+bottom_right_tile = 0x01b3
+top_left_source_hex = "00000000f000f060f060f00000000000"
+top_right_source_hex = "00000000f000f060f060f020f040e000"
+bottom_left_source_hex = "00000000fc00fca8fca8fc0000000000"
+bottom_right_source_hex = "00000000000000000000000000000000"
+top_left_hex = "0b0b1f143b2b7858ffb77f603f2f7848"
+top_right_hex = "f0f0f808f0f00000f8f8fc04f8d87050"
+bottom_left_hex = "f8a87868382839293b2a111100000000"
+bottom_right_hex = "705070507050f0d0f010e0e000000000"
+
+[glyph.zh."达"]
+top_left_tile = 0x01b4
+top_right_tile = 0x01b5
+bottom_left_tile = 0x01b6
+bottom_right_tile = 0x01b7
+top_left_source_hex = "00000000000000000000000000000000"
+top_right_source_hex = "00000000000000000000000000000000"
+bottom_left_source_hex = "00000000000000000000000000000000"
+bottom_right_source_hex = "00000000000000000000000000000000"
+top_left_hex = "2020715139291f173f387f4f39293b2a"
+top_right_hex = "8080c040c040f878fc04f878c040e020"
+bottom_left_hex = "3b2a3f2d3e2a7f47ffb04f4f00000000"
+bottom_right_hex = "f0d038281c14fcfcfe02fcfc00000000"
+
+[glyph.zh."阻"]
+top_left_tile = 0x01b8
+top_right_tile = 0x01b9
+bottom_left_tile = 0x01ba
+bottom_right_tile = 0x01bb
+top_left_source_hex = "00000000000000000000000000000000"
+top_right_source_hex = "00000000000000000000000000000000"
+bottom_left_source_hex = "00000000000000000000000000000000"
+bottom_right_source_hex = "00000000000000000000000000000000"
+top_left_hex = "3d3d7f427f5a7f567f567f567f567f5a"
+top_right_hex = "f8f8fc04fcf49c94fcf4fc04fcf4fcf4"
+bottom_left_hex = "7f5a7f5a7f427f5e7f58272700000000"
+bottom_right_hex = "fc04fcf49c94fcf4fe02fcfc00000000"
+
+[glyph.zh."降"]
+top_left_tile = 0x01bc
+top_right_tile = 0x01bd
+bottom_left_tile = 0x01be
+bottom_right_tile = 0x01bf
+top_left_source_hex = "00000000000000000000000000000000"
+top_right_source_hex = "00000000000000000000000000000000"
+bottom_left_source_hex = "00000000000000000000000000000000"
+bottom_right_source_hex = "00000000000000000000000000000000"
+top_left_hex = "3c3c7f437f5a7f547f577f547f577f58"
+top_right_hex = "8080f878fc04f868fc9cfe62fcdcfe02"
+bottom_left_hex = "7f5b7f5a7f447b5b7050202000000000"
+bottom_right_hex = "fcdcfcdcfe02fcdc7050202000000000"
+
+[glyph.zh."除"]
+top_left_tile = 0x01c0
+top_right_tile = 0x01c1
+bottom_left_tile = 0x01c2
+bottom_right_tile = 0x01c3
+top_left_source_hex = "0000070007023b077e3f7f04170c1f0f"
+top_right_source_hex = "00000000f000f0e0608080008e00768c"
+bottom_left_source_hex = "000000001f001f0f0f00020105030b07"
+bottom_right_source_hex = "00000000f000f0e060c0c080f000e8f0"
+top_left_hex = "3c3c7f437f5b7f567f547f507f5b7f58"
+top_right_hex = "c0c0e020f010f8d8fce4fe0afcbcfe02"
+bottom_left_hex = "7f5b7f427f5d7f5b7756212100000000"
+bottom_right_hex = "fcbcf8a8fcb4eeaae424c0c000000000"
+
+[glyph.zh."驶"]
+top_left_tile = 0x01c4
+top_right_tile = 0x01c5
+bottom_left_tile = 0x01c6
+bottom_right_tile = 0x01c7
+top_left_source_hex = "00000700070302011d001c081d081e09"
+top_right_source_hex = "000080006080f0e0f0000000f000e8f0"
+bottom_left_source_hex = "00000300030102013f003f1f3f000000"
+bottom_right_source_hex = "000080004080fc80bcf8dce0d060b060"
+top_left_hex = "38387c443d357f567f567f567f567f43"
+top_right_hex = "4040e0a0f8b8fc04fcb4fcb4fc04fcb4"
+bottom_left_hex = "3f3a7f62ff9b7f7a7f403f3f00000000"
+bottom_right_hex = "e8a8e0a0e020fc1cfee21c1c00000000"
+
+[glyph.zh."驾"]
+top_left_tile = 0x01c8
+top_right_tile = 0x01c9
+bottom_left_tile = 0x01ca
+bottom_right_tile = 0x01cb
+top_left_source_hex = "00001c001c081c083d08fe3deb7ffd0e"
+top_right_source_hex = "0000000000006000f06098f0f8103810"
+bottom_left_source_hex = "0000010001007f007f3f7f001a0c160c"
+bottom_right_source_hex = "0000c000c080ff80fffeff1038103810"
 top_left_hex = "10107e6eff817f6d7f4dff807f6f3f2f"
 top_right_hex = "0000f8f8fc04fc74fc74fc04f8d8f8d8"
 bottom_left_hex = "3f207f7fff807f7f0101000000000000"
 bottom_right_hex = "fc04fcf4fc14fcf4f808f0f000000000"
 
 [glyph.zh."高"]
-top_left_tile = 0x01ac
-top_right_tile = 0x01ad
-bottom_left_tile = 0x01ae
-bottom_right_tile = 0x01af
+top_left_tile = 0x01cc
+top_right_tile = 0x01cd
+bottom_left_tile = 0x01ce
+bottom_right_tile = 0x01cf
 top_left_source_hex = "00000000000000000000000000000000"
 top_right_source_hex = "00000000000000000000000000000000"
 bottom_left_source_hex = "00000000000000000000000000000000"
@@ -520,7 +632,7 @@ bottom_right_hex = "fc14fcd4fc14fcf47c44383800000000"
 font = "Malgun Gothic"
 font_size = 13
 glyph_width = 2
-chars = "거건괴구기년다담라럼로를맡무밀방비섯성소싸아에연올운위유임자제지처체파합해"
+chars = "거건괴구극년는다담두라럼로를모무방비섯성소수싸에연올와운위유을임자제지처파평한합해행화"
 
 [glyph.ko."거"]
 top_left_tile = 0x0120
@@ -578,7 +690,7 @@ top_right_hex = "0000e0e0f010f0d070507050f8d8fc04"
 bottom_left_hex = "3f3e0302030203020302030201010000"
 bottom_right_hex = "f8f88080808080808080808000000000"
 
-[glyph.ko."기"]
+[glyph.ko."극"]
 top_left_tile = 0x0130
 top_right_tile = 0x0131
 bottom_left_tile = 0x0132
@@ -587,10 +699,10 @@ top_left_source_hex = "7e247e247e247e247e247e0000000000"
 top_right_source_hex = "7e247e247e247e247e387c0000000000"
 bottom_left_source_hex = "7e207e247e247e247e183c0000000000"
 bottom_right_source_hex = "7e247e247e247e247e387c0000000000"
-top_left_hex = "000000001f1f3f201f1e030207050705"
-top_right_hex = "000010103828b8a8b8a8b8a838283828"
-bottom_left_hex = "1e1a3c24784830300000000000000000"
-bottom_right_hex = "38283828382838283828382810100000"
+top_left_hex = "00000f0f1f100f0f00003f3f7f403f3f"
+top_right_hex = "0000e0e0f010f0d07050f8d8fc04f8f8"
+bottom_left_hex = "0f0f1f100f0f00000000000000000000"
+bottom_right_hex = "e0e0f010f0d070507050705020200000"
 
 [glyph.ko."년"]
 top_left_tile = 0x0134
@@ -606,7 +718,7 @@ top_right_hex = "00001010f8e8f808f8e8f808f8e8f8e8"
 bottom_left_hex = "3f201f1f1c141c141f171f100f0f0000"
 bottom_right_hex = "f828f8e838281010f0f0f808f0f00000"
 
-[glyph.ko."다"]
+[glyph.ko."는"]
 top_left_tile = 0x0138
 top_right_tile = 0x0139
 bottom_left_tile = 0x013a
@@ -615,12 +727,12 @@ top_left_source_hex = "38103810381038103810380000000000"
 top_right_source_hex = "0e047e047e247e247e183c0000000000"
 bottom_left_source_hex = "7c287e287e247e247e247e0000000000"
 bottom_right_source_hex = "7020702070207e207e3c7e0000000000"
-top_left_hex = "000000001f1f3f203f2f382838283828"
-top_right_hex = "00001010b8a8f868b8a838283c2c3e22"
-bottom_left_hex = "38283f2f3f201f1f0000000000000000"
-bottom_right_hex = "3c2cf8e8f828f8e83828382810100000"
+top_left_hex = "000008081c141c141f171f100f0f3f3f"
+top_right_hex = "0000000000000000e0e0f010e0e0f8f8"
+bottom_left_hex = "7f403f3f1c141c141f171f100f0f0000"
+bottom_right_hex = "fc04f8f800000000e0e0f010e0e00000"
 
-[glyph.ko."담"]
+[glyph.ko."다"]
 top_left_tile = 0x013c
 top_right_tile = 0x013d
 bottom_left_tile = 0x013e
@@ -629,12 +741,12 @@ top_left_source_hex = "fe54fe54fe54fe54fe54fe0000000000"
 top_right_source_hex = "7e2c7e2c7e247e247e247e0000000000"
 bottom_left_source_hex = "7e247e247e247e247e183c0000000000"
 bottom_right_source_hex = "7c207020702070207020700000000000"
-top_left_hex = "00001f1f3f203f2f382838283f2f3f20"
-top_right_hex = "00002020f0d078587c447858f0d0f050"
-bottom_left_hex = "1f1f1f101f171c141f171f100f0f0000"
-bottom_right_hex = "e0e0f010f0d07050f0d0f010e0e00000"
+top_left_hex = "000000001f1f3f203f2f382838283828"
+top_right_hex = "00001010b8a8f868b8a838283c2c3e22"
+bottom_left_hex = "38283f2f3f201f1f0000000000000000"
+bottom_right_hex = "3c2cf8e8f828f8e83828382810100000"
 
-[glyph.ko."라"]
+[glyph.ko."담"]
 top_left_tile = 0x0140
 top_right_tile = 0x0141
 bottom_left_tile = 0x0142
@@ -643,12 +755,12 @@ top_left_source_hex = "00003c007e187e247e247e247e247e24"
 top_right_source_hex = "00007c007e387e247e247e247e247e38"
 bottom_left_source_hex = "00003c007e187e247e247e207c207e18"
 bottom_right_source_hex = "0000fe00fe7cfe103810381038103810"
-top_left_hex = "000000001f1f3f201f1e1f1e3f203f2f"
-top_right_hex = "000020207050f0d0f0d0f0d0f8d87c44"
-bottom_left_hex = "38283f2f3f201f1f0000000000000000"
-bottom_right_hex = "7858f0d0f050f0d07050705020200000"
+top_left_hex = "00001f1f3f203f2f382838283f2f3f20"
+top_right_hex = "00002020f0d078587c447858f0d0f050"
+bottom_left_hex = "1f1f1f101f171c141f171f100f0f0000"
+bottom_right_hex = "e0e0f010f0d07050f0d0f010e0e00000"
 
-[glyph.ko."럼"]
+[glyph.ko."두"]
 top_left_tile = 0x0144
 top_right_tile = 0x0145
 bottom_left_tile = 0x0146
@@ -657,12 +769,12 @@ top_left_source_hex = "00007e007e247e247e247e247e247e24"
 top_right_source_hex = "0000ee00ee44ee44ee44ee44fe44fe28"
 bottom_left_source_hex = "0000fe00fe54fe54fe54fe54fe54fe54"
 bottom_right_source_hex = "0000ee00ee44fe44fe287c287c103810"
-top_left_hex = "00001f1f3f201f1e3f203f2f3f2f3f20"
-top_right_hex = "00001010b8a8f8e8f8887868b8a8f868"
-bottom_left_hex = "1f1f1f101f171c141f171f100f0f0000"
-bottom_right_hex = "f0f0f808f8e83828f8e8f808f0f00000"
+top_left_hex = "00000f0f1f101f171c141f171f100f0f"
+top_right_hex = "0000e0e0f010e0e00000e0e0f010e0e0"
+bottom_left_hex = "3f3f7f403f3e03020302030201010000"
+bottom_right_hex = "f8f8fc04f8f880808080808000000000"
 
-[glyph.ko."로"]
+[glyph.ko."라"]
 top_left_tile = 0x0148
 top_right_tile = 0x0149
 bottom_left_tile = 0x014a
@@ -671,12 +783,12 @@ top_left_source_hex = "0000ee00ee44ee44fe44fe287c287c28"
 top_right_source_hex = "00007e007e3c7e041e081e083c083c10"
 bottom_left_source_hex = "00000000000000003c007e187e247e04"
 bottom_right_source_hex = "00007000702070207c207e287e347e24"
-top_left_hex = "000000000f0f1f100f0f1f101f171f17"
-top_right_hex = "00000000e0e0f010f0d0f010e0e0e0e0"
-bottom_left_hex = "1f100f0e3f3e7f403f3f000000000000"
-bottom_right_hex = "f010e0e0f8f8fc04f8f8000000000000"
+top_left_hex = "000000001f1f3f201f1e1f1e3f203f2f"
+top_right_hex = "000020207050f0d0f0d0f0d0f8d87c44"
+bottom_left_hex = "38283f2f3f201f1f0000000000000000"
+bottom_right_hex = "7858f0d0f050f0d07050705020200000"
 
-[glyph.ko."를"]
+[glyph.ko."럼"]
 top_left_tile = 0x014c
 top_right_tile = 0x014d
 bottom_left_tile = 0x014e
@@ -685,12 +797,12 @@ top_left_source_hex = "00000000000000003c007e187e247e20"
 top_right_source_hex = "00000e000e040e043e047e147e2c7e24"
 bottom_left_source_hex = "00000000000000003c007e187e247e24"
 bottom_right_source_hex = "00001e003e0c3e103c103c107e107e3c"
-top_left_hex = "00000f0f1f100f0f1f101f171f103f3f"
-top_right_hex = "0000e0e0f010f0d0f010e0e0f010f8f8"
-bottom_left_hex = "7f403f3f1f100f0f1f101f171f100f0f"
-bottom_right_hex = "fc04f8f8f010f0d0f010e0e0f010e0e0"
+top_left_hex = "00001f1f3f201f1e3f203f2f3f2f3f20"
+top_right_hex = "00001010b8a8f8e8f8887868b8a8f868"
+bottom_left_hex = "1f1f1f101f171c141f171f100f0f0000"
+bottom_right_hex = "f0f0f808f8e83828f8e8f808f0f00000"
 
-[glyph.ko."맡"]
+[glyph.ko."로"]
 top_left_tile = 0x0150
 top_right_tile = 0x0151
 bottom_left_tile = 0x0152
@@ -699,12 +811,12 @@ top_left_source_hex = "7e247e247e247e2c7e1e3e0600000000"
 top_right_source_hex = "7e287e247e247e247e247e0000000000"
 bottom_left_source_hex = "3e047e047e247e247e183c0000000000"
 bottom_right_source_hex = "38103810381038103810380000000000"
-top_left_hex = "00001f1f3f203f2e3b2a3b2a3f2e3f20"
-top_right_hex = "00000000c0c0f8b8fcc4f8b8e0a0c0c0"
-bottom_left_hex = "1f1f1f101f171f101f171f100f0f0000"
-bottom_right_hex = "c0c0e020c0c0e020c0c0e020c0c00000"
+top_left_hex = "000000000f0f1f100f0f1f101f171f17"
+top_right_hex = "00000000e0e0f010f0d0f010e0e0e0e0"
+bottom_left_hex = "1f100f0e3f3e7f403f3f000000000000"
+bottom_right_hex = "f010e0e0f8f8fc04f8f8000000000000"
 
-[glyph.ko."무"]
+[glyph.ko."를"]
 top_left_tile = 0x0154
 top_right_tile = 0x0155
 bottom_left_tile = 0x0156
@@ -713,12 +825,12 @@ top_left_source_hex = "7e247e247e247e247e183c0000000000"
 top_right_source_hex = "7c287c287c2838103810380000000000"
 bottom_left_source_hex = "fe54fe54fe54fe287c287c0000000000"
 bottom_right_source_hex = "7c107c28fe28fe44ee44ee0000000000"
-top_left_hex = "00000f0f1f101f171c141f171f100f0f"
-top_right_hex = "0000e0e0f010f0d07050f0d0f010e0e0"
-bottom_left_hex = "3f3f7f403f3e03020302030201010000"
-bottom_right_hex = "f8f8fc04f8f880808080808000000000"
+top_left_hex = "00000f0f1f100f0f1f101f171f103f3f"
+top_right_hex = "0000e0e0f010f0d0f010e0e0f010f8f8"
+bottom_left_hex = "7f403f3f1f100f0f1f101f171f100f0f"
+bottom_right_hex = "fc04f8f8f010f0d0f010e0e0f010e0e0"
 
-[glyph.ko."밀"]
+[glyph.ko."모"]
 top_left_tile = 0x0158
 top_right_tile = 0x0159
 bottom_left_tile = 0x015a
@@ -727,12 +839,12 @@ top_left_source_hex = "7c103810381038103810380000000000"
 top_right_source_hex = "3810381078207e207e3c7e0000000000"
 bottom_left_source_hex = "3e1c7e347e247e2c7e143e0000000000"
 bottom_right_source_hex = "7e247e247e247e347e287c0000000000"
-top_left_hex = "00001f1f3f203f2f39293f2f3f201f1f"
-top_right_hex = "00009090f868f868f868f868f868f0f0"
-bottom_left_hex = "1f100f0f1f101f171f171f100f0f0000"
-bottom_right_hex = "f808f8e8f808f0f0f0f0f808f0f00000"
+top_left_hex = "000000000f0f1f101f171c141c141f17"
+top_right_hex = "00000000e0e0f010f0d070507050f0d0"
+bottom_left_hex = "1f100f0e3f3e7f403f3f000000000000"
+bottom_right_hex = "f010e0e0f8f8fc04f8f8000000000000"
 
-[glyph.ko."방"]
+[glyph.ko."무"]
 top_left_tile = 0x015c
 top_right_tile = 0x015d
 bottom_left_tile = 0x015e
@@ -741,12 +853,12 @@ top_left_source_hex = "7e207e207e247e247e183c0000000000"
 top_right_source_hex = "7e247e247e247e2c7e143e0000000000"
 bottom_left_source_hex = "7e3c7e207e247e247e183c0000000000"
 bottom_right_source_hex = "7e103810381038103810380000000000"
-top_left_hex = "000011113b2a3f2e3f203f2e3f2e3f20"
-top_right_hex = "00002020f0d0f0d0f8d8fcc4f8d8f0d0"
-bottom_left_hex = "1f1f0f081f131c141f130f0807070000"
-bottom_right_hex = "f0d0f010f8c83828f8c8f010e0e00000"
+top_left_hex = "00000f0f1f101f171c141f171f100f0f"
+top_right_hex = "0000e0e0f010f0d07050f0d0f010e0e0"
+bottom_left_hex = "3f3f7f403f3e03020302030201010000"
+bottom_right_hex = "f8f8fc04f8f880808080808000000000"
 
-[glyph.ko."비"]
+[glyph.ko."방"]
 top_left_tile = 0x0160
 top_right_tile = 0x0161
 bottom_left_tile = 0x0162
@@ -755,12 +867,12 @@ top_left_source_hex = "00000000000000003c007e147e2c7e24"
 top_right_source_hex = "00007000702070207c207e287e347e24"
 bottom_left_source_hex = "00003800381038103800381038103810"
 bottom_right_source_hex = "00001c001c081c081c001c081c081c08"
-top_left_hex = "000000001010392939293f2f3f203f2f"
-top_right_hex = "00001010b8a8f868f868f868f868f868"
-bottom_left_hex = "39293f2f3f201f1f0000000000000000"
-bottom_right_hex = "f868f868f868b8a83828382810100000"
+top_left_hex = "000011113b2a3f2e3f203f2e3f2e3f20"
+top_right_hex = "00002020f0d0f0d0f8d8fcc4f8d8f0d0"
+bottom_left_hex = "1f1f0f081f131c141f130f0807070000"
+bottom_right_hex = "f0d0f010f8c83828f8c8f010e0e00000"
 
-[glyph.ko."섯"]
+[glyph.ko."비"]
 top_left_tile = 0x0164
 top_right_tile = 0x0165
 bottom_left_tile = 0x0166
@@ -769,12 +881,12 @@ top_left_source_hex = "00007000702070207e207e247e287c30"
 top_right_source_hex = "00003800381038103810381038103810"
 bottom_left_source_hex = "0000000000000000fc00fe68fe54fe54"
 bottom_right_source_hex = "00000000000000003c007e287e347e24"
-top_left_hex = "000004040e0a0e0a0f0b1f153f267959"
-top_right_hex = "000010103828f8e8f808f8e8b8a8f868"
-bottom_left_hex = "20200101010107061f193e2618180000"
-bottom_right_hex = "b8a8f868d050e020f8987c6418180000"
+top_left_hex = "000000001010392939293f2f3f203f2f"
+top_right_hex = "00001010b8a8f868f868f868f868f868"
+bottom_left_hex = "39293f2f3f201f1f0000000000000000"
+bottom_right_hex = "f868f868f868b8a83828382810100000"
 
-[glyph.ko."성"]
+[glyph.ko."섯"]
 top_left_tile = 0x0168
 top_right_tile = 0x0169
 bottom_left_tile = 0x016a
@@ -783,12 +895,12 @@ top_left_source_hex = "00000000000000003c007e187e247e24"
 top_right_source_hex = "00000000000000003c007e287e347e24"
 bottom_left_source_hex = "00000000000000003c007e147e2c7e24"
 bottom_right_source_hex = "00000000000000007c007c287c307820"
-top_left_hex = "000004040e0a0e0a0f0b1f153b2a7151"
+top_left_hex = "000004040e0a0e0a0f0b1f153f267959"
 top_right_hex = "000010103828f8e8f808f8e8b8a8f868"
-bottom_left_hex = "27270f081f131c141f130f0807070000"
-bottom_right_hex = "f8e8f010f8c83828f8c8f010e0e00000"
+bottom_left_hex = "20200101010107061f193e2618180000"
+bottom_right_hex = "b8a8f868d050e020f8987c6418180000"
 
-[glyph.ko."소"]
+[glyph.ko."성"]
 top_left_tile = 0x016c
 top_right_tile = 0x016d
 bottom_left_tile = 0x016e
@@ -797,12 +909,12 @@ top_left_source_hex = "00000000000000003c007e187e247e20"
 top_right_source_hex = "00003800381038107e107e3c7e103810"
 bottom_left_source_hex = "00000000000000007e007e247e247e24"
 bottom_right_source_hex = "0000000000000000ee00ee44ee44fe44"
-top_left_hex = "000000000101030203020f0d3e327d4d"
-top_right_hex = "00000000000080808080e060f8987c64"
-bottom_left_hex = "333203023f3e7f403f3f000000000000"
-bottom_right_hex = "98988080f8f8fc04f8f8000000000000"
+top_left_hex = "000004040e0a0e0a0f0b1f153b2a7151"
+top_right_hex = "000010103828f8e8f808f8e8b8a8f868"
+bottom_left_hex = "27270f081f131c141f130f0807070000"
+bottom_right_hex = "f8e8f010f8c83828f8c8f010e0e00000"
 
-[glyph.ko."싸"]
+[glyph.ko."소"]
 top_left_tile = 0x0170
 top_right_tile = 0x0171
 bottom_left_tile = 0x0172
@@ -811,12 +923,12 @@ top_left_source_hex = "7e247e247e247e2c7e147e047c387c00"
 top_right_source_hex = "7e247e247e247e247e247e0000000000"
 bottom_left_source_hex = "38103810381038103810380000000000"
 bottom_right_source_hex = "1c081c081c081c081c087c087c307800"
-top_left_hex = "0000000009091f161f161f161f163f26"
-top_right_hex = "000010103828b8a8b8a8b8a8bcacbea2"
-bottom_left_hex = "3f293f2d7e5a2e2a0404000000000000"
-bottom_right_hex = "fc6cf868f8a878683828382810100000"
+top_left_hex = "000000000101030203020f0d3e327d4d"
+top_right_hex = "00000000000080808080e060f8987c64"
+bottom_left_hex = "333203023f3e7f403f3f000000000000"
+bottom_right_hex = "98988080f8f8fc04f8f8000000000000"
 
-[glyph.ko."아"]
+[glyph.ko."수"]
 top_left_tile = 0x0174
 top_right_tile = 0x0175
 bottom_left_tile = 0x0176
@@ -825,12 +937,12 @@ top_left_source_hex = "7c287e287e287e247e247e0000000000"
 top_right_source_hex = "38103810381038103810380000000000"
 bottom_left_source_hex = "fe54fe54fe54fe54fe54fe0000000000"
 bottom_right_source_hex = "7e247e247e247e247e247e0000000000"
-top_left_hex = "000000001e1e3f213f2d735273527352"
-top_right_hex = "00002020705070507050f8d8fcc4f8d8"
-bottom_left_hex = "73523f2d3f211e1e0000000000000000"
-bottom_right_hex = "f0d07050705070507050705020200000"
+top_left_hex = "000001010302030207053e3a7c443838"
+top_right_hex = "0000000080808080c040f8b87c443838"
+bottom_left_hex = "3f3f7f403f3e03020302030201010000"
+bottom_right_hex = "f8f8fc04f8f880808080808000000000"
 
-[glyph.ko."에"]
+[glyph.ko."싸"]
 top_left_tile = 0x0178
 top_right_tile = 0x0179
 bottom_left_tile = 0x017a
@@ -839,12 +951,12 @@ top_left_source_hex = "7e247e247e247e247e183c0000000000"
 top_right_source_hex = "7e247e247e247e347e287c2070207000"
 bottom_left_source_hex = "7e247e247e247e2c7e143e040e040e00"
 bottom_right_source_hex = "70207020702070207020700000000000"
-top_left_hex = "000000001c1c3e227f49775577547755"
-top_right_hex = "00005050f8a8f8a8f8a8f8a8f828f8a8"
-bottom_left_hex = "77557f493e221c1c0000000000000000"
-bottom_right_hex = "f8a8f8a8f8a8f8a8f8a8f8a850500000"
+top_left_hex = "0000000009091f161f161f161f163f26"
+top_right_hex = "000010103828b8a8b8a8b8a8bcacbea2"
+bottom_left_hex = "3f293f2d7e5a2e2a0404000000000000"
+bottom_right_hex = "fc6cf868f8a878683828382810100000"
 
-[glyph.ko."연"]
+[glyph.ko."에"]
 top_left_tile = 0x017c
 top_right_tile = 0x017d
 bottom_left_tile = 0x017e
@@ -853,12 +965,12 @@ top_left_source_hex = "7e187e047e247e247e183c0000000000"
 top_right_source_hex = "3810381038103e103e0c1e0000000000"
 bottom_left_source_hex = "7e247e247e247e2c7e143e0000000000"
 bottom_right_source_hex = "fe287c287c287c103810380000000000"
-top_left_hex = "00000f0f1f103f263929392939293f26"
-top_right_hex = "00001010b8a8f8e8f808f868f868f808"
-bottom_left_hex = "1f100f0f0e0a0e0a0f0b0f0807070000"
-bottom_right_hex = "f8e8382838281010f0f0f808f0f00000"
+top_left_hex = "000000001c1c3e227f49775577547755"
+top_right_hex = "00005050f8a8f8a8f8a8f8a8f828f8a8"
+bottom_left_hex = "77557f493e221c1c0000000000000000"
+bottom_right_hex = "f8a8f8a8f8a8f8a8f8a8f8a850500000"
 
-[glyph.ko."올"]
+[glyph.ko."연"]
 top_left_tile = 0x0180
 top_right_tile = 0x0181
 bottom_left_tile = 0x0182
@@ -867,12 +979,12 @@ top_left_source_hex = "0000000000000000fe00fe54fe54fe54"
 top_right_source_hex = "0000000000000000ee00ee44fe44fe28"
 bottom_left_source_hex = "0000000000000000ee00ee44ee44fe44"
 bottom_right_source_hex = "00000000000000007e007e3c7e041e08"
-top_left_hex = "000007070f081f171f170f083f3e7f40"
-top_right_hex = "0000c0c0e020f0d0f0d0e020f8f8fc04"
-bottom_left_hex = "3f3f1f100f0f1f101f171f100f0f0000"
-bottom_right_hex = "f8f8f010f0d0f010e0e0f010e0e00000"
+top_left_hex = "00000f0f1f103f263929392939293f26"
+top_right_hex = "00001010b8a8f8e8f808f868f868f808"
+bottom_left_hex = "1f100f0f0e0a0e0a0f0b0f0807070000"
+bottom_right_hex = "f8e8382838281010f0f0f808f0f00000"
 
-[glyph.ko."운"]
+[glyph.ko."올"]
 top_left_tile = 0x0184
 top_right_tile = 0x0185
 bottom_left_tile = 0x0186
@@ -881,12 +993,12 @@ top_left_source_hex = "00003c007e187e247e247e247e247e24"
 top_right_source_hex = "00001c003c083c183c081c081c081c08"
 bottom_left_source_hex = "00003c007e187e247e247e041e083c08"
 bottom_right_source_hex = "00003c007e187e247e247e043e043e18"
-top_left_hex = "000007070f081f131c141f130f083f3f"
-top_right_hex = "0000c0c0e020f0907050f090e020f8f8"
-bottom_left_hex = "7f403f3e1f161f161f171f100f0f0000"
-bottom_right_hex = "fc04f8f880808080e0e0f010e0e00000"
+top_left_hex = "000007070f081f171f170f083f3e7f40"
+top_right_hex = "0000c0c0e020f0d0f0d0e020f8f8fc04"
+bottom_left_hex = "3f3f1f100f0f1f101f171f100f0f0000"
+bottom_right_hex = "f8f8f010f0d0f010e0e0f010e0e00000"
 
-[glyph.ko."위"]
+[glyph.ko."와"]
 top_left_tile = 0x0188
 top_right_tile = 0x0189
 bottom_left_tile = 0x018a
@@ -895,12 +1007,12 @@ top_left_source_hex = "00003c003c187c187c287c287c287c28"
 top_right_source_hex = "00007e007e3c7e2070207c207e387e24"
 bottom_left_source_hex = "00003c007e187e247e247e207e387e24"
 bottom_right_source_hex = "00007e007e3c7e040e041e041e081c08"
-top_left_hex = "000000000f0f1f103f2f39293f2f1f10"
-top_right_hex = "000010103828b8a8f868f868f868b8a8"
-bottom_left_hex = "3f3f7f403f3d07050705070502020000"
-bottom_right_hex = "f8e8f828f8e838283828382810100000"
+top_left_hex = "000000000f0f3f307f4e715171517f4e"
+top_right_hex = "000010103828b8a8f868f868fc6cfe62"
+bottom_left_hex = "3f201f1b7f7bff807f7f000000000000"
+bottom_right_hex = "bcac3828f8e8f828f8e8382810100000"
 
-[glyph.ko."유"]
+[glyph.ko."운"]
 top_left_tile = 0x018c
 top_right_tile = 0x018d
 bottom_left_tile = 0x018e
@@ -911,10 +1023,10 @@ bottom_left_source_hex = "00003800381038103810381038103810"
 bottom_right_source_hex = "00007c00fe38fe44fe44fe44fe44fe08"
 top_left_hex = "000007070f081f131c141f130f083f3f"
 top_right_hex = "0000c0c0e020f0907050f090e020f8f8"
-bottom_left_hex = "7f403f3b0e0a0e0a0e0a0e0a04040000"
-bottom_right_hex = "fc04f8b8e0a0e0a0e0a0e0a040400000"
+bottom_left_hex = "7f403f3e1f161f161f171f100f0f0000"
+bottom_right_hex = "fc04f8f880808080e0e0f010e0e00000"
 
-[glyph.ko."임"]
+[glyph.ko."위"]
 top_left_tile = 0x0190
 top_right_tile = 0x0191
 bottom_left_tile = 0x0192
@@ -923,12 +1035,12 @@ top_left_source_hex = "fe54fe54fe54fe54fe68fc0000000000"
 top_right_source_hex = "7c107c28fe28fe44ee44ee0000000000"
 bottom_left_source_hex = "fe287c287c287c103810f810f860f000"
 bottom_right_source_hex = "3c083c1078107e207e3c7e0000000000"
-top_left_hex = "00000f0f1f103f26392939293f261f10"
-top_right_hex = "00001010b8a8f868f868f868f868b8a8"
-bottom_left_hex = "0f0f0f080f0b0e0a0f0b0f0807070000"
-bottom_right_hex = "f0f0f808f8e83828f8e8f808f0f00000"
+top_left_hex = "000000000f0f1f103f2f39293f2f1f10"
+top_right_hex = "000010103828b8a8f868f868f868b8a8"
+bottom_left_hex = "3f3f7f403f3d07050705070502020000"
+bottom_right_hex = "f8e8f828f8e838283828382810100000"
 
-[glyph.ko."자"]
+[glyph.ko."유"]
 top_left_tile = 0x0194
 top_right_tile = 0x0195
 bottom_left_tile = 0x0196
@@ -937,12 +1049,12 @@ top_left_source_hex = "7e247e247e247e247e183c0000000000"
 top_right_source_hex = "1c081c081c081c081c081c0000000000"
 bottom_left_source_hex = "3c10781078207e207e3c7e0000000000"
 bottom_right_source_hex = "3e047e047e247e247e183c0000000000"
-top_left_hex = "000000003f3f7f403f3b0e0a0e0a1f15"
-top_right_hex = "000020207050f0d07050705078587c44"
-bottom_left_hex = "1f153b2a715120200000000000000000"
-bottom_right_hex = "7858f0d0f050f0d07050705020200000"
+top_left_hex = "000007070f081f131c141f130f083f3f"
+top_right_hex = "0000c0c0e020f0907050f090e020f8f8"
+bottom_left_hex = "7f403f3b0e0a0e0a0e0a0e0a04040000"
+bottom_right_hex = "fc04f8b8e0a0e0a0e0a0e0a040400000"
 
-[glyph.ko."제"]
+[glyph.ko."을"]
 top_left_tile = 0x0198
 top_right_tile = 0x0199
 bottom_left_tile = 0x019a
@@ -951,12 +1063,12 @@ top_left_source_hex = "7e287e3c7e081c081c081c0000000000"
 top_right_source_hex = "3e047e047e047e247e183c0000000000"
 bottom_left_source_hex = "7e247e247e247e247e183c0000000000"
 bottom_right_source_hex = "3c083c10381038103810380000000000"
-top_left_hex = "000000003f3f7f403f3b0f0b0f0a1f13"
-top_right_hex = "00005050f8a8f8a8f8a8f8a8f828f8a8"
-bottom_left_hex = "1f113f2d735221210000000000000000"
-bottom_right_hex = "f8a8f8a8f8a8f8a8f8a8f8a850500000"
+top_left_hex = "000007070f081f171f170f083f3f7f40"
+top_right_hex = "0000c0c0e020f0d0f0d0e020f8f8fc04"
+bottom_left_hex = "3f3f1f100f0f1f101f171f100f0f0000"
+bottom_right_hex = "f8f8f010f0d0f010e0e0f010e0e00000"
 
-[glyph.ko."지"]
+[glyph.ko."임"]
 top_left_tile = 0x019c
 top_right_tile = 0x019d
 bottom_left_tile = 0x019e
@@ -965,12 +1077,12 @@ top_left_source_hex = "7e247e247e247e247e183c0000000000"
 top_right_source_hex = "7e1c7e047e247e247e183c0000000000"
 bottom_left_source_hex = "38103810380038103810380000000000"
 bottom_right_source_hex = "3c103810380038103810380000000000"
-top_left_hex = "000000003f3f7f403f3b0e0a0e0a1f15"
-top_right_hex = "00001010b8a8f868b8a8382838283828"
-bottom_left_hex = "1f153b2a715120200000000000000000"
-bottom_right_hex = "3828b8a8f868b8a83828382810100000"
+top_left_hex = "00000f0f1f103f26392939293f261f10"
+top_right_hex = "00001010b8a8f868f868f868f868b8a8"
+bottom_left_hex = "0f0f0f080f0b0e0a0f0b0f0807070000"
+bottom_right_hex = "f0f0f808f8e83828f8e8f808f0f00000"
 
-[glyph.ko."처"]
+[glyph.ko."자"]
 top_left_tile = 0x01a0
 top_right_tile = 0x01a1
 bottom_left_tile = 0x01a2
@@ -979,12 +1091,12 @@ top_left_source_hex = "00000000000000000000000000000000"
 top_right_source_hex = "00000000000000000000000000000000"
 bottom_left_source_hex = "00000000000000000000000000000000"
 bottom_right_source_hex = "00000000f000f060f060f020f040e000"
-top_left_hex = "000004040e0a3f3b7f403f3b0e0a0f0b"
-top_right_hex = "000010103828b8a8f868b8a8f8e8f808"
-bottom_left_hex = "1f153f247b5b20200000000000000000"
-bottom_right_hex = "f8e8b8a8f868b8a83828382810100000"
+top_left_hex = "000000003f3f7f403f3b0e0a0e0a1f15"
+top_right_hex = "000020207050f0d07050705078587c44"
+bottom_left_hex = "1f153b2a715120200000000000000000"
+bottom_right_hex = "7858f0d0f050f0d07050705020200000"
 
-[glyph.ko."체"]
+[glyph.ko."제"]
 top_left_tile = 0x01a4
 top_right_tile = 0x01a5
 bottom_left_tile = 0x01a6
@@ -993,12 +1105,12 @@ top_left_source_hex = "00000000000000000000000000000000"
 top_right_source_hex = "00000000000000000000000000000000"
 bottom_left_source_hex = "00000000000000000000000000000000"
 bottom_right_source_hex = "00000000000000000000000000000000"
-top_left_hex = "000004040e0a3f3b7f403f3b0f0b0f0a"
-top_right_hex = "00005050f8a8f8a8f8a8f8a8f8a8f828"
-bottom_left_hex = "1f131f113f2c73522121000000000000"
+top_left_hex = "000000003f3f7f403f3b0f0b0f0a1f13"
+top_right_hex = "00005050f8a8f8a8f8a8f8a8f828f8a8"
+bottom_left_hex = "1f113f2d735221210000000000000000"
 bottom_right_hex = "f8a8f8a8f8a8f8a8f8a8f8a850500000"
 
-[glyph.ko."파"]
+[glyph.ko."지"]
 top_left_tile = 0x01a8
 top_right_tile = 0x01a9
 bottom_left_tile = 0x01aa
@@ -1007,16 +1119,72 @@ top_left_source_hex = "00000000000000000000000000000000"
 top_right_source_hex = "00000000000000000000000000000000"
 bottom_left_source_hex = "00000000000000000000000000000000"
 bottom_right_source_hex = "00000000000000000000000000000000"
+top_left_hex = "000000003f3f7f403f3b0e0a0e0a1f15"
+top_right_hex = "00001010b8a8f868b8a8382838283828"
+bottom_left_hex = "1f153b2a715120200000000000000000"
+bottom_right_hex = "3828b8a8f868b8a83828382810100000"
+
+[glyph.ko."처"]
+top_left_tile = 0x01ac
+top_right_tile = 0x01ad
+bottom_left_tile = 0x01ae
+bottom_right_tile = 0x01af
+top_left_source_hex = "00000000000000000000000000000000"
+top_right_source_hex = "00000000000000000000000000000000"
+bottom_left_source_hex = "00000000000000000000000000000000"
+bottom_right_source_hex = "00000000000000000000000000000000"
+top_left_hex = "000004040e0a3f3b7f403f3b0e0a0f0b"
+top_right_hex = "000010103828b8a8f868b8a8f8e8f808"
+bottom_left_hex = "1f153f247b5b20200000000000000000"
+bottom_right_hex = "f8e8b8a8f868b8a83828382810100000"
+
+[glyph.ko."파"]
+top_left_tile = 0x01b0
+top_right_tile = 0x01b1
+bottom_left_tile = 0x01b2
+bottom_right_tile = 0x01b3
+top_left_source_hex = "00000000f000f060f060f00000000000"
+top_right_source_hex = "00000000f000f060f060f020f040e000"
+bottom_left_source_hex = "00000000fc00fca8fca8fc0000000000"
+bottom_right_source_hex = "00000000000000000000000000000000"
 top_left_hex = "000000003f3f7f403f3f1f161f161f16"
 top_right_hex = "00001010f8e8f828f8e8b8a8bcacbea2"
 bottom_left_hex = "1f163f367f403f3f0000000000000000"
 bottom_right_hex = "bcacf8e8f828f8e83828382810100000"
 
+[glyph.ko."평"]
+top_left_tile = 0x01b4
+top_right_tile = 0x01b5
+bottom_left_tile = 0x01b6
+bottom_right_tile = 0x01b7
+top_left_source_hex = "00000000000000000000000000000000"
+top_right_source_hex = "00000000000000000000000000000000"
+bottom_left_source_hex = "00000000000000000000000000000000"
+bottom_right_source_hex = "00000000000000000000000000000000"
+top_left_hex = "00003f3f7f403f3f3f263f263f367f40"
+top_right_hex = "00009090f868f8e8f808f868f888f828"
+bottom_left_hex = "3f3f0f081f131c141f130f0807070000"
+bottom_right_hex = "f8e8f010f8c83828f8c8f010e0e00000"
+
+[glyph.ko."한"]
+top_left_tile = 0x01b8
+top_right_tile = 0x01b9
+bottom_left_tile = 0x01ba
+bottom_right_tile = 0x01bb
+top_left_source_hex = "00000000000000000000000000000000"
+top_right_source_hex = "00000000000000000000000000000000"
+bottom_left_source_hex = "00000000000000000000000000000000"
+bottom_right_source_hex = "00000000000000000000000000000000"
+top_left_hex = "000004043f3b7f403f3f1f103f2f3929"
+top_right_hex = "00002020f0d0f050f0d0f0d0f858fc44"
+bottom_left_hex = "3f2f1f100f0f1c141f171f100f0f0000"
+bottom_right_hex = "f858f0d070502020f0f0f808f0f00000"
+
 [glyph.ko."합"]
-top_left_tile = 0x01ac
-top_right_tile = 0x01ad
-bottom_left_tile = 0x01ae
-bottom_right_tile = 0x01af
+top_left_tile = 0x01bc
+top_right_tile = 0x01bd
+bottom_left_tile = 0x01be
+bottom_right_tile = 0x01bf
 top_left_source_hex = "00000000000000000000000000000000"
 top_right_source_hex = "00000000000000000000000000000000"
 bottom_left_source_hex = "00000000000000000000000000000000"
@@ -1027,16 +1195,44 @@ bottom_left_hex = "1f100f0f1f171f101f171f100f0f0000"
 bottom_right_hex = "b8a81010f8e8f808f8e8f808f0f00000"
 
 [glyph.ko."해"]
-top_left_tile = 0x01b0
-top_right_tile = 0x01b1
-bottom_left_tile = 0x01b2
-bottom_right_tile = 0x01b3
-top_left_source_hex = "00000000f000f060f060f00000000000"
-top_right_source_hex = "00000000f000f060f060f020f040e000"
-bottom_left_source_hex = "00000000fc00fca8fca8fc0000000000"
-bottom_right_source_hex = "00000000000000000000000000000000"
+top_left_tile = 0x01c0
+top_right_tile = 0x01c1
+bottom_left_tile = 0x01c2
+bottom_right_tile = 0x01c3
+top_left_source_hex = "0000070007023b077e3f7f04170c1f0f"
+top_right_source_hex = "00000000f000f0e0608080008e00768c"
+bottom_left_source_hex = "000000001f001f0f0f00020105030b07"
+bottom_right_source_hex = "00000000f000f0e060c0c080f000e8f0"
 top_left_hex = "000008081c147f77ff807f7f3f217f5e"
 top_right_hex = "00005050f8a8f8a8f8a8f8a8f8a8f8a8"
 bottom_left_hex = "73527f5e3f211e1e0000000000000000"
 bottom_right_hex = "f888f8a8f8a8f8a8f8a8f8a850500000"
+
+[glyph.ko."행"]
+top_left_tile = 0x01c4
+top_right_tile = 0x01c5
+bottom_left_tile = 0x01c6
+bottom_right_tile = 0x01c7
+top_left_source_hex = "00000700070302011d001c081d081e09"
+top_right_source_hex = "000080006080f0e0f0000000f000e8f0"
+bottom_left_source_hex = "00000300030102013f003f1f3f000000"
+bottom_right_source_hex = "000080004080fc80bcf8dce0d060b060"
+top_left_hex = "000008087f77ff807f7f3f217f5e7f5e"
+top_right_hex = "00005050f8a8f8a8f8a8f8a8f888f8a8"
+bottom_left_hex = "3f211f1f0f081f171f170f0807070000"
+bottom_right_hex = "f8a8f0f0f010f8e8f8e8f010e0e00000"
+
+[glyph.ko."화"]
+top_left_tile = 0x01c8
+top_right_tile = 0x01c9
+bottom_left_tile = 0x01ca
+bottom_right_tile = 0x01cb
+top_left_source_hex = "00001c001c081c083d08fe3deb7ffd0e"
+top_right_source_hex = "0000000000006000f06098f0f8103810"
+bottom_left_source_hex = "0000010001007f007f3f7f001a0c160c"
+bottom_right_source_hex = "0000c000c080ff80fffeff1038103810"
+top_left_hex = "0000020207051f1d3f201f1f1f103f2f"
+top_right_hex = "000010103828f8e8f828f8e8bcacfe62"
+bottom_left_hex = "3f2f1f103f3d7f403f3f000000000000"
+bottom_right_hex = "fc6cb8a8f8e8f828f8e8382810100000"
 

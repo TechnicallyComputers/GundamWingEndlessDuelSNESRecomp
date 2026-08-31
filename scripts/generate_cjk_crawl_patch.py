@@ -65,25 +65,19 @@ def centered_col(col: int, width: int) -> int:
 
 def generate_language_hex(crawl: dict, candidates: dict, glyphs: dict, lang: str) -> str:
     group, key, glyph_width = LANG_SPECS[lang]
-    lang_data = candidates[group][key]
-    lines = list(lang_data["lines"])
+    lines = list(candidates[group][key]["lines"])
     slots = crawl["line_slot"]
     row_width = int(crawl["row_width"])
     rows = int(crawl["rows"])
-    slot_offset = int(lang_data.get("slot_offset", 0))
-    if slot_offset < 0 or slot_offset + len(lines) > len(slots):
-        raise ValueError(
-            f"{lang}: slot_offset {slot_offset} with {len(lines)} lines "
-            f"exceeds {len(slots)} crawl slots"
-        )
-    active_slots = slots[slot_offset:slot_offset + len(lines)]
+    if len(lines) > len(slots):
+        raise ValueError(f"{lang}: {len(lines)} lines exceed {len(slots)} crawl slots")
 
-    space = "2000"
+    space = "2100"
     grid = [[space for _ in range(row_width)] for _ in range(rows)]
     lang_glyphs = glyphs["glyph"][lang]
 
     for line_number, line in enumerate(lines, 1):
-        slot = active_slots[line_number - 1]
+        slot = slots[line_number - 1]
         top_row, top_col = [int(x) for x in slot["top"]]
         bottom_row, bottom_col = [int(x) for x in slot["bottom"]]
         width = text_width(line, lang_glyphs, glyph_width)

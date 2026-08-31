@@ -34,28 +34,31 @@ lines = [
 [prototype.zh_compact]
 name = "Chinese compact"
 status = "active compact 16x16 Chinese crawl tiles"
-slot_offset = 2
 lines = [
   "五名少年",
-  "如流星降临",
-  "地球",
+  "如流星般",
+  "降临地球",
   "他们驾驶高达",
   "执行极密任务",
-  "摧毁敌方MS",
-  "排除威胁",
-  "为自由奋战",
+  "摧毁联盟MS",
+  "排除阻碍者",
+  "为了和平",
+  "与自由",
+  "奋战到底",
 ]
 
 [pending.ko]
 name = "Korean"
 status = "active authored 16x16 Hangul crawl tiles"
-slot_offset = 2
 lines = [
   "다섯 소년",
   "유성처럼 지구로",
   "건담에 올라",
-  "비밀 임무를 맡아",
-  "연합 기체를 파괴",
-  "방해자를 제거",
-  "자유를 위해 싸운다",
+  "극비 임무를",
+  "수행한다",
+  "연합을 파괴",
+  "방해자는",
+  "모두 제거",
+  "평화와 자유를",
+  "위해 싸운다",
 ]

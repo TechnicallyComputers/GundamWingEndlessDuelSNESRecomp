@@ -6,8 +6,7 @@ param(
     [string]$OutDir = "",
     [int]$BasePort = 4670,
     [switch]$Turbo,
-    [int]$TurboFrames = 6,
-    [switch]$DumpState
+    [int]$TurboFrames = 6
 )
 
 $ErrorActionPreference = "Stop"
@@ -107,12 +106,6 @@ function Take-Shot($Conn, [string]$Path) {
             throw "screenshot command returned unexpected response: $json"
         }
     }
-}
-
-function Save-TcpJson($Conn, [string]$Command, [string]$Path) {
-    $json = Invoke-TcpLine $Conn $Command
-    $json | Set-Content -LiteralPath $Path -Encoding ascii
-    return $json
 }
 
 function Stop-Game($Proc) {
@@ -242,12 +235,6 @@ foreach ($lang in $Languages) {
             $shotName = "crawl_{0:000}s.bmp" -f $second
             $shotPath = Join-Path $langDir $shotName
             Take-Shot $conn $shotPath
-            if ($DumpState) {
-                $prefix = "crawl_{0:000}s" -f $second
-                Save-TcpJson $conn "get_ppu_state" (Join-Path $langDir "$prefix.ppu_state.json") | Out-Null
-                Save-TcpJson $conn "dump_vram 0 65536" (Join-Path $langDir "$prefix.vram.json") | Out-Null
-                Save-TcpJson $conn "dump_cgram" (Join-Path $langDir "$prefix.cgram.json") | Out-Null
-            }
             $rel = Join-Path $lang $shotName
             $rows.Add(('<tr><td>{0}</td><td>{1}s</td><td><img src="{2}" width="512"></td></tr>' -f $lang, $second, $rel.Replace('\', '/'))) | Out-Null
         }
