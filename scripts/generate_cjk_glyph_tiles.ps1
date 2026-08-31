@@ -91,12 +91,21 @@ function Render-Glyph([string]$Char, [string]$FontName, [int]$FontSize, [int]$Gl
     $rect = [System.Drawing.RectangleF]::new(0.0, 0.0, 16.0, 16.0)
     $g.DrawString($Char, $font, [System.Drawing.Brushes]::White, $rect, $format)
 
+    $mask = New-Object 'bool[,]' 16,16
     $pixels = New-Object 'int[,]' 16,16
     for ($y = 0; $y -lt 16; $y++) {
         for ($x = 0; $x -lt 16; $x++) {
             $c = $bmp.GetPixel($x, $y)
             $lum = [int](($c.R + $c.G + $c.B) / 3)
-            $pixels[$x, $y] = if ($lum -gt 48) { 3 } else { 0 }
+            $mask[$x, $y] = $lum -gt 48
+        }
+    }
+
+    for ($y = 0; $y -lt 16; $y++) {
+        for ($x = 0; $x -lt 16; $x++) {
+            if ($mask[$x, $y]) {
+                $pixels[$x, $y] = 3
+            }
         }
     }
 
@@ -160,7 +169,7 @@ if ($VramJson) {
     }
 }
 $langSpecs = @(
-    [pscustomobject]@{ Lang = "ko"; Section = "pending.ko"; Font = "Malgun Gothic"; FontSize = 12; GlyphWidth = 2 }
+    [pscustomobject]@{ Lang = "ko"; Section = "pending.ko"; Font = "Malgun Gothic"; FontSize = 13; GlyphWidth = 2 }
 )
 
 $outLines = New-Object System.Collections.Generic.List[string]

@@ -35,6 +35,7 @@ typedef struct TitleGlyphEntry {
 #define OPTION_SCREEN_NONE -1
 #define OPTION_SCREEN_MAIN 0
 #define OPTION_SCREEN_KEY_CONFIG 1
+#define OPTION_SCREEN_HOLD_FRAMES 4
 
 static TitleMenuLabel g_title_labels[4];
 static TitleMenuLabel g_option_labels[MAX_OPTION_LABELS];
@@ -42,6 +43,7 @@ static int g_option_label_count;
 static int g_title_menu_active;
 static int g_option_menu_active;
 static int g_option_overlay_screen = OPTION_SCREEN_NONE;
+static int g_option_overlay_hold_frames;
 
 static const TitleGlyph kEmptyGlyph = { 8, 8, { 0 } };
 static const TitleGlyph kSpaceGlyph = { 5, 8, { 0 } };
@@ -922,6 +924,7 @@ int gwed_option_menu_overlay_load(const char *path, const char *language)
     g_option_label_count = 0;
     g_option_menu_active = 0;
     g_option_overlay_screen = OPTION_SCREEN_NONE;
+    g_option_overlay_hold_frames = 0;
     if (!path || !language || strcmp(language, "ko") != 0)
         return 0;
 
@@ -999,6 +1002,7 @@ int gwed_option_menu_overlay_load(const char *path, const char *language)
     }
     g_option_menu_active = g_option_label_count > 0;
     g_option_overlay_screen = OPTION_SCREEN_NONE;
+    g_option_overlay_hold_frames = 0;
     return g_option_menu_active;
 }
 
@@ -1010,6 +1014,7 @@ void gwed_title_menu_overlay_clear(void)
     g_title_menu_active = 0;
     g_option_menu_active = 0;
     g_option_overlay_screen = OPTION_SCREEN_NONE;
+    g_option_overlay_hold_frames = 0;
 }
 
 void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
@@ -1026,6 +1031,7 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
     if (g_title_menu_active && is_title_menu(pixels, width, height,
                                              pitch_pixels)) {
         g_option_overlay_screen = OPTION_SCREEN_NONE;
+        g_option_overlay_hold_frames = 0;
         selected = (int)(g_ram[0x0504] / 2);
         if (selected < 0 || selected > 3)
             selected = 0;
@@ -1048,15 +1054,24 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
 
     if (g_option_menu_active) {
         int option_panel = is_option_panel(pixels, width, height, pitch_pixels);
-        if (!option_panel)
+        if (!option_panel) {
             g_option_overlay_screen = OPTION_SCREEN_NONE;
-        else if (is_key_config_menu(pixels, width, height, pitch_pixels))
+            g_option_overlay_hold_frames = 0;
+        } else if (is_key_config_menu(pixels, width, height, pitch_pixels)) {
             g_option_overlay_screen = OPTION_SCREEN_KEY_CONFIG;
-        else if (is_option_menu(pixels, width, height, pitch_pixels))
+            g_option_overlay_hold_frames = OPTION_SCREEN_HOLD_FRAMES;
+        } else if (is_option_menu(pixels, width, height, pitch_pixels)) {
             g_option_overlay_screen = OPTION_SCREEN_MAIN;
+            g_option_overlay_hold_frames = OPTION_SCREEN_HOLD_FRAMES;
+        } else if (g_option_overlay_hold_frames > 0) {
+            g_option_overlay_hold_frames--;
+        } else {
+            g_option_overlay_screen = OPTION_SCREEN_NONE;
+        }
     }
 
     if (g_option_menu_active &&
+        g_option_overlay_hold_frames > 0 &&
         g_option_overlay_screen == OPTION_SCREEN_KEY_CONFIG) {
         uint32_t bg = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) ?
                       rgb(8, 57, 8) : rgb(8, 8, 16);
@@ -1072,6 +1087,7 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
     }
 
     if (g_option_menu_active &&
+        g_option_overlay_hold_frames > 0 &&
         g_option_overlay_screen == OPTION_SCREEN_MAIN) {
         uint32_t bg = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) ?
                       rgb(8, 57, 8) : rgb(8, 8, 16);
