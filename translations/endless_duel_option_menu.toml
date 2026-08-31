@@ -1,0 +1,330 @@
+# Source data for the option-screen host overlay.
+#
+# Korean cannot be encoded in the recovered fixed ASCII option strings, so the
+# runtime redraws the affected option frames with the shared Endless Duel title
+# glyph atlas.
+
+schema = 1
+source_capture = "scripts/validate_localization_tcp.ps1"
+source_surface = "main option screen"
+
+[[label]]
+id = "header"
+source = "OPTION"
+x = 92
+y = 31
+text_y = 32
+source_x = 104
+source_y = 32
+width = 72
+height = 14
+style = "value"
+ko = "\uc124\uc815"
+
+[[label]]
+id = "level"
+source = "LEVEL"
+x = 49
+y = 64
+text_y = 66
+source_x = 49
+source_y = 64
+width = 54
+height = 13
+style = "selectable"
+ko = "\ub09c\uc774\ub3c4"
+
+[[label]]
+id = "normal"
+source = "NORMAL"
+x = 156
+y = 64
+text_y = 66
+source_x = 160
+source_y = 64
+width = 56
+height = 13
+style = "value"
+ko = "\ubcf4\ud1b5"
+
+[[label]]
+id = "time"
+source = "TIME"
+x = 64
+y = 88
+text_y = 90
+source_x = 64
+source_y = 88
+width = 36
+height = 13
+style = "selectable"
+ko = "\uc2dc\uac04"
+
+[[label]]
+id = "limit"
+source = "LIMIT"
+x = 164
+y = 88
+text_y = 90
+source_x = 169
+source_y = 88
+width = 48
+height = 13
+style = "value"
+ko = "\uc81c\ud55c"
+
+[[label]]
+id = "sound"
+source = "SOUND"
+x = 64
+y = 112
+text_y = 114
+source_x = 64
+source_y = 112
+width = 48
+height = 13
+style = "selectable"
+ko = "\uc0ac\uc6b4\ub4dc"
+
+[[label]]
+id = "stereo"
+source = "STEREO"
+x = 156
+y = 112
+text_y = 114
+source_x = 160
+source_y = 112
+width = 60
+height = 13
+style = "value"
+ko = "\uc2a4\ud14c\ub808\uc624"
+
+[[label]]
+id = "key_config"
+source = "KEY CONFIG"
+x = 56
+y = 144
+text_y = 146
+source_x = 64
+source_y = 144
+width = 96
+height = 13
+style = "selectable"
+ko = "\uc870\uc791\uc124\uc815"
+
+[[label]]
+id = "exit"
+source = "EXIT"
+x = 64
+y = 176
+text_y = 178
+source_x = 64
+source_y = 176
+width = 42
+height = 13
+style = "selectable"
+ko = "\ub098\uac00\uae30"
+
+[[label]]
+id = "key_header"
+screen = "key_config"
+source = "KEY CONFIG"
+x = 84
+y = 32
+text_y = 34
+source_x = 73
+source_y = 32
+width = 88
+height = 14
+style = "value"
+ko = "\ud0a4 \uc124\uc815"
+
+[[label]]
+id = "key_1p"
+screen = "key_config"
+source = "1P"
+x = 164
+y = 64
+text_y = 66
+source_x = 164
+source_y = 64
+width = 22
+height = 13
+style = "value"
+ko = "1P"
+
+[[label]]
+id = "key_2p"
+screen = "key_config"
+source = "2P"
+x = 214
+y = 64
+text_y = 66
+source_x = 214
+source_y = 64
+width = 22
+height = 13
+style = "value"
+ko = "2P"
+
+[[label]]
+id = "weak_punch"
+screen = "key_config"
+source = "WEAK PUNCH"
+x = 24
+y = 84
+text_y = 86
+source_x = 14
+source_y = 84
+width = 64
+height = 13
+style = "value"
+ko = "\uc57d\ud380\uce58"
+
+[[label]]
+id = "strong_punch"
+screen = "key_config"
+source = "STRONG PUNCH"
+x = 24
+y = 116
+text_y = 118
+source_x = 14
+source_y = 116
+width = 64
+height = 13
+style = "value"
+ko = "\uac15\ud380\uce58"
+
+[[label]]
+id = "weak_weapon"
+screen = "key_config"
+source = "WEAK WEAPON"
+x = 24
+y = 148
+text_y = 150
+source_x = 14
+source_y = 148
+width = 64
+height = 13
+style = "value"
+ko = "\uc57d\ubb34\uae30"
+
+[[label]]
+id = "strong_weapon"
+screen = "key_config"
+source = "STRONG WEAPON"
+x = 24
+y = 180
+text_y = 182
+source_x = 14
+source_y = 180
+width = 64
+height = 13
+style = "value"
+ko = "\uac15\ubb34\uae30"
+
+[[label]]
+id = "key_y_1p"
+screen = "key_config"
+source = "Y"
+x = 174
+y = 84
+text_y = 86
+source_x = 174
+source_y = 84
+width = 13
+height = 13
+style = "value"
+ko = "Y"
+
+[[label]]
+id = "key_y_2p"
+screen = "key_config"
+source = "Y"
+x = 225
+y = 84
+text_y = 86
+source_x = 225
+source_y = 84
+width = 13
+height = 13
+style = "value"
+ko = "Y"
+
+[[label]]
+id = "key_x_1p"
+screen = "key_config"
+source = "X"
+x = 174
+y = 116
+text_y = 118
+source_x = 174
+source_y = 116
+width = 13
+height = 13
+ko = "X"
+
+[[label]]
+id = "key_x_2p"
+screen = "key_config"
+source = "X"
+x = 225
+y = 116
+text_y = 118
+source_x = 225
+source_y = 116
+width = 13
+height = 13
+ko = "X"
+
+[[label]]
+id = "key_b_1p"
+screen = "key_config"
+source = "B"
+x = 174
+y = 148
+text_y = 150
+source_x = 174
+source_y = 148
+width = 13
+height = 13
+ko = "B"
+
+[[label]]
+id = "key_b_2p"
+screen = "key_config"
+source = "B"
+x = 225
+y = 148
+text_y = 150
+source_x = 225
+source_y = 148
+width = 13
+height = 13
+ko = "B"
+
+[[label]]
+id = "key_a_1p"
+screen = "key_config"
+source = "A"
+x = 174
+y = 180
+text_y = 182
+source_x = 174
+source_y = 180
+width = 13
+height = 13
+ko = "A"
+
+[[label]]
+id = "key_a_2p"
+screen = "key_config"
+source = "A"
+x = 225
+y = 180
+text_y = 182
+source_x = 225
+source_y = 180
+width = 13
+height = 13
+ko = "A"

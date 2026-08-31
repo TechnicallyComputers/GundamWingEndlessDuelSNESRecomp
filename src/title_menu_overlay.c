@@ -11,6 +11,9 @@ typedef struct TitleMenuLabel {
     int x, y, w, h;
     int text_y;
     int source_x, source_y;
+    int selectable;
+    int value_style;
+    int screen;
     char id[32];
     char source[128];
     char text[128];
@@ -28,13 +31,32 @@ typedef struct TitleGlyphEntry {
     TitleGlyph glyph;
 } TitleGlyphEntry;
 
+#define MAX_OPTION_LABELS 32
+#define OPTION_SCREEN_MAIN 0
+#define OPTION_SCREEN_KEY_CONFIG 1
+
 static TitleMenuLabel g_title_labels[4];
+static TitleMenuLabel g_option_labels[MAX_OPTION_LABELS];
+static int g_option_label_count;
 static int g_title_menu_active;
+static int g_option_menu_active;
 
 static const TitleGlyph kEmptyGlyph = { 8, 8, { 0 } };
 static const TitleGlyph kSpaceGlyph = { 5, 8, { 0 } };
 static const TitleGlyph kDotGlyph = {
     2, 8, { 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0003, 0x0003 }
+};
+static const TitleGlyph kNativeDigitGlyphs[10] = {
+    /* 0 */ { 8, 8, { 0x007e, 0x00ff, 0x00c3, 0x00c3, 0x00c3, 0x00c3, 0x00ff, 0x007e } },
+    /* 1 */ { 5, 8, { 0x000c, 0x001c, 0x003c, 0x000c, 0x000c, 0x000c, 0x003f, 0x003f } },
+    /* 2 */ { 8, 8, { 0x007e, 0x00ff, 0x0003, 0x000e, 0x0038, 0x00e0, 0x00ff, 0x00ff } },
+    /* 3 */ { 8, 8, { 0x00fe, 0x00ff, 0x0003, 0x003e, 0x003f, 0x0003, 0x00ff, 0x00fe } },
+    /* 4 */ { 8, 8, { 0x00c6, 0x00c6, 0x00c6, 0x00ff, 0x00ff, 0x0006, 0x0006, 0x0006 } },
+    /* 5 */ { 8, 8, { 0x00ff, 0x00ff, 0x00c0, 0x00fe, 0x007f, 0x0003, 0x00ff, 0x00fe } },
+    /* 6 */ { 8, 8, { 0x007e, 0x00ff, 0x00c0, 0x00fe, 0x00ff, 0x00c3, 0x00ff, 0x007e } },
+    /* 7 */ { 8, 8, { 0x00ff, 0x00ff, 0x0006, 0x000c, 0x0018, 0x0030, 0x0030, 0x0030 } },
+    /* 8 */ { 8, 8, { 0x007e, 0x00ff, 0x00c3, 0x007e, 0x00ff, 0x00c3, 0x00ff, 0x007e } },
+    /* 9 */ { 8, 8, { 0x007e, 0x00ff, 0x00c3, 0x00ff, 0x007f, 0x0003, 0x00ff, 0x007e } },
 };
 static const TitleGlyph kNativeTitleGlyphs[26] = {
     /* A */ { 8, 8, { 0x007e, 0x00ff, 0x00c3, 0x00df, 0x00df, 0x00c3, 0x00c3, 0x00c3 } },
@@ -102,6 +124,52 @@ static int is_title_menu(const uint32_t *pixels, int width, int height,
     if (!near_color(pixels[180 * pitch_pixels + 180], 165, 206, 156, 36))
         return 0;
     if (!near_color(pixels[213 * pitch_pixels + 16], 8, 16, 41, 16))
+        return 0;
+    return 1;
+}
+
+static int is_option_menu(const uint32_t *pixels, int width, int height,
+                          int pitch_pixels)
+{
+    int green_panel;
+    int dark_panel;
+
+    if (width < 256 || height < 224)
+        return 0;
+
+    green_panel = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) &&
+                  near_color(pixels[30 * pitch_pixels + 128], 8, 57, 8, 18);
+    dark_panel = near_color(pixels[20 * pitch_pixels + 20], 8, 8, 16, 18) &&
+                 near_color(pixels[30 * pitch_pixels + 128], 8, 8, 16, 18);
+    if (!green_panel && !dark_panel)
+        return 0;
+    if (!near_color(pixels[32 * pitch_pixels + 112], 132, 181, 123, 70) &&
+        !near_color(pixels[32 * pitch_pixels + 112], 255, 255, 255, 70))
+        return 0;
+    if (!near_color(pixels[210 * pitch_pixels + 240], 8, 8, 16, 18))
+        return 0;
+    return 1;
+}
+
+static int is_key_config_menu(const uint32_t *pixels, int width, int height,
+                              int pitch_pixels)
+{
+    int green_panel;
+    int dark_panel;
+
+    if (width < 256 || height < 224)
+        return 0;
+
+    green_panel = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) &&
+                  near_color(pixels[30 * pitch_pixels + 128], 8, 57, 8, 18);
+    dark_panel = near_color(pixels[20 * pitch_pixels + 20], 8, 8, 16, 18) &&
+                 near_color(pixels[30 * pitch_pixels + 128], 8, 8, 16, 18);
+    if (!green_panel && !dark_panel)
+        return 0;
+    if (!near_color(pixels[33 * pitch_pixels + 94], 132, 181, 123, 70) &&
+        !near_color(pixels[33 * pitch_pixels + 94], 255, 255, 255, 70))
+        return 0;
+    if (!near_color(pixels[210 * pitch_pixels + 240], 8, 8, 16, 18))
         return 0;
     return 1;
 }
@@ -286,6 +354,8 @@ static void reset_title_glyphs(void)
         g_title_glyphs[(unsigned char)('A' + i)] = kNativeTitleGlyphs[i];
         g_title_glyphs[(unsigned char)('a' + i)] = kNativeTitleGlyphs[i];
     }
+    for (i = 0; i < 10; i++)
+        g_title_glyphs[(unsigned char)('0' + i)] = kNativeDigitGlyphs[i];
 }
 
 static int utf8_next(const char **text, uint32_t *codepoint)
@@ -493,6 +563,26 @@ static void draw_text(uint32_t *pixels, int width, int height, int pitch_pixels,
     }
 }
 
+static void fill_rect(uint32_t *pixels, int width, int height, int pitch_pixels,
+                      int x, int y, int w, int h, uint32_t color)
+{
+    int yy, xx;
+    int x0 = x;
+    int y0 = y;
+    int x1 = x + w;
+    int y1 = y + h;
+
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > width) x1 = width;
+    if (y1 > height) y1 = height;
+    for (yy = y0; yy < y1; yy++) {
+        uint32_t *row = pixels + yy * pitch_pixels;
+        for (xx = x0; xx < x1; xx++)
+            row[xx] = color;
+    }
+}
+
 static void draw_label(uint32_t *pixels, int width, int height, int pitch_pixels,
                        const TitleMenuLabel *label, int selected,
                        int skip_source_erase)
@@ -518,6 +608,83 @@ static void draw_label(uint32_t *pixels, int width, int height, int pitch_pixels
               label->text, shadow, scale);
     draw_text(pixels, width, height, pitch_pixels, tx, ty,
               label->text, text, scale);
+}
+
+static int has_cursor_near(const uint32_t *pixels, int width, int height,
+                           int pitch_pixels, const TitleMenuLabel *label)
+{
+    int x0 = label->x - 18;
+    int x1 = label->x + 10;
+    int y0 = label->source_y ? label->source_y - 2 : label->y - 2;
+    int y1 = y0 + label->h + 5;
+    int x, y;
+
+    if (x0 < 0) x0 = 0;
+    if (x1 > width) x1 = width;
+    if (y0 < 0) y0 = 0;
+    if (y1 > height) y1 = height;
+    for (y = y0; y < y1; y++) {
+        const uint32_t *row = pixels + y * pitch_pixels;
+        for (x = x0; x < x1; x++) {
+            if (near_color(row[x], 132, 181, 123, 50) ||
+                near_color(row[x], 255, 255, 255, 70))
+                return 1;
+        }
+    }
+    return 0;
+}
+
+static void draw_option_label(uint32_t *pixels, int width, int height,
+                              int pitch_pixels, const TitleMenuLabel *label,
+                              int selected)
+{
+    uint32_t text = selected || label->value_style ? rgb(132, 181, 123)
+                                                   : rgb(8, 173, 0);
+    uint32_t shadow = selected || label->value_style ? rgb(33, 82, 24)
+                                                     : rgb(0, 90, 0);
+    int scale = 1;
+    int tw = text_width(label->text, scale);
+    int th = text_height(label->text, scale);
+    int tx, ty;
+    tx = label->x + (label->w - tw) / 2;
+    ty = label->text_y ? label->text_y : label->y + (label->h - th) / 2;
+    if (tx < label->x)
+        tx = label->x;
+    if (ty < label->y)
+        ty = label->y;
+    draw_text(pixels, width, height, pitch_pixels, tx + scale, ty + scale,
+              label->text, shadow, scale);
+    draw_text(pixels, width, height, pitch_pixels, tx, ty, label->text, text,
+              scale);
+}
+
+static void draw_option_arrow(uint32_t *pixels, int width, int height,
+                              int pitch_pixels, int x0, int y)
+{
+    uint32_t fill = rgb(132, 181, 123);
+    uint32_t shadow = rgb(33, 82, 24);
+    int dy, x;
+
+    for (dy = 0; dy < 13; dy++) {
+        int span = dy < 7 ? dy + 1 : 13 - dy;
+        int py = y + dy;
+        if (py < 0 || py >= height)
+            continue;
+        for (x = 0; x < span; x++) {
+            int px = x0 + x;
+            if (px >= 0 && px < width)
+                pixels[py * pitch_pixels + px] = fill;
+            if (px + 1 >= 0 && px + 1 < width && py + 1 >= 0 &&
+                py + 1 < height)
+                pixels[(py + 1) * pitch_pixels + px + 1] = shadow;
+        }
+    }
+}
+
+static void draw_option_cursor(uint32_t *pixels, int width, int height,
+                               int pitch_pixels, int y)
+{
+    draw_option_arrow(pixels, width, height, pitch_pixels, 49, y);
 }
 
 static int parse_glyph_row(const char *value, unsigned short *out)
@@ -743,10 +910,102 @@ int gwed_title_menu_overlay_load(const char *path, const char *glyph_path,
     return 1;
 }
 
+int gwed_option_menu_overlay_load(const char *path, const char *language)
+{
+    FILE *f;
+    char line[512];
+    int current = -1;
+    int i;
+
+    memset(g_option_labels, 0, sizeof(g_option_labels));
+    g_option_label_count = 0;
+    g_option_menu_active = 0;
+    if (!path || !language || strcmp(language, "ko") != 0)
+        return 0;
+
+    f = fopen(path, "rb");
+    if (!f)
+        return 0;
+
+    while (fgets(line, sizeof(line), f)) {
+        char *s;
+        char *key;
+        char *value;
+        char parsed[128];
+
+        strip_comment(line);
+        s = trim(line);
+        if (!*s)
+            continue;
+        if (strcmp(s, "[[label]]") == 0) {
+            current = -1;
+            if (g_option_label_count < MAX_OPTION_LABELS) {
+                current = g_option_label_count++;
+                reset_label(&g_option_labels[current]);
+                g_option_labels[current].present = 1;
+            }
+            continue;
+        }
+        if (current < 0 || !parse_key_value(s, &key, &value))
+            continue;
+        if (strcmp(key, "id") == 0) {
+            parse_toml_string(value, g_option_labels[current].id,
+                              sizeof(g_option_labels[current].id));
+        } else if (strcmp(key, "x") == 0) {
+            g_option_labels[current].x = atoi(value);
+        } else if (strcmp(key, "y") == 0) {
+            g_option_labels[current].y = atoi(value);
+        } else if (strcmp(key, "text_y") == 0) {
+            g_option_labels[current].text_y = atoi(value);
+        } else if (strcmp(key, "source_x") == 0) {
+            g_option_labels[current].source_x = atoi(value);
+        } else if (strcmp(key, "source_y") == 0) {
+            g_option_labels[current].source_y = atoi(value);
+        } else if (strcmp(key, "width") == 0) {
+            g_option_labels[current].w = atoi(value);
+        } else if (strcmp(key, "height") == 0) {
+            g_option_labels[current].h = atoi(value);
+        } else if (strcmp(key, "style") == 0) {
+            if (parse_toml_string(value, parsed, sizeof(parsed))) {
+                g_option_labels[current].selectable =
+                    strcmp(parsed, "selectable") == 0;
+                g_option_labels[current].value_style =
+                    strcmp(parsed, "value") == 0;
+            }
+        } else if (strcmp(key, "screen") == 0) {
+            if (parse_toml_string(value, parsed, sizeof(parsed)) &&
+                strcmp(parsed, "key_config") == 0)
+                g_option_labels[current].screen = OPTION_SCREEN_KEY_CONFIG;
+        } else if (strcmp(key, "source") == 0) {
+            parse_toml_string(value, g_option_labels[current].source,
+                              sizeof(g_option_labels[current].source));
+        } else if (strcmp(key, language) == 0) {
+            parse_toml_string(value, g_option_labels[current].text,
+                              sizeof(g_option_labels[current].text));
+        }
+    }
+    fclose(f);
+
+    for (i = 0; i < g_option_label_count; i++) {
+        if (!g_option_labels[i].present || !g_option_labels[i].source[0] ||
+            !g_option_labels[i].text[0] || g_option_labels[i].w <= 0 ||
+            g_option_labels[i].h <= 0) {
+            memset(g_option_labels, 0, sizeof(g_option_labels));
+            g_option_label_count = 0;
+            return 0;
+        }
+    }
+    g_option_menu_active = g_option_label_count > 0;
+    return g_option_menu_active;
+}
+
 void gwed_title_menu_overlay_clear(void)
 {
     memset(g_title_labels, 0, sizeof(g_title_labels));
+    memset(g_option_labels, 0, sizeof(g_option_labels));
+    g_option_label_count = 0;
     g_title_menu_active = 0;
+    g_option_menu_active = 0;
 }
 
 void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
@@ -754,27 +1013,89 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
 {
     int selected;
     int skip_source_erase;
+    int i;
 
-    if (!g_title_menu_active || !pixels || pitch_pixels <= 0)
+    if ((!g_title_menu_active && !g_option_menu_active) || !pixels ||
+        pitch_pixels <= 0)
         return;
-    if (!is_title_menu(pixels, width, height, pitch_pixels))
+
+    if (g_title_menu_active && is_title_menu(pixels, width, height,
+                                             pitch_pixels)) {
+        selected = (int)(g_ram[0x0504] / 2);
+        if (selected < 0 || selected > 3)
+            selected = 0;
+
+        skip_source_erase = text_has_non_ascii(g_title_labels[0].text) ||
+                            text_has_non_ascii(g_title_labels[1].text) ||
+                            text_has_non_ascii(g_title_labels[2].text) ||
+                            text_has_non_ascii(g_title_labels[3].text);
+
+        draw_label(pixels, width, height, pitch_pixels, &g_title_labels[0],
+                   selected == 0, skip_source_erase);
+        draw_label(pixels, width, height, pitch_pixels, &g_title_labels[1],
+                   selected == 1, skip_source_erase);
+        draw_label(pixels, width, height, pitch_pixels, &g_title_labels[2],
+                   selected == 2, skip_source_erase);
+        draw_label(pixels, width, height, pitch_pixels, &g_title_labels[3],
+                   selected == 3, skip_source_erase);
         return;
+    }
 
-    selected = (int)(g_ram[0x0504] / 2);
-    if (selected < 0 || selected > 3)
-        selected = 0;
+    if (g_option_menu_active && is_key_config_menu(pixels, width, height,
+                                                   pitch_pixels)) {
+        uint32_t bg = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) ?
+                      rgb(8, 57, 8) : rgb(8, 8, 16);
 
-    skip_source_erase = text_has_non_ascii(g_title_labels[0].text) ||
-                        text_has_non_ascii(g_title_labels[1].text) ||
-                        text_has_non_ascii(g_title_labels[2].text) ||
-                        text_has_non_ascii(g_title_labels[3].text);
+        fill_rect(pixels, width, height, pitch_pixels, 16, 18, 220, 193, bg);
+        draw_option_arrow(pixels, width, height, pitch_pixels, 156, 84);
+        draw_option_arrow(pixels, width, height, pitch_pixels, 207, 84);
+        for (i = 0; i < g_option_label_count; i++)
+            if (g_option_labels[i].screen == OPTION_SCREEN_KEY_CONFIG)
+                draw_option_label(pixels, width, height, pitch_pixels,
+                                  &g_option_labels[i], 0);
+        return;
+    }
 
-    draw_label(pixels, width, height, pitch_pixels, &g_title_labels[0],
-               selected == 0, skip_source_erase);
-    draw_label(pixels, width, height, pitch_pixels, &g_title_labels[1],
-               selected == 1, skip_source_erase);
-    draw_label(pixels, width, height, pitch_pixels, &g_title_labels[2],
-               selected == 2, skip_source_erase);
-    draw_label(pixels, width, height, pitch_pixels, &g_title_labels[3],
-               selected == 3, skip_source_erase);
+    if (g_option_menu_active && is_option_menu(pixels, width, height,
+                                               pitch_pixels)) {
+        uint32_t bg = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) ?
+                      rgb(8, 57, 8) : rgb(8, 8, 16);
+        int selected_index = -1;
+        int selected_y = 64;
+        for (i = 0; i < g_option_label_count; i++) {
+            if (g_option_labels[i].screen == OPTION_SCREEN_MAIN &&
+                g_option_labels[i].selectable &&
+                has_cursor_near(pixels, width, height, pitch_pixels,
+                                &g_option_labels[i])) {
+                selected_index = i;
+                selected_y = g_option_labels[i].source_y ?
+                             g_option_labels[i].source_y :
+                             g_option_labels[i].y;
+                break;
+            }
+        }
+        fill_rect(pixels, width, height, pitch_pixels, 16, 18, 220, 193, bg);
+        if (selected_index >= 0)
+            draw_option_cursor(pixels, width, height, pitch_pixels,
+                               selected_y);
+        else {
+            for (i = 0; i < g_option_label_count; i++) {
+                if (g_option_labels[i].screen == OPTION_SCREEN_MAIN &&
+                    g_option_labels[i].selectable) {
+                    selected_index = i;
+                    selected_y = g_option_labels[i].source_y ?
+                                 g_option_labels[i].source_y :
+                                 g_option_labels[i].y;
+                    draw_option_cursor(pixels, width, height, pitch_pixels,
+                                       selected_y);
+                    break;
+                }
+            }
+        }
+        for (i = 0; i < g_option_label_count; i++)
+            if (g_option_labels[i].screen == OPTION_SCREEN_MAIN)
+                draw_option_label(pixels, width, height, pitch_pixels,
+                                  &g_option_labels[i], i == selected_index);
+        return;
+    }
 }

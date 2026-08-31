@@ -44,16 +44,17 @@ def repo_root() -> Path:
     return Path(__file__.replace("\\", "/")).resolve().parents[1]
 
 
-def ordered_non_ascii_chars(source: dict, langs: list[str]) -> list[tuple[str, str]]:
+def ordered_non_ascii_chars(sources: list[dict], langs: list[str]) -> list[tuple[str, str]]:
     chars: list[tuple[str, str]] = []
     seen: set[str] = set()
-    for lang in langs:
-        for label in source.get("label", []):
-            for char in str(label.get(lang, "")):
-                if ord(char) < 128 or char in seen:
-                    continue
-                seen.add(char)
-                chars.append((lang, char))
+    for source in sources:
+        for lang in langs:
+            for label in source.get("label", []):
+                for char in str(label.get(lang, "")):
+                    if ord(char) < 128 or char in seen:
+                        continue
+                    seen.add(char)
+                    chars.append((lang, char))
     return chars
 
 
@@ -145,7 +146,15 @@ def emit_codepoint_glyph(
 def main() -> int:
     root = repo_root()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--source", default=str(root / "translations" / "endless_duel_title_menu.toml"))
+    parser.add_argument(
+        "--source",
+        action="append",
+        default=[
+            str(root / "translations" / "endless_duel_title_menu.toml"),
+            str(root / "translations" / "endless_duel_option_menu.toml"),
+        ],
+        help="source TOML with translated [[label]] entries; may be passed more than once",
+    )
     parser.add_argument("--out", default=str(root / "translations" / "endless_duel_title_glyphs.toml"))
     parser.add_argument("--langs", default="zh,ko")
     parser.add_argument("--font-zh", default=DEFAULT_FONTS["zh"])
@@ -161,14 +170,16 @@ def main() -> int:
         "zh": (Path(args.font_zh), "Microsoft YaHei Bold"),
         "ko": (Path(args.font_ko), "Malgun Gothic Bold"),
     }
-    with Path(args.source).open("rb") as f:
-        source = tomllib.load(f)
+    sources = []
+    for source_path in args.source:
+        with Path(source_path).open("rb") as f:
+            sources.append(tomllib.load(f))
 
     lines: list[str] = []
     emit_header(lines)
     emit_ascii_overrides(lines)
 
-    for lang, char in ordered_non_ascii_chars(source, langs):
+    for lang, char in ordered_non_ascii_chars(sources, langs):
         font_path, font_name = font_by_lang[lang]
         if not font_path.is_file():
             raise FileNotFoundError(font_path)

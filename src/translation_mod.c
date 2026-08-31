@@ -26,6 +26,7 @@ static void gwed_translation_activate(void)
     char language[32] = "en";
     char table_path[1024];
     char title_menu_path[1024];
+    char option_menu_path[1024];
     char title_glyph_path[1024];
     const char *resolved_title_glyph_path = NULL;
 
@@ -55,6 +56,10 @@ static void gwed_translation_activate(void)
                                 title_menu_path, sizeof(title_menu_path))) {
         gwed_title_menu_overlay_load(title_menu_path,
                                      resolved_title_glyph_path, language);
+    }
+    if (snesrecomp_exe_dir_path("translations/endless_duel_option_menu.toml",
+                                option_menu_path, sizeof(option_menu_path))) {
+        gwed_option_menu_overlay_load(option_menu_path, language);
     }
     if (!snes_text_xlate_init_c(table_path, language)) {
         fprintf(stderr, "translation: %s\n", snes_text_xlate_last_error_c());
