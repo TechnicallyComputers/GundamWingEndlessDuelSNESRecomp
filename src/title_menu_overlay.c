@@ -237,6 +237,25 @@ static int has_title_scene_background(const uint32_t *pixels, int width,
     return hits >= 4;
 }
 
+static int has_title_logo_art(const uint32_t *pixels, int width, int height,
+                              int pitch_pixels)
+{
+    int hits = 0;
+
+    if (width < 256 || height < 224)
+        return 0;
+
+    if (near_color(pixels[34 * pitch_pixels + 119], 255, 255, 255, 34))
+        hits++;
+    if (near_color(pixels[82 * pitch_pixels + 74], 206, 57, 66, 46))
+        hits++;
+    if (near_color(pixels[52 * pitch_pixels + 164], 255, 222, 66, 46))
+        hits++;
+    if (near_color(pixels[116 * pitch_pixels + 90], 57, 148, 255, 40))
+        hits++;
+    return hits >= 2;
+}
+
 static int title_source_label_hits(const uint32_t *pixels, int width,
                                    int height, int pitch_pixels)
 {
@@ -276,6 +295,8 @@ static int is_title_menu_or_transition(const uint32_t *pixels, int width,
                                              pitch_pixels);
 
     if (label_hits < 18)
+        return 0;
+    if (!has_title_logo_art(pixels, width, height, pitch_pixels))
         return 0;
     return is_title_menu(pixels, width, height, pitch_pixels) ||
            has_title_scene_background(pixels, width, height, pitch_pixels);
@@ -1095,6 +1116,7 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
     int selected;
     int title_menu_visible;
     int title_background_visible;
+    int title_logo_visible;
     int i;
 
     if ((!g_title_menu_active && !g_option_menu_active) || !pixels ||
@@ -1107,10 +1129,14 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
     title_background_visible =
         g_title_menu_active &&
         has_title_scene_background(pixels, width, height, pitch_pixels);
+    title_logo_visible =
+        g_title_menu_active &&
+        has_title_logo_art(pixels, width, height, pitch_pixels);
 
     if (g_title_menu_active &&
         (title_menu_visible ||
-         (g_title_overlay_hold_frames > 0 && title_background_visible))) {
+         (g_title_overlay_hold_frames > 0 && title_background_visible &&
+          title_logo_visible))) {
         if (title_menu_visible)
             g_title_overlay_hold_frames = TITLE_MENU_HOLD_FRAMES;
         else
@@ -1134,6 +1160,8 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
                    selected == 3, 1);
         return;
     }
+    if (!title_logo_visible)
+        g_title_overlay_hold_frames = 0;
 
     if (g_option_menu_active) {
         int option_panel = is_option_panel(pixels, width, height, pitch_pixels);
