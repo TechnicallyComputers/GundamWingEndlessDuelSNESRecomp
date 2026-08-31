@@ -1170,11 +1170,12 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
         if (!option_panel) {
             g_option_overlay_screen = OPTION_SCREEN_NONE;
             g_option_overlay_hold_frames = 0;
-        } else if (is_key_config_menu(pixels, width, height, pitch_pixels)) {
-            g_option_overlay_screen = OPTION_SCREEN_KEY_CONFIG;
-            g_option_overlay_hold_frames = OPTION_SCREEN_HOLD_FRAMES;
         } else if (is_option_menu(pixels, width, height, pitch_pixels)) {
             g_option_overlay_screen = OPTION_SCREEN_MAIN;
+            g_option_overlay_hold_frames = OPTION_SCREEN_HOLD_FRAMES;
+        } else if (is_key_config_menu(pixels, width, height, pitch_pixels) ||
+                   option_panel) {
+            g_option_overlay_screen = OPTION_SCREEN_KEY_CONFIG;
             g_option_overlay_hold_frames = OPTION_SCREEN_HOLD_FRAMES;
         } else if (g_option_overlay_hold_frames > 0) {
             g_option_overlay_hold_frames--;
@@ -1186,12 +1187,6 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
     if (g_option_menu_active &&
         g_option_overlay_hold_frames > 0 &&
         g_option_overlay_screen == OPTION_SCREEN_KEY_CONFIG) {
-        uint32_t bg = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) ?
-                      rgb(8, 57, 8) : rgb(8, 8, 16);
-
-        fill_rect(pixels, width, height, pitch_pixels, 16, 18, 220, 193, bg);
-        draw_option_arrow(pixels, width, height, pitch_pixels, 156, 84);
-        draw_option_arrow(pixels, width, height, pitch_pixels, 207, 84);
         for (i = 0; i < g_option_label_count; i++)
             if (g_option_labels[i].screen == OPTION_SCREEN_KEY_CONFIG)
                 draw_option_label(pixels, width, height, pitch_pixels,
@@ -1202,8 +1197,6 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
     if (g_option_menu_active &&
         g_option_overlay_hold_frames > 0 &&
         g_option_overlay_screen == OPTION_SCREEN_MAIN) {
-        uint32_t bg = near_color(pixels[20 * pitch_pixels + 20], 8, 57, 8, 18) ?
-                      rgb(8, 57, 8) : rgb(8, 8, 16);
         int selected_index = -1;
         int selected_y = 64;
         for (i = 0; i < g_option_label_count; i++) {
@@ -1218,20 +1211,11 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
                 break;
             }
         }
-        fill_rect(pixels, width, height, pitch_pixels, 16, 18, 220, 193, bg);
-        if (selected_index >= 0)
-            draw_option_cursor(pixels, width, height, pitch_pixels,
-                               selected_y);
-        else {
+        if (selected_index < 0) {
             for (i = 0; i < g_option_label_count; i++) {
                 if (g_option_labels[i].screen == OPTION_SCREEN_MAIN &&
                     g_option_labels[i].selectable) {
                     selected_index = i;
-                    selected_y = g_option_labels[i].source_y ?
-                                 g_option_labels[i].source_y :
-                                 g_option_labels[i].y;
-                    draw_option_cursor(pixels, width, height, pitch_pixels,
-                                       selected_y);
                     break;
                 }
             }

@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 LANGS = ("en", "es", "fr", "it", "pt")
+CJK_BLANK_LANGS = ("zh", "ko")
 
 
 def repo_root() -> Path:
@@ -83,6 +84,8 @@ def generate_entries(source: dict) -> dict[int, dict[str, str]]:
         for lang in LANGS:
             if lang in entry:
                 values[f"{lang}_hex"] = ascii_hex(str(entry[lang]), f"{address:#x} {lang}", width)
+        for lang in CJK_BLANK_LANGS:
+            values[f"{lang}_hex"] = ascii_hex(" " * width, f"{address:#x} {lang}", width)
         generated[address] = values
     return generated
 
@@ -97,7 +100,8 @@ def update_block(block: str, generated: dict[str, str]) -> str:
         if pattern.search(out):
             out = pattern.sub(replacement, out, count=1)
         else:
-            out = out.rstrip() + "\n" + replacement + "\n"
+            trailing = "\n\n" if out.endswith("\n\n") else "\n"
+            out = out.rstrip() + "\n" + replacement + trailing
     return out
 
 
@@ -151,7 +155,7 @@ def main() -> int:
         out = table_text
         for start, end, updated in sorted(replacements, reverse=True):
             out = out[:start] + updated + out[end:]
-        table_path.write_text(out, encoding="utf-8")
+        table_path.write_text(out, encoding="utf-8", newline="\n")
         print(f"updated {table_path} for {len(replacements)} option text patch blocks")
         return 0
 

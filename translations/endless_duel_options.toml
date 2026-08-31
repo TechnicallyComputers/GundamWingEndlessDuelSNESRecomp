@@ -119,12 +119,24 @@ it = "FACIL"
 pt = "FACIL"
 
 [[text_patch]]
+address = 0x00c1e7
+source = "NORMAL"
+
+[[text_patch]]
 address = 0x00c1f9
 source = " HARD"
 es = "DIFIC"
 fr = "DUR  "
 it = "DIFF."
 pt = "DIFIC"
+
+[[text_patch]]
+address = 0x00c283
+source = "LIMIT"
+
+[[text_patch]]
+address = 0x00c296
+source = "LIMIT"
 
 [[text_patch]]
 address = 0x00c225
@@ -187,6 +199,10 @@ es = "SONIDO"
 fr = "SON   "
 it = "AUDIO "
 pt = "SOM   "
+
+[[text_patch]]
+address = 0x00c31e
+source = "STEREO"
 
 [[text_patch]]
 address = 0x00c3d4
