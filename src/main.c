@@ -656,6 +656,53 @@ static uint16_t read_keyboard(void)
     return pad;
 }
 
+#define GAME_FAST_FORWARD_DEFAULT_FRAMES 6
+#define GAME_FAST_FORWARD_MAX_FRAMES 30
+
+static int game_env_flag(const char *name)
+{
+    const char *value = getenv(name);
+    if (!value || !*value)
+        return 0;
+    return strcmp(value, "0") != 0 &&
+           strcmp(value, "false") != 0 &&
+           strcmp(value, "FALSE") != 0 &&
+           strcmp(value, "off") != 0 &&
+           strcmp(value, "OFF") != 0;
+}
+
+static int game_fast_forward_frames(void)
+{
+    static int inited;
+    static int frames = GAME_FAST_FORWARD_DEFAULT_FRAMES;
+    if (!inited) {
+        const char *value = getenv("SNESRECOMP_TURBO_FRAMES");
+        inited = 1;
+        if (value && *value) {
+            int parsed = atoi(value);
+            if (parsed < 1)
+                parsed = 1;
+            if (parsed > GAME_FAST_FORWARD_MAX_FRAMES)
+                parsed = GAME_FAST_FORWARD_MAX_FRAMES;
+            frames = parsed;
+        }
+    }
+    return frames;
+}
+
+static int game_fast_forward_active(void)
+{
+    const uint8_t *keys = snesrecomp_sdl_get_keyboard_state();
+    static int env_inited;
+    static int env_enabled;
+
+    if (!env_inited) {
+        env_enabled = game_env_flag("SNESRECOMP_TURBO");
+        env_inited = 1;
+    }
+    return env_enabled || (keys && keys[SDL_SCANCODE_TAB]);
+}
+
 #if defined(SNES_HAS_LOBBY_CLIENT)
 /* Barrier hooks: the admit pump stalls the sim until the peer's inputs
  * arrive, and needs the host to keep sampling the pad and pumping SDL so a
@@ -1353,12 +1400,22 @@ session_reboot:
             if (ls >= 0)
                 RtlSaveLoad(kSaveLoad_Save, ls);
         }
-        RtlRunFrame(inputs);
+        {
+            int fast_forward = game_fast_forward_active();
+            int frames_this_iter =
+                fast_forward ? game_fast_forward_frames() : 1;
+            int ffi;
+
+            RtlAudioSetFastForward(fast_forward != 0);
+            for (ffi = 0; ffi < frames_this_iter; ffi++)
+                RtlRunFrame(inputs);
+        }
         game_present(renderer, texture, 1);
         if (!g_vsync)
             game_frame_limit();
     }
 
+    RtlAudioSetFastForward(0);
     game_close_pads();
     if (g_overlay_tex) {
         SDL_DestroyTexture(g_overlay_tex);

@@ -2,9 +2,11 @@ param(
     [string]$RomPath = $env:SNESRECOMP_ROM,
     [string]$BuildDir = "build-local-xlate-trace",
     [string[]]$Languages = @("en", "es", "fr", "it", "pt"),
-    [string[]]$CaptureSeconds = @("55", "60"),
+    [string[]]$CaptureSeconds = @("105", "120"),
     [string]$OutDir = "",
-    [int]$BasePort = 4670
+    [int]$BasePort = 4670,
+    [switch]$Turbo,
+    [int]$TurboFrames = 6
 )
 
 $ErrorActionPreference = "Stop"
@@ -46,7 +48,8 @@ language = "$Language"
 "@ | Set-Content -LiteralPath $StatePath -NoNewline -Encoding ascii
 }
 
-function Start-Game([string]$ExePath, [string]$WorkDir, [string]$Rom, [int]$Port) {
+function Start-Game([string]$ExePath, [string]$WorkDir, [string]$Rom, [int]$Port,
+                    [int]$FastForwardFrames) {
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
     $psi.FileName = $ExePath
     $psi.WorkingDirectory = $WorkDir
@@ -56,6 +59,10 @@ function Start-Game([string]$ExePath, [string]$WorkDir, [string]$Rom, [int]$Port
     $psi.Environment["SDL_VIDEODRIVER"] = "dummy"
     $psi.Environment["SDL_AUDIODRIVER"] = "dummy"
     $psi.Environment["SNESRECOMP_DEBUG_PORT"] = [string]$Port
+    if ($FastForwardFrames -gt 1) {
+        $psi.Environment["SNESRECOMP_TURBO"] = "1"
+        $psi.Environment["SNESRECOMP_TURBO_FRAMES"] = [string]$FastForwardFrames
+    }
     return [System.Diagnostics.Process]::Start($psi)
 }
 
@@ -166,6 +173,14 @@ if (-not $RomPath) {
 if (-not $CaptureSeconds -or $CaptureSeconds.Count -eq 0) {
     throw "Pass at least one capture second."
 }
+if ($TurboFrames -lt 1) {
+    throw "TurboFrames must be at least 1."
+}
+
+$waitScale = 1.0
+if ($Turbo) {
+    $waitScale = [double]$TurboFrames
+}
 
 $buildPath = Resolve-RepoPath $BuildDir
 $exePath = Join-Path $buildPath "GundamWingEndlessDuelSNESRecomp.exe"
@@ -199,8 +214,13 @@ foreach ($lang in $Languages) {
     $proc = $null
     $conn = $null
     try {
+        $fastForwardFrames = 1
+        if ($Turbo) {
+            $fastForwardFrames = $TurboFrames
+        }
         $start = Get-Date
-        $proc = Start-Game $exePath $buildPath $romFull $port
+        $proc = Start-Game $exePath $buildPath $romFull $port `
+            $fastForwardFrames
         $conn = Connect-Tcp $port
         $stats = Invoke-TcpLine $conn "xlate_stats"
         $statsPath = Join-Path $langDir "xlate_stats.json"
@@ -208,7 +228,7 @@ foreach ($lang in $Languages) {
 
         foreach ($second in $CaptureSeconds) {
             $elapsed = ((Get-Date) - $start).TotalSeconds
-            $remaining = [double]$second - $elapsed
+            $remaining = ([double]$second / $waitScale) - $elapsed
             if ($remaining -gt 0) {
                 Start-Sleep -Milliseconds ([int]($remaining * 1000.0))
             }

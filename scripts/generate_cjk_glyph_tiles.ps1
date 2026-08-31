@@ -104,7 +104,16 @@ function Render-Glyph([string]$Char, [string]$FontName, [int]$FontSize, [int]$Gl
     for ($y = 0; $y -lt 16; $y++) {
         for ($x = 0; $x -lt 16; $x++) {
             if ($mask[$x, $y]) {
-                $pixels[$x, $y] = 3
+                $pixels[$x, $y] = 1
+            } else {
+                $nearGlyph = $false
+                if ($x -gt 0 -and $mask[($x - 1), $y]) { $nearGlyph = $true }
+                if ($x -lt 15 -and $mask[($x + 1), $y]) { $nearGlyph = $true }
+                if ($y -gt 0 -and $mask[$x, ($y - 1)]) { $nearGlyph = $true }
+                if ($y -lt 15 -and $mask[$x, ($y + 1)]) { $nearGlyph = $true }
+                if ($nearGlyph) {
+                    $pixels[$x, $y] = 3
+                }
             }
         }
     }
@@ -154,6 +163,43 @@ function Read-VramSourceHex([byte[]]$Vram, [int]$TileBaseWord, [int]$Tile) {
     return -join ($bytes | ForEach-Object { $_.ToString("x2") })
 }
 
+function Read-ExistingSourceHex([string]$Path) {
+    $result = @{}
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $result
+    }
+
+    $currentLang = ""
+    $currentChar = ""
+    foreach ($line in [System.IO.File]::ReadAllLines($Path, [System.Text.Encoding]::UTF8)) {
+        if ($line -match '^\[glyph\.([^\.]+)\."(.*)"\]$') {
+            $currentLang = $Matches[1]
+            $currentChar = $Matches[2]
+            continue
+        }
+        if ($currentLang -and
+            $line -match '^(top_left|top_right|bottom_left|bottom_right)_source_hex = "([0-9a-fA-F]*)"$') {
+            $key = "{0}`0{1}`0{2}" -f $currentLang, $currentChar, $Matches[1]
+            $result[$key] = $Matches[2]
+        }
+    }
+    return $result
+}
+
+function Resolve-SourceHex([hashtable]$Existing, [string]$Lang, [string]$Char,
+                           [string]$Part, [byte[]]$Vram,
+                           [int]$TileBaseWord, [int]$Tile) {
+    if ($null -ne $Vram -and $Vram.Length -gt 0) {
+        return Read-VramSourceHex $Vram $TileBaseWord $Tile
+    }
+
+    $key = "{0}`0{1}`0{2}" -f $Lang, $Char, $Part
+    if ($Existing.ContainsKey($key)) {
+        return $Existing[$key]
+    }
+    return ""
+}
+
 $sourcePath = Resolve-RepoPath $Source
 $outPath = Resolve-RepoPath $Out
 $sourceLines = Get-Content -LiteralPath $sourcePath -Encoding utf8
@@ -168,6 +214,7 @@ if ($VramJson) {
         $vramBytes[$i] = [Convert]::ToByte($vramHex.Substring($i * 2, 2), 16)
     }
 }
+$existingSourceHex = Read-ExistingSourceHex $outPath
 $langSpecs = @(
     [pscustomobject]@{ Lang = "ko"; Section = "pending.ko"; Font = "Malgun Gothic"; FontSize = 13; GlyphWidth = 2 }
 )
@@ -199,10 +246,10 @@ foreach ($spec in $langSpecs) {
         $outLines.Add(("top_right_tile = 0x{0:x4}" -f ($tile + 1))) | Out-Null
         $outLines.Add(("bottom_left_tile = 0x{0:x4}" -f ($tile + 2))) | Out-Null
         $outLines.Add(("bottom_right_tile = 0x{0:x4}" -f ($tile + 3))) | Out-Null
-        $outLines.Add(("top_left_source_hex = ""{0}""" -f (Read-VramSourceHex $vramBytes $tileBaseWord $tile))) | Out-Null
-        $outLines.Add(("top_right_source_hex = ""{0}""" -f (Read-VramSourceHex $vramBytes $tileBaseWord ($tile + 1)))) | Out-Null
-        $outLines.Add(("bottom_left_source_hex = ""{0}""" -f (Read-VramSourceHex $vramBytes $tileBaseWord ($tile + 2)))) | Out-Null
-        $outLines.Add(("bottom_right_source_hex = ""{0}""" -f (Read-VramSourceHex $vramBytes $tileBaseWord ($tile + 3)))) | Out-Null
+        $outLines.Add(("top_left_source_hex = ""{0}""" -f (Resolve-SourceHex $existingSourceHex $spec.Lang $char "top_left" $vramBytes $tileBaseWord $tile))) | Out-Null
+        $outLines.Add(("top_right_source_hex = ""{0}""" -f (Resolve-SourceHex $existingSourceHex $spec.Lang $char "top_right" $vramBytes $tileBaseWord ($tile + 1)))) | Out-Null
+        $outLines.Add(("bottom_left_source_hex = ""{0}""" -f (Resolve-SourceHex $existingSourceHex $spec.Lang $char "bottom_left" $vramBytes $tileBaseWord ($tile + 2)))) | Out-Null
+        $outLines.Add(("bottom_right_source_hex = ""{0}""" -f (Resolve-SourceHex $existingSourceHex $spec.Lang $char "bottom_right" $vramBytes $tileBaseWord ($tile + 3)))) | Out-Null
         $outLines.Add(("top_left_hex = ""{0}""" -f $glyph.TopLeft)) | Out-Null
         $outLines.Add(("top_right_hex = ""{0}""" -f $glyph.TopRight)) | Out-Null
         $outLines.Add(("bottom_left_hex = ""{0}""" -f $glyph.BottomLeft)) | Out-Null

@@ -57,6 +57,11 @@ def text_width(line: str, glyphs: dict, glyph_width: int) -> int:
     return width
 
 
+def centered_col(col: int, width: int) -> int:
+    band_start = 32 if col >= 32 else 0
+    return band_start + max((32 - width) // 2, 0)
+
+
 def generate_language_hex(crawl: dict, candidates: dict, glyphs: dict, lang: str) -> str:
     group, key, glyph_width = LANG_SPECS[lang]
     lines = list(candidates[group][key]["lines"])
@@ -75,6 +80,8 @@ def generate_language_hex(crawl: dict, candidates: dict, glyphs: dict, lang: str
         top_row, top_col = [int(x) for x in slot["top"]]
         bottom_row, bottom_col = [int(x) for x in slot["bottom"]]
         width = text_width(line, lang_glyphs, glyph_width)
+        top_col = centered_col(top_col, width)
+        bottom_col = centered_col(bottom_col, width)
         for row, col, name in ((top_row, top_col, "top"), (bottom_row, bottom_col, "bottom")):
             if row < 0 or row >= rows:
                 raise ValueError(f"{lang} line {line_number}: {name} row {row} outside 0..{rows - 1}")
