@@ -436,12 +436,6 @@ static void erase_source_label(uint32_t *pixels, int width, int height,
             (label->text_y ? label->text_y : label->y);
     const char *source = label->source;
     int source_x = cursor;
-    int source_w = text_width(source, scale);
-    int cleanup_x0 = source_x - 1;
-    int cleanup_x1 = source_x + source_w + 2;
-    int cleanup_y0 = y - 1;
-    int cleanup_y1 = y + 10;
-    int cy, cx;
 
     while (source && *source) {
         const TitleGlyph *glyph = next_title_glyph(&source);
@@ -466,18 +460,6 @@ static void erase_source_label(uint32_t *pixels, int width, int height,
             }
         }
         cursor += (glyph->width + 1) * scale;
-    }
-
-    if (cleanup_x0 < 0) cleanup_x0 = 0;
-    if (cleanup_y0 < 0) cleanup_y0 = 0;
-    if (cleanup_x1 > width) cleanup_x1 = width;
-    if (cleanup_y1 > height) cleanup_y1 = height;
-    for (cy = cleanup_y0; cy < cleanup_y1; cy++) {
-        uint32_t *row = pixels + cy * pitch_pixels;
-        for (cx = cleanup_x0; cx < cleanup_x1; cx++) {
-            if (is_menu_text_pixel(row[cx]))
-                row[cx] = bg;
-        }
     }
 }
 
@@ -511,36 +493,9 @@ static void draw_text(uint32_t *pixels, int width, int height, int pitch_pixels,
     }
 }
 
-static void fill_rect(uint32_t *pixels, int width, int height, int pitch_pixels,
-                      int x, int y, int w, int h, uint32_t color)
-{
-    int yy, xx;
-    int x0 = x;
-    int y0 = y;
-    int x1 = x + w;
-    int y1 = y + h;
-
-    if (x0 < 0) x0 = 0;
-    if (y0 < 0) y0 = 0;
-    if (x1 > width) x1 = width;
-    if (y1 > height) y1 = height;
-    for (yy = y0; yy < y1; yy++) {
-        uint32_t *row = pixels + yy * pitch_pixels;
-        for (xx = x0; xx < x1; xx++)
-            row[xx] = color;
-    }
-}
-
-static void draw_nonlatin_panel(uint32_t *pixels, int width, int height,
-                                int pitch_pixels)
-{
-    fill_rect(pixels, width, height, pitch_pixels, 84, 136, 88, 49,
-              rgb(8, 16, 41));
-}
-
 static void draw_label(uint32_t *pixels, int width, int height, int pitch_pixels,
                        const TitleMenuLabel *label, int selected,
-                       int nonlatin_panel)
+                       int skip_source_erase)
 {
     uint32_t text = selected ? rgb(252, 244, 156) : rgb(64, 120, 88);
     uint32_t shadow = selected ? rgb(56, 120, 96) : rgb(24, 56, 48);
@@ -549,7 +504,7 @@ static void draw_label(uint32_t *pixels, int width, int height, int pitch_pixels
     int th = text_height(label->text, scale);
     int tx, ty;
 
-    if (!nonlatin_panel)
+    if (!skip_source_erase)
         erase_source_label(pixels, width, height, pitch_pixels, label);
     tx = label->x + (label->w - tw) / 2;
     ty = label->text_y ? label->text_y : label->y + (label->h - th) / 2;
@@ -798,7 +753,7 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
                                    int pitch_pixels)
 {
     int selected;
-    int nonlatin_panel;
+    int skip_source_erase;
 
     if (!g_title_menu_active || !pixels || pitch_pixels <= 0)
         return;
@@ -809,19 +764,17 @@ void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
     if (selected < 0 || selected > 3)
         selected = 0;
 
-    nonlatin_panel = text_has_non_ascii(g_title_labels[0].text) ||
-                     text_has_non_ascii(g_title_labels[1].text) ||
-                     text_has_non_ascii(g_title_labels[2].text) ||
-                     text_has_non_ascii(g_title_labels[3].text);
-    if (nonlatin_panel)
-        draw_nonlatin_panel(pixels, width, height, pitch_pixels);
+    skip_source_erase = text_has_non_ascii(g_title_labels[0].text) ||
+                        text_has_non_ascii(g_title_labels[1].text) ||
+                        text_has_non_ascii(g_title_labels[2].text) ||
+                        text_has_non_ascii(g_title_labels[3].text);
 
     draw_label(pixels, width, height, pitch_pixels, &g_title_labels[0],
-               selected == 0, nonlatin_panel);
+               selected == 0, skip_source_erase);
     draw_label(pixels, width, height, pitch_pixels, &g_title_labels[1],
-               selected == 1, nonlatin_panel);
+               selected == 1, skip_source_erase);
     draw_label(pixels, width, height, pitch_pixels, &g_title_labels[2],
-               selected == 2, nonlatin_panel);
+               selected == 2, skip_source_erase);
     draw_label(pixels, width, height, pitch_pixels, &g_title_labels[3],
-               selected == 3, nonlatin_panel);
+               selected == 3, skip_source_erase);
 }

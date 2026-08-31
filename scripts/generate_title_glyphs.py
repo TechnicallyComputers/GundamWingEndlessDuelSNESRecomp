@@ -151,7 +151,7 @@ def main() -> int:
     parser.add_argument("--font-zh", default=DEFAULT_FONTS["zh"])
     parser.add_argument("--font-ko", default=DEFAULT_FONTS["ko"])
     parser.add_argument("--font-size", type=int, default=24)
-    parser.add_argument("--target", type=int, default=12)
+    parser.add_argument("--target", type=int, default=8)
     parser.add_argument("--threshold", type=int, default=72)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()

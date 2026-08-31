@@ -178,13 +178,6 @@ def overlay_language(
     width, height, base_rgb = base
     rgb = bytearray(base_rgb)
     palette = source["palette"]
-    nonlatin_panel = any(
-        ord(char) >= 128
-        for label in source["label"]
-        for char in str(label.get(lang, label["source"]))
-    )
-    if nonlatin_panel:
-        put_rect(rgb, width, height, 84, 136, 88, 49, (8, 16, 41))
     for label in source["label"]:
         text = str(label.get(lang, label["source"]))
         selected = bool(label.get("selected", False))
@@ -195,8 +188,7 @@ def overlay_language(
         fill = tuple(int(v) for v in palette["selected_fill" if selected else "inactive_fill"])
         text_color = tuple(int(v) for v in palette["selected_text" if selected else "inactive_text"])
         shadow = tuple(int(v) for v in palette["selected_shadow" if selected else "inactive_shadow"])
-        if not nonlatin_panel:
-            put_rect(rgb, width, height, x, y, w, h, fill)
+        put_rect(rgb, width, height, x, y, w, h, fill)
         scale = 1
         tw, th = text_size(text, scale, glyphs)
         tx = x + max(0, (w - tw) // 2)
