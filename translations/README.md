@@ -91,7 +91,10 @@ The title-screen mode selector labels live in
 is seeded from glyph masks extracted from native selected-row captures, and
 `endless_duel_title_glyphs.toml` contains authored overrides for translation
 letters that do not appear in the original English labels, starting with `H`
-and `C`.
+and `C`. It also supports `codepoint = "U+...."` entries for UTF-8 labels.
+The checked-in Chinese and Korean title-menu strings are prototype data for
+validating this external glyph path; they are not exposed in the launcher until
+the broader CJK experience has been visually validated beyond this one screen.
 
 They are not plain option-menu strings and the current BG/OAM helper renders do
 not yet reproduce the exact source layer, so the live replacement is a
@@ -105,6 +108,14 @@ To preview rectangle fit against a captured frame without launching the game:
 ```powershell
 py -3 scripts\render_title_menu_overlay_preview.py `
   C:\path\to\title-menu-capture\en --langs es,fr,it,pt
+```
+
+Regenerate the authored/generated title glyph asset after changing non-ASCII
+title labels:
+
+```powershell
+py -3 scripts\generate_title_glyphs.py --check
+py -3 scripts\generate_title_glyphs.py
 ```
 
 The generated BMPs are ignored under `translations/title_menu_previews/`. They

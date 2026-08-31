@@ -159,9 +159,13 @@ art.
 
 This is also the path for CJK. If the game has no Chinese/Korean glyph tiles,
 do not expose the language as a fallback-only option. Add real glyph assets,
-map strings to those assets, and validate screenshots first. The current title
-glyph override format is ASCII-only; CJK will need the same idea extended to
-UTF-8 keyed glyph records or image-atlas labels.
+map strings to those assets, and validate screenshots first. The title glyph
+override format now accepts single-byte `char = "H"` entries and Unicode
+`codepoint = "U+5267"` entries with 1-16 pixel masks. Run
+`scripts/generate_title_glyphs.py --check` to verify generated Chinese/Korean
+title glyphs remain in sync with `translations/endless_duel_title_menu.toml`.
+The current Chinese/Korean title labels are a proof of the external glyph path,
+not a complete language release.
 
 ## Visual Validation
 

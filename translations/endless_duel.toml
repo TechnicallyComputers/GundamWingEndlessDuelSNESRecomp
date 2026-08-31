@@ -6,6 +6,8 @@ default_lang = "en"
 fallback_fr = "en"
 fallback_it = "en"
 fallback_pt = "en"
+fallback_zh = "en"
+fallback_ko = "en"
 
 [[rom_patch]]
 address = 0x004819

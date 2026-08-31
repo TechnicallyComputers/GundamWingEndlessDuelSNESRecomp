@@ -10,7 +10,7 @@ import tomllib
 from pathlib import Path
 
 
-LANGS = ("en", "es", "fr", "it", "pt")
+LANGS = ("en", "es", "fr", "it", "pt", "zh", "ko")
 
 DEFAULT_TITLE_GLYPHS = {
     " ": (5, (0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)),
@@ -103,35 +103,46 @@ def put_rect(rgb: bytearray, width: int, height: int, x: int, y: int, w: int, h:
             rgb[off:off + 3] = bytes(color)
 
 
-def load_glyphs(path: Path | None) -> dict[str, tuple[int, tuple[int, ...]]]:
+def load_glyphs(path: Path | None) -> dict[str, tuple[int, int, tuple[int, ...]]]:
     glyphs = dict(DEFAULT_TITLE_GLYPHS)
     if path is None or not path.is_file():
-        return glyphs
+        return {k: (v[0], len(v[1]), v[1]) for k, v in glyphs.items()}
     with path.open("rb") as f:
         source = tomllib.load(f)
+    glyphs = {k: (v[0], len(v[1]), v[1]) for k, v in glyphs.items()}
     for entry in source.get("glyph", []):
-        char = str(entry["char"])
+        if "codepoint" in entry:
+            value = str(entry["codepoint"])
+            if value.startswith("U+"):
+                value = value[2:]
+            char = chr(int(value, 16))
+        else:
+            char = str(entry["char"])
         if len(char) != 1:
-            raise ValueError(f"{path}: only single-byte title glyphs are supported for now: {char!r}")
+            raise ValueError(f"{path}: expected one glyph codepoint: {char!r}")
         width = int(entry["width"])
-        rows = tuple(int(str(entry[f"row{i}"]), 16) for i in range(8))
-        if width < 1 or width > 16:
-            raise ValueError(f"{path}: glyph {char!r} has invalid width {width}")
-        glyphs[char.upper()] = (width, rows)
+        height = int(entry.get("height", 8))
+        rows = tuple(int(str(entry[f"row{i}"]), 16) for i in range(height))
+        if width < 1 or width > 16 or height < 1 or height > 16:
+            raise ValueError(f"{path}: glyph {char!r} has invalid size {width}x{height}")
+        glyphs[char] = (width, height, rows)
+        glyphs[char.upper()] = (width, height, rows)
     return glyphs
 
 
-def text_size(text: str, scale: int, glyphs: dict[str, tuple[int, tuple[int, ...]]]) -> tuple[int, int]:
+def text_size(text: str, scale: int, glyphs: dict[str, tuple[int, int, tuple[int, ...]]]) -> tuple[int, int]:
     width = 0
-    for index, char in enumerate(text.upper()):
+    height = 8
+    for index, char in enumerate(text):
         try:
-            glyph_width, _ = glyphs[char]
+            glyph_width, glyph_height, _ = glyphs[char]
         except KeyError as exc:
             raise ValueError(f"unsupported title-menu preview glyph {char!r}") from exc
         if index:
             width += scale
         width += glyph_width * scale
-    return width, 8 * scale
+        height = max(height, glyph_height)
+    return width, height * scale
 
 
 def draw_text(
@@ -143,12 +154,12 @@ def draw_text(
     text: str,
     color: tuple[int, int, int],
     scale: int,
-    glyphs: dict[str, tuple[int, tuple[int, ...]]],
+    glyphs: dict[str, tuple[int, int, tuple[int, ...]]],
 ) -> None:
     cursor = x
-    for char in text.upper():
+    for char in text:
         try:
-            glyph_width, rows = glyphs[char]
+            glyph_width, _, rows = glyphs[char]
         except KeyError as exc:
             raise ValueError(f"unsupported title-menu preview glyph {char!r}") from exc
         for gy, row in enumerate(rows):
@@ -162,11 +173,18 @@ def overlay_language(
     base: tuple[int, int, bytearray],
     source: dict,
     lang: str,
-    glyphs: dict[str, tuple[int, tuple[int, ...]]],
+    glyphs: dict[str, tuple[int, int, tuple[int, ...]]],
 ) -> tuple[int, int, bytearray]:
     width, height, base_rgb = base
     rgb = bytearray(base_rgb)
     palette = source["palette"]
+    nonlatin_panel = any(
+        ord(char) >= 128
+        for label in source["label"]
+        for char in str(label.get(lang, label["source"]))
+    )
+    if nonlatin_panel:
+        put_rect(rgb, width, height, 84, 136, 88, 49, (8, 16, 41))
     for label in source["label"]:
         text = str(label.get(lang, label["source"]))
         selected = bool(label.get("selected", False))
@@ -177,11 +195,14 @@ def overlay_language(
         fill = tuple(int(v) for v in palette["selected_fill" if selected else "inactive_fill"])
         text_color = tuple(int(v) for v in palette["selected_text" if selected else "inactive_text"])
         shadow = tuple(int(v) for v in palette["selected_shadow" if selected else "inactive_shadow"])
-        put_rect(rgb, width, height, x, y, w, h, fill)
+        if not nonlatin_panel:
+            put_rect(rgb, width, height, x, y, w, h, fill)
         scale = 1
         tw, th = text_size(text, scale, glyphs)
         tx = x + max(0, (w - tw) // 2)
         ty = int(label.get("text_y", y + max(0, (h - th) // 2)))
+        if th > 8 * scale:
+            ty = y + max(0, (h - th) // 2)
         draw_text(rgb, width, height, tx + scale, ty + scale, text, shadow, scale, glyphs)
         draw_text(rgb, width, height, tx, ty, text, text_color, scale, glyphs)
     return width, height, rgb

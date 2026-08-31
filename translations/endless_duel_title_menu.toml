@@ -33,6 +33,8 @@ es = "HISTORIA"
 fr = "HISTOIRE"
 it = "STORIA"
 pt = "HISTORIA"
+zh = "\u5267\u60c5"
+ko = "\uc2a4\ud1a0\ub9ac"
 
 [[label]]
 id = "vs_mode"
@@ -50,6 +52,8 @@ es = "MODO VS"
 fr = "MODE VS"
 it = "MODO VS"
 pt = "MODO VS"
+zh = "\u5bf9\u6218"
+ko = "\ub300\uc804"
 
 [[label]]
 id = "trial_mode"
@@ -67,6 +71,8 @@ es = "PRUEBA"
 fr = "ESSAI"
 it = "PROVA"
 pt = "TREINO"
+zh = "\u8bd5\u70bc"
+ko = "\uc5f0\uc2b5"
 
 [[label]]
 id = "option"
@@ -84,3 +90,5 @@ es = "OPCIONES"
 fr = "OPTIONS"
 it = "OPZIONI"
 pt = "OPCOES"
+zh = "\u9009\u9879"
+ko = "\uc124\uc815"
