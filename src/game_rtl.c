@@ -528,6 +528,7 @@ const RtlGameInfo kGameInfo = {
     .title = "gundamwingendlessduel",
     .initialize = &GameInitialize,
     .run_frame = &GameRunOneFrame,
+    .session_reset = &GameSessionReset,
     .draw_ppu_frame = &GameDrawPpuFrame,
     .save_name_prefix = "save",
 };
@@ -544,4 +545,17 @@ void GameSessionReset(void)
      * stale WAI: g_cpu survives a session teardown, so a rematch that skipped
      * this would start frame 1 mid-flight. Re-points g_cpu.ram too. */
     cpu_state_init(&g_cpu, g_ram);
+    /* Scanout latch belongs to the retired machine's PPU (see s_scanout_oam):
+     * presenting frame 1 of a rematch from the previous match's OAM/CGRAM
+     * would show a stale sprite table over a freshly booted guest. */
+    s_scanout_valid = 0;
+    memset(s_scanout_oam, 0, sizeof(s_scanout_oam));
+    memset(s_scanout_high_oam, 0, sizeof(s_scanout_high_oam));
+    memset(s_scanout_cgram, 0, sizeof(s_scanout_cgram));
+    memset(g_q22_at_nmi, 0, sizeof(g_q22_at_nmi));
+    /* Self-reporting: a rematch that boots correctly prints this immediately
+     * before its SnesInit. Its ABSENCE in a black-screen rematch log is the
+     * diagnosis — the hook was not reached, so the guest resumed a dead
+     * machine's PC. */
+    fprintf(stderr, "game: session reset (cold boot for rematch)\n");
 }
