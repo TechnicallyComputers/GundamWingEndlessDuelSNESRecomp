@@ -34,7 +34,6 @@ typedef struct TitleGlyphEntry {
 #define OPTION_SCREEN_NONE -1
 #define OPTION_SCREEN_MAIN 0
 #define OPTION_SCREEN_KEY_CONFIG 1
-#define TITLE_MENU_HOLD_FRAMES 96
 #define OPTION_SCREEN_HOLD_FRAMES 4
 
 static TitleMenuLabel g_title_labels[4];
@@ -42,7 +41,6 @@ static TitleMenuLabel g_option_labels[MAX_OPTION_LABELS];
 static int g_option_label_count;
 static int g_title_menu_active;
 static int g_option_menu_active;
-static int g_title_overlay_hold_frames;
 static int g_option_overlay_screen = OPTION_SCREEN_NONE;
 static int g_option_overlay_hold_frames;
 
@@ -116,23 +114,6 @@ static int near_color(uint32_t p, int r, int g, int b, int tolerance)
            pb >= b - tolerance && pb <= b + tolerance;
 }
 
-static int is_title_menu(const uint32_t *pixels, int width, int height,
-                         int pitch_pixels)
-{
-    if (width < 256 || height < 224)
-        return 0;
-
-    if (!near_color(pixels[34 * pitch_pixels + 119], 255, 255, 255, 18))
-        return 0;
-    if (!near_color(pixels[116 * pitch_pixels + 90], 57, 148, 255, 28))
-        return 0;
-    if (!near_color(pixels[180 * pitch_pixels + 180], 165, 206, 156, 36))
-        return 0;
-    if (!near_color(pixels[213 * pitch_pixels + 16], 8, 16, 41, 16))
-        return 0;
-    return 1;
-}
-
 static int is_option_panel(const uint32_t *pixels, int width, int height,
                            int pitch_pixels)
 {
@@ -176,130 +157,6 @@ static int is_key_config_menu(const uint32_t *pixels, int width, int height,
         !near_color(pixels[33 * pitch_pixels + 94], 255, 255, 255, 70))
         return 0;
     return 1;
-}
-
-static int is_menu_text_pixel(uint32_t p)
-{
-    int r, g, b;
-    unpack(p, &r, &g, &b);
-
-    if (r >= 135 && g >= 135 && b <= 210 && r + 24 >= g)
-        return 1;
-    if (g >= 70 && g >= r + 12 && b <= 150)
-        return 1;
-    return 0;
-}
-
-static int is_dim_title_label_pixel(uint32_t p)
-{
-    int r, g, b;
-    unpack(p, &r, &g, &b);
-
-    if (r + g + b < 50)
-        return 0;
-    if (r >= 24 && g >= 24 && b <= g + 44 && r + 28 >= g)
-        return 1;
-    if (g >= 28 && g >= r + 4 && b <= g + 36)
-        return 1;
-    return 0;
-}
-
-static int is_title_background_pixel(uint32_t p)
-{
-    int r, g, b;
-    unpack(p, &r, &g, &b);
-
-    if (near_color(p, 8, 16, 41, 40))
-        return 1;
-    return r <= 40 && g <= 72 && b >= 32 && b <= 128 &&
-           b >= r + 10 && b >= g + 4;
-}
-
-static int has_title_scene_background(const uint32_t *pixels, int width,
-                                      int height, int pitch_pixels)
-{
-    static const unsigned char sample_points[][2] = {
-        { 16, 213 }, { 33, 210 }, { 220, 180 },
-        { 240, 40 }, { 20, 20 }, { 190, 135 }
-    };
-    int hits = 0;
-    int i;
-
-    if (width < 256 || height < 224)
-        return 0;
-
-    for (i = 0; i < (int)(sizeof(sample_points) / sizeof(sample_points[0])); i++) {
-        uint32_t p = pixels[sample_points[i][1] * pitch_pixels +
-                            sample_points[i][0]];
-        if (is_title_background_pixel(p))
-            hits++;
-    }
-    return hits >= 4;
-}
-
-static int has_title_logo_art(const uint32_t *pixels, int width, int height,
-                              int pitch_pixels)
-{
-    int hits = 0;
-
-    if (width < 256 || height < 224)
-        return 0;
-
-    if (near_color(pixels[34 * pitch_pixels + 119], 255, 255, 255, 34))
-        hits++;
-    if (near_color(pixels[82 * pitch_pixels + 74], 206, 57, 66, 46))
-        hits++;
-    if (near_color(pixels[52 * pitch_pixels + 164], 255, 222, 66, 46))
-        hits++;
-    if (near_color(pixels[116 * pitch_pixels + 90], 57, 148, 255, 40))
-        hits++;
-    return hits >= 2;
-}
-
-static int title_source_label_hits(const uint32_t *pixels, int width,
-                                   int height, int pitch_pixels)
-{
-    int hits = 0;
-    int i;
-
-    for (i = 0; i < 4; i++) {
-        const TitleMenuLabel *label = &g_title_labels[i];
-        int x0, x1, y0, y1, x, y;
-
-        if (!label->present)
-            continue;
-        x0 = label->source_x ? label->source_x : label->x;
-        y0 = label->source_y ? label->source_y : label->y;
-        x1 = x0 + (int)strlen(label->source) * 10 + 8;
-        y1 = y0 + label->h + 4;
-        if (x0 < 0) x0 = 0;
-        if (y0 < 0) y0 = 0;
-        if (x1 > width) x1 = width;
-        if (y1 > height) y1 = height;
-        for (y = y0; y < y1; y++) {
-            const uint32_t *row = pixels + y * pitch_pixels;
-            for (x = x0; x < x1; x++) {
-                if (is_menu_text_pixel(row[x]) ||
-                    is_dim_title_label_pixel(row[x]))
-                    hits++;
-            }
-        }
-    }
-    return hits;
-}
-
-static int is_title_menu_or_transition(const uint32_t *pixels, int width,
-                                       int height, int pitch_pixels)
-{
-    int label_hits = title_source_label_hits(pixels, width, height,
-                                             pitch_pixels);
-
-    if (label_hits < 18)
-        return 0;
-    if (!has_title_logo_art(pixels, width, height, pitch_pixels))
-        return 0;
-    return is_title_menu(pixels, width, height, pitch_pixels) ||
-           has_title_scene_background(pixels, width, height, pitch_pixels);
 }
 
 static char *trim(char *s)
@@ -566,67 +423,6 @@ static int text_height(const char *text, int scale)
     return height * scale;
 }
 
-static uint32_t row_background(const uint32_t *pixels, int width, int height,
-                               int pitch_pixels, const TitleMenuLabel *label)
-{
-    unsigned sr = 0, sg = 0, sb = 0, count = 0;
-    int x0 = label->x + 10;
-    int x1 = label->x + label->w - 16;
-    int y0 = label->y;
-    int y1 = label->y + label->h;
-    int y, x;
-
-    if (x0 < 0) x0 = 0;
-    if (y0 < 0) y0 = 0;
-    if (x1 > width) x1 = width;
-    if (y1 > height) y1 = height;
-    for (y = y0; y < y1; y++) {
-        const uint32_t *row = pixels + y * pitch_pixels;
-        for (x = x0; x < x1; x++) {
-            int r, g, b;
-            uint32_t p = row[x];
-            if (is_menu_text_pixel(p))
-                continue;
-            unpack(p, &r, &g, &b);
-            if (r >= 130 && g >= 130 && b >= 130)
-                continue;
-            sr += (unsigned)r;
-            sg += (unsigned)g;
-            sb += (unsigned)b;
-            count++;
-        }
-    }
-    if (!count)
-        return rgb(8, 16, 41);
-    return rgb(sr / count, sg / count, sb / count);
-}
-
-static void erase_source_label(uint32_t *pixels, int width, int height,
-                               int pitch_pixels, const TitleMenuLabel *label)
-{
-    uint32_t bg = row_background(pixels, width, height, pitch_pixels, label);
-    int x0 = (label->source_x ? label->source_x : label->x) - 4;
-    int x1 = (label->source_x ? label->source_x : label->x) +
-             (int)strlen(label->source) * 9 + 4;
-    int y0 = (label->source_y ? label->source_y : label->y) - 3;
-    int y1 = (label->source_y ? label->source_y : label->y) +
-             label->h + 6;
-    int x, y;
-
-    if (x0 < 0) x0 = 0;
-    if (x1 > width) x1 = width;
-    if (y0 < 0) y0 = 0;
-    if (y1 > height) y1 = height;
-    for (y = y0; y < y1; y++) {
-        uint32_t *row = pixels + y * pitch_pixels;
-        for (x = x0; x < x1; x++) {
-            if (is_menu_text_pixel(row[x]) ||
-                is_dim_title_label_pixel(row[x]))
-                row[x] = bg;
-        }
-    }
-}
-
 static void draw_text(uint32_t *pixels, int width, int height, int pitch_pixels,
                       int x, int y, const char *text, uint32_t color,
                       int scale)
@@ -655,53 +451,6 @@ static void draw_text(uint32_t *pixels, int width, int height, int pitch_pixels,
         }
         cursor += (glyph->width + 1) * scale;
     }
-}
-
-static void fill_rect(uint32_t *pixels, int width, int height, int pitch_pixels,
-                      int x, int y, int w, int h, uint32_t color)
-{
-    int yy, xx;
-    int x0 = x;
-    int y0 = y;
-    int x1 = x + w;
-    int y1 = y + h;
-
-    if (x0 < 0) x0 = 0;
-    if (y0 < 0) y0 = 0;
-    if (x1 > width) x1 = width;
-    if (y1 > height) y1 = height;
-    for (yy = y0; yy < y1; yy++) {
-        uint32_t *row = pixels + yy * pitch_pixels;
-        for (xx = x0; xx < x1; xx++)
-            row[xx] = color;
-    }
-}
-
-static void draw_label(uint32_t *pixels, int width, int height, int pitch_pixels,
-                       const TitleMenuLabel *label, int selected,
-                       int skip_source_erase)
-{
-    uint32_t text = selected ? rgb(252, 244, 156) : rgb(64, 120, 88);
-    uint32_t shadow = selected ? rgb(56, 120, 96) : rgb(24, 56, 48);
-    int scale = 1;
-    int tw = text_width(label->text, scale);
-    int th = text_height(label->text, scale);
-    int tx, ty;
-
-    if (!skip_source_erase)
-        erase_source_label(pixels, width, height, pitch_pixels, label);
-    tx = label->x + (label->w - tw) / 2;
-    ty = label->text_y ? label->text_y : label->y + (label->h - th) / 2;
-    if (th > 8 * scale)
-        ty = label->y + (label->h - th) / 2;
-    if (tx < label->x)
-        tx = label->x;
-    if (ty < label->y)
-        ty = label->y;
-    draw_text(pixels, width, height, pitch_pixels, tx + scale, ty + scale,
-              label->text, shadow, scale);
-    draw_text(pixels, width, height, pitch_pixels, tx, ty,
-              label->text, text, scale);
 }
 
 static int has_cursor_near(const uint32_t *pixels, int width, int height,
@@ -750,35 +499,6 @@ static void draw_option_label(uint32_t *pixels, int width, int height,
               label->text, shadow, scale);
     draw_text(pixels, width, height, pitch_pixels, tx, ty, label->text, text,
               scale);
-}
-
-static void draw_option_arrow(uint32_t *pixels, int width, int height,
-                              int pitch_pixels, int x0, int y)
-{
-    uint32_t fill = rgb(132, 181, 123);
-    uint32_t shadow = rgb(33, 82, 24);
-    int dy, x;
-
-    for (dy = 0; dy < 13; dy++) {
-        int span = dy < 7 ? dy + 1 : 13 - dy;
-        int py = y + dy;
-        if (py < 0 || py >= height)
-            continue;
-        for (x = 0; x < span; x++) {
-            int px = x0 + x;
-            if (px >= 0 && px < width)
-                pixels[py * pitch_pixels + px] = fill;
-            if (px + 1 >= 0 && px + 1 < width && py + 1 >= 0 &&
-                py + 1 < height)
-                pixels[(py + 1) * pitch_pixels + px + 1] = shadow;
-        }
-    }
-}
-
-static void draw_option_cursor(uint32_t *pixels, int width, int height,
-                               int pitch_pixels, int y)
-{
-    draw_option_arrow(pixels, width, height, pitch_pixels, 49, y);
 }
 
 static int parse_glyph_row(const char *value, unsigned short *out)
@@ -1001,7 +721,6 @@ int gwed_title_menu_overlay_load(const char *path, const char *glyph_path,
         }
     }
     g_title_menu_active = 1;
-    g_title_overlay_hold_frames = 0;
     return 1;
 }
 
@@ -1015,7 +734,6 @@ int gwed_option_menu_overlay_load(const char *path, const char *language)
     memset(g_option_labels, 0, sizeof(g_option_labels));
     g_option_label_count = 0;
     g_option_menu_active = 0;
-    g_title_overlay_hold_frames = 0;
     g_option_overlay_screen = OPTION_SCREEN_NONE;
     g_option_overlay_hold_frames = 0;
     if (!path || !language ||
@@ -1107,7 +825,6 @@ void gwed_title_menu_overlay_clear(void)
     g_option_label_count = 0;
     g_title_menu_active = 0;
     g_option_menu_active = 0;
-    g_title_overlay_hold_frames = 0;
     g_option_overlay_screen = OPTION_SCREEN_NONE;
     g_option_overlay_hold_frames = 0;
 }
@@ -1115,55 +832,16 @@ void gwed_title_menu_overlay_clear(void)
 void gwed_title_menu_overlay_apply(uint32_t *pixels, int width, int height,
                                    int pitch_pixels)
 {
-    int selected;
-    int title_menu_visible;
-    int title_background_visible;
-    int title_logo_visible;
     int i;
 
-    if ((!g_title_menu_active && !g_option_menu_active) || !pixels ||
-        pitch_pixels <= 0)
+    /* The title mode-menu labels are translated at the SNES asset level:
+     * generated [[vram_patch]] tile-art entries (see
+     * scripts/generate_title_menu_vram_patch.py) intercept the game's own
+     * label tiles, so they render translated in every animation state and
+     * never appear on screens the game does not draw them on. No host
+     * drawing happens for the title menu. */
+    if (!g_option_menu_active || !pixels || pitch_pixels <= 0)
         return;
-
-    title_menu_visible =
-        g_title_menu_active &&
-        is_title_menu_or_transition(pixels, width, height, pitch_pixels);
-    title_background_visible =
-        g_title_menu_active &&
-        has_title_scene_background(pixels, width, height, pitch_pixels);
-    title_logo_visible =
-        g_title_menu_active &&
-        has_title_logo_art(pixels, width, height, pitch_pixels);
-
-    if (g_title_menu_active &&
-        (title_menu_visible ||
-         (g_title_overlay_hold_frames > 0 && title_background_visible &&
-          title_logo_visible))) {
-        if (title_menu_visible)
-            g_title_overlay_hold_frames = TITLE_MENU_HOLD_FRAMES;
-        else
-            g_title_overlay_hold_frames--;
-        g_option_overlay_screen = OPTION_SCREEN_NONE;
-        g_option_overlay_hold_frames = 0;
-        selected = (int)(g_ram[0x0504] / 2);
-        if (selected < 0 || selected > 3)
-            selected = 0;
-
-        for (i = 0; i < 4; i++)
-            erase_source_label(pixels, width, height, pitch_pixels,
-                               &g_title_labels[i]);
-        draw_label(pixels, width, height, pitch_pixels, &g_title_labels[0],
-                   selected == 0, 1);
-        draw_label(pixels, width, height, pitch_pixels, &g_title_labels[1],
-                   selected == 1, 1);
-        draw_label(pixels, width, height, pitch_pixels, &g_title_labels[2],
-                   selected == 2, 1);
-        draw_label(pixels, width, height, pitch_pixels, &g_title_labels[3],
-                   selected == 3, 1);
-        return;
-    }
-    if (!title_logo_visible)
-        g_title_overlay_hold_frames = 0;
 
     if (g_option_menu_active) {
         int option_panel = is_option_panel(pixels, width, height, pitch_pixels);

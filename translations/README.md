@@ -96,12 +96,21 @@ validating this external glyph path. Korean is exposed in the launcher now that
 the title/options/crawl path has screenshot validation; Chinese remains hidden
 until the broader CJK experience has been visually validated.
 
-They are not plain option-menu strings and the current BG/OAM helper renders do
-not yet reproduce the exact source layer, so the live replacement is a
-screen-space host overlay keyed by the selected runtime language. It masks the
-original English source glyph pixels, reads the selected title row from WRAM
-`$7E0504` (`0,2,4,6` for rows 0-3), and then draws the translated labels into
-the PPU frame buffer before SDL presentation and TCP screenshots.
+The live replacement is SNES-level asset interception, not host drawing: the
+labels are unique, consecutive, pre-rendered 4bpp BG1 tiles (map rows 17-22,
+cols 10-21, palette 6) whose ROM source is compressed, so generated
+`[[vram_patch]]` entries intercept the game's own tile upload and swap in
+translated glyph art. Selection highlighting is CGRAM-only (each label owns one
+color index: STORY=14, VS=13, TRIAL=12, OPTION=11), so one art set per language
+inherits selection behaviour, and the labels stay translated through every
+fade/slide animation because the game's own tilemap references the patched
+tiles. The original captured art lives in
+`endless_duel_title_menu_assets.toml`; regenerate the runtime patches with:
+
+```powershell
+py -3 scripts\generate_title_menu_vram_patch.py --check
+py -3 scripts\generate_title_menu_vram_patch.py --write
+```
 
 To preview rectangle fit against a captured frame without launching the game:
 
@@ -119,9 +128,9 @@ py -3 scripts\generate_title_glyphs.py
 ```
 
 The generated BMPs are ignored under `translations/title_menu_previews/`. They
-use the same string/rectangle and title glyph source as the runtime overlay,
-but they are review previews only; the actual in-game path is
-`src/title_menu_overlay.c`.
+use the same string and title glyph sources as the tile-art generator, but they
+are review previews only; the actual in-game path is the generated
+`[[vram_patch]]` tile-art section in `endless_duel.toml`.
 
 The battle and ending dialogue decoded from the English and Spanish IPS files
 lives in `endless_duel_dialogue.toml`, with a readable audit report in
@@ -228,14 +237,14 @@ python scripts\render_vram_bg_capture.py C:\path\to\capture\es --bg 3
 ```
 
 This confirmed the title/menu capture uses Mode 1, BG1 map base `0xd000`, BG2
-map base `0xe000`, BG3 map base `0xf000`, and BG1/BG2 tile base `0xc000`.
-The visible mode labels are still not reached by the normal runtime text patch
-path. A later frame-keyed probe showed the simplified BG/OAM render helpers can
-draw surrounding logo/bracket art from the capture, but do not reproduce the
-visible label text itself. `src/title_menu_overlay.c` handles the current
-runtime replacement by drawing translated labels over that presented frame for
-Spanish, French, Italian, and Portuguese. A future lower-level track can still
-recover the missing upload/render path and patch its ROM or VRAM source.
+map base `0xe000`, BG3 map base `0xf000`, BG1/BG2 tile base `0x0000`, and BG3
+tile base `0xc000` (BG12NBA=0x00, BG34NBA=0x66; an earlier revision of this
+file wrongly claimed BG1/BG2 tile base `0xc000`).
+The visible mode labels are translated by intercepting the game's own VRAM
+tile upload with the generated `[[vram_patch]]` tile-art section (see the
+title-menu section above); no host-side drawing is involved. The ROM-side
+upload source remains unrecovered (compressed), which is fine: the VRAM
+guard IS the interception point.
 
 ## External Reverse-Engineering Context
 

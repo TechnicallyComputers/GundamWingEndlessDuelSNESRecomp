@@ -133,28 +133,29 @@ validated:
 1. Capture the target screen with `scripts/probe_title_menu_vram.ps1`.
 2. Identify BG/OAM ownership and tile IDs.
 3. Extract or author replacement tile graphics for each language.
-4. Patch the ROM-backed upload source or add language-gated `[[vram_patch]]`
-   entries if runtime injection is cleaner, or use a host overlay when the
-   exact SNES upload path is not yet recovered.
+4. Patch the ROM-backed upload source, or add language-gated `[[vram_patch]]`
+   entries when the ROM source is compressed or shared: the source-guarded
+   VRAM patch IS the upload interception point.
 5. Screenshot-validate every language on the exact screen.
 
-When ownership is not yet fully recovered, use the host-overlay path as the
-editable contract for fit and language coverage:
+NEVER detect screens with framebuffer pixel heuristics and never draw
+replacement text over the presented frame. Pixel detection false-positives on
+unrelated scenes (menu text over the intro FMV) and false-negatives on
+transition animations (source-language text during fades and slides). If an
+asset path is genuinely not recoverable yet, gate any interim mechanism on
+WRAM game state, never on sampled pixels.
 
-```powershell
-py -3 scripts\render_title_menu_overlay_preview.py `
-  C:\path\to\title-menu-capture\en --langs es,fr,it,pt
-```
-
-The runtime implementation is `src/title_menu_overlay.c`. It reads the selected
-language from the localization mod, detects the real title mode menu in the
-presented PPU frame, reads the selected row from WRAM `$7E0504`, and draws the
-translated labels before presentation. The preview renderer reads the same
-`translations/endless_duel_title_menu.toml` geometry and
-`translations/endless_duel_title_glyphs.toml` glyph overrides, then writes
-ignored BMPs under `translations/title_menu_previews/` for quick fit checks.
-The current evidence says the text is visible in the presented title frame,
-while the raw BG/OAM helper renderers only reproduce surrounding title art.
+The title mode-menu labels are the worked example: unique pre-rendered 4bpp
+BG1 tiles, compressed in ROM, intercepted by the generated `[[vram_patch]]`
+tile-art section from `scripts/generate_title_menu_vram_patch.py` (sources:
+`translations/endless_duel_title_menu.toml` strings,
+`translations/endless_duel_title_glyphs.toml` glyph masks,
+`translations/endless_duel_title_menu_assets.toml` captured stock art).
+Because selection highlighting is CGRAM-only, one art set per language
+inherits selection behaviour, and the labels stay translated through every
+fade/slide animation. The preview renderer
+(`scripts/render_title_menu_overlay_preview.py`) writes ignored BMPs under
+`translations/title_menu_previews/` for quick fit checks.
 
 This is also the path for CJK. If the game has no Chinese/Korean glyph tiles,
 do not expose the language as a fallback-only option. Add real glyph assets,
