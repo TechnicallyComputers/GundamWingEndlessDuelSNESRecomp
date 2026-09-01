@@ -17,6 +17,7 @@ from generate_dialogue_accent_patch import (
     load_source as load_accent_source,
     per_language_charmap,
 )
+from generate_dialogue_cjk_patch import row_payloads as cjk_row_payloads
 
 
 BEGIN_MARKER = "# BEGIN GENERATED DIALOGUE TILEMAP PATCHES"
@@ -90,7 +91,8 @@ def load_targets(path: Path) -> dict[int, dict[str, str]]:
 
 
 def generated_blocks(dialogue: dict, targets: dict[int, dict[str, str]],
-                     charmaps: dict[str, dict[str, int]]) -> list[str]:
+                     charmaps: dict[str, dict[str, int]],
+                     cjk: dict[int, dict[str, str]] | None = None) -> list[str]:
     blocks = [BEGIN_MARKER]
     count = 0
     for index, entry in enumerate(dialogue.get("line", []), 1):
@@ -104,6 +106,13 @@ def generated_blocks(dialogue: dict, targets: dict[int, dict[str, str]],
                 continue
             values[lang] = encode_line(
                 source_hex, start_col, text, charmaps.get(lang))
+        # CJK payloads are pre-encoded tilemap rows referencing per-quote glyph
+        # pages (scripts/generate_dialogue_cjk_patch.py).  They ride inside THIS
+        # patch rather than a second one over the same row: a second patch would
+        # leave bytes the first one's guard no longer recognises, and es/fr/it/pt
+        # would stop being restored on a language switch.
+        for lang, hex_value in (cjk or {}).get(address, {}).items():
+            values[lang] = hex_value
         if not values:
             continue
         count += 1
@@ -189,7 +198,13 @@ def main() -> int:
     if unknown_targets:
         formatted = ", ".join(f"0x{address:06x}" for address in unknown_targets)
         raise ValueError(f"target dialogue address not present in decoded source: {formatted}")
-    generated = "\n".join(generated_blocks(dialogue, targets, charmaps))
+    cjk = cjk_row_payloads(root)
+    unknown_cjk = sorted(set(cjk) - decoded_addresses)
+    if unknown_cjk:
+        formatted = ", ".join(f"0x{address:06x}" for address in unknown_cjk)
+        raise ValueError(
+            f"CJK dialogue address not present in decoded source: {formatted}")
+    generated = "\n".join(generated_blocks(dialogue, targets, charmaps, cjk))
     table_text = normalize_embedded_markers(table_path.read_text(encoding="utf-8"))
     updated = replace_generated_section(table_text, generated)
 

@@ -1,0 +1,668 @@
+# Korean and simplified-Chinese dialogue for the Endless Duel
+# victory/defeat quote screen (BG3 2bpp box, map row 22).
+#
+# Regenerate the runtime patches with:
+#   py -3 scripts/generate_dialogue_cjk_patch.py --write
+#
+# GEOMETRY EVIDENCE (live captures; every recorded quote moment agrees, and
+# rows from battle_dialogue_0, _1 and _2 have all been observed rendering
+# here, so the four covered groups share one draw routine and one geometry.
+# battle_dialogue_3 (0x03eb00+) and ending_dialogue (0x05e000+) have NOT been
+# captured and are deliberately NOT covered: their rows keep their Latin
+# payloads and render in English under ko/zh.):
+#   BG3 map base 0xc000, 64x64 words; the quote box draws its frame on map
+#   rows 21 and 26 and its text on rows 22..25.  A quote's first ROM row
+#   renders top-half on map row 22 and bottom-half on row 23; its optional
+#   second ROM row renders on rows 24/25.  Text occupies columns 2..29
+#   (column 1 and 30 are the 0x6001/0x2001 box edges), so 28 cells.
+#   The draw routine writes VRAM word = (rom_word & 0x03ff) | 0x2000, i.e.
+#   the full 10-bit tile id survives; BG3 char base is 0x4000.
+#
+# FREE TILE REGION: ids 0x300-0x3ff (VRAM 0x7000-0x7fff) are unreferenced by
+# every BG/OBJ on this screen and byte-identical across all eight captures
+# (md5 33fa23e2e0cf98f6f36dcfa307acbbc1).  page_source_hex below is that
+# 4096-byte blob; each generated page patch guards on the map row, not on
+# these bytes, and slices its source_hex out of the blob.
+#
+# BUDGET: 28 cells per line; a CJK character is 2 cells, ASCII is 1.
+# Punctuation is written as ASCII so it uses the game's own Latin cells.
+
+schema = 1
+
+[surface]
+name = "battle_quote"
+groups = ["battle_dialogue_0", "battle_dialogue_1", "battle_dialogue_2", "battle_dialogue_4"]
+map_base = 0xc000
+map_row_stride = 0x40
+map_first_row = 22
+text_start_col = 2
+text_cells = 28
+char_base = 0x4000
+page_tile_first = 0x300
+page_tile_last = 0x3ff
+page_source_hex = "000000000000000000000000000000005ffae51ac8f78dffda2dd26d0bffdaa71dea6cd773aeef193eeb8bf4b55f39f6e020f0c8a05ca8fc7af49ceabc52f62c1b1c071e1c0b0619151e0d130b14071958f8e018c8f088f8d828d06808f8d8a005020c17332e2f193e6b0b74355f3976f927f7caa25fa9fe7af59cebbd53f72dfa3ce61e7ccae698b47e8cf26af4a6d80702051a08370d3f5a2d526d0b7f5a271dea6cd773aeef193eeb8bf4b55f39f6f927f7caa25fa9fe7af59cebbd53f72d7b3c671e7c4b6619357e0d736b7427595ffae51ac8f78dffda2dd26d0bffdaa71dea6cd773aeef193eeb8bf4b55f39f6f824f4c8a058a8f870f080c08040c000543f1d624b345d6f57383b575d2b4a35c54b0bce8fcb458bcf8e4a8584cfc94ea25341b2e371d32260d3f391b36253a1946a60de6e94e2befe646cbaee5c50be141f1d020b141d0f17181b171d0b0a15f06828d8a8f870b8e89848b0b0f8f8482e57413e6f79572e645b7b153f6a5729906060c06080e0a0e06060a0e04040a000000000000000000000000000000000756b2b5e2f7b753b6f1e4a35347f794ea05040a0e060c02060c0e080a06040a0050a0007060503060605050306050106543f1d624b345d6f57383b575d2b4a35e06020c0a0e060a0e08040a0a0e0e040ae5741beef79d72e64dbfb95bf6a57a9806060c06080e0a0f06060b0e05050b0335e767f7b1c617e6f133f57577c536e8f468fcbc94ec9c602cf8e4d4e87498ee1b3f213f1a2a1f3f14262b1e153d2b3a65efa8cc4fab24e5ca63eee9e74a658131e161f1b1c011e0f131f17171c130eb86098e8d878e8d010e8b868689048b86d3f7a1779262d7b754e6e316d5f5a37a040e080c0e0b0405da73eef9f74a75800000000000000006080b850d4fcd06c3f661f6b597e6956126f3e6d6e17493ee0a0e000e0a0a0e0e04060a0e040c0a007060205050302070507060707040700335e767f7b1c617e6f133f57577c536ea06080e0c060e0c000e0a060608040a0edbffa17f9a62d7b754e6e316d5f5a37a058f888c0f8b0485ca43cec9c74a4585f31057e6a157d5f1e61396e6e3d1b6d864b478bcb05c94fce0bca854dcacc8732c321f2b3e132c381f3b26331f3d3633ee6fc5af05eb46e58f6caf4768a4abc1f11051e0a151d1f1e01190e0e1d1b0db07850a8e830d868e818f8a068d8d8a0360b2d321f09060700000000000000003ee7fc5bf15fb46f09070205070202055eb0847eea947cde9ee0b8ee6ebc1aec367b572b6b35596f6e1b7a256d5a5c2720c020e0a0e020c080e0a06020e0c060060704030107040701070205070202055f31057e6a157d5f1e61396e6e3d1b6da06040a0e020c060e000e0a060c0c0a0360b2d323f29360f0917160b1d17170f3ee6fc5af05eb46e59f7caf5778a4abd33def67ffb1c61fe6f93bf57d7fcd36e3f261f2b193e2916122f3e2d2e17093ecd8fca07c9868dcbc54e4e81cd4fca87a050f080c0f0b04050a030e09070a05033def67ffb1c61fe6f93bf57d7fcd36e0f060f0b090e0906020f0e0d0e07090eedbffa17f9a6a0f0f04060b0e050d0b0a75efa8dc5fb0207050706070704070000c0f070f01060f86890b850d0f8d0680000000000000000000103020607030d1b1c073e3c6bce7155aeadf34bb4d77958f8e018c8f088f8d828d06808f8d8a00000000000000000000000000000000000000000000000000000000000000000b67b57abeb35d96f3e6b0b74351f393634c82cf0b8e820c0008080808040c0005fb1857eea957ddf9ee1b9ee6ebd1bed363b172b2b35192f2e1b3a252d1a1c2706cb0dc28fc906cf89c7864b0dc7c74f30e0f050f050b06050f0c0f0708040b05fb1857eea957ddf9ee1b9ee6ebd1bed060b070b0b05090f0e0b0a050d0a0c0730c020f0b0e030c080f0b06030f0d0600607040301070407010702050702020558b08078e89078d898e0b8e868b818e81d12060d05020203000100000000000074ffdda2abf4bd6f97589b971d0b0a15f06828d8a8f870b8e89848b0b0f8f84800000000000000000000000000000000000000000000000000000000000000002e17011e0f19170e040b0b050f0a0701804060c06080e0a0f06060b0e05050b8fb3ce71e7ccbe699b57e0d736b7407191f3a251a08370d3fda2dd26d09f9d0a00dca4cc7438ecf093eeb8bf4b55f39f6f020f0c0a050a0f070f080e0a0408000fb3ce71e7ccbe699b57e8df36bf4a7d90f0a050a08070d0f0a0d020d0b0f0a0710e060d070a0e01030e080f0b05030f001070702020701060205040305030705f838e01878c8e098b07888f068f0a0d8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005070207010201030102000101010001a058f888c4f8b04c5ca43eee9e74a658040f1d220b345d6f57383b575d2b4a35f56b2bdeaffb40808080008080808000a85040b8e87800000000000000000000150a605f6e15e3befe656dbbee5d51bed4bf9d624bb401010000000000000000f0682adeaefa75bbef9e4ab5b4fff94e2e17013e2f39172e241b3b153f2a1729804040c04080c080c0404080c0404080d4bf9d624bb4dd6f57b8bbd7dd2bcab55f31057e6a157d5f1e61396e6e3d1b6da06040a0e020c060e000e0a060c0c0a0000000000000000000000000000000001d6a6c57732e6f193e6b0b74355f3976f927f7caa25fa9fe7af59cebbd53f72dfb3ce71e7ccbe699b57e8df36bf4a7d95efae41ac8f68cfeda2cd26c0afedaa6335e767f7b1c617e6f133f57577c536e800080808000808000808000008000807b3c671e7c4b6619357e0d736b742759a75efa8dc5fbb24f5da73eef9f74a758000000000000000001013f17173c132ebf669febd97ee9d612efbe6c6e9648b82d3f3a1739262d3b350e2e312d1f1a378040c080c0c08040408000c08040804033def67ffb1c61fe6f93bf57d7fcd36e7b3c671e7c4b6619357e0d736b74275940e0e000c0e080e0c020c06000e0d0a00000000000000000000000000000000000000000000000000000000000000000150a001f0e15031e1e050d1b0e1d111ed0b8986048b0d86850b8b8d0d828c8b0000000000000000000000000000000005f31057e6a157d5f1e61392e2e3d0b0d8000008080008000c000faa56ddadca700000000000000000000b4683cf4d46c3ee7fc5bf15fb46f59f7caf5778a4abd0000000000000000000000000000000000000000000000000000000000000000360b2d323f29360f0937160b1d17070700c0c040c040804041e1caf5778a4abd5fb1857eea957ddf9ee1b8ee6ebc18e8543f1d624b345d6f17383b171d0b0205f56b2bdeaffb75bbef9e4ab5b4fff94eae5640beee78d62e64dafa94be6a56a800000000000000000000000000000000071e1a0d051b120f1d071e0f1f14071830d8f078f81860f86890b850d0f8d068000000000000000000000000000000000b0c271e7c4b6619b57e8df36bf4a7d95ffae51ac8f78dffda2dd26d0bffdaa71cea6cd672aeee183eea8af4b45e38f67927774a225f297e7a751c6b3d53772de020e00060c0e080a06080e060e0a0c005e264c763a6e70126e383e4a54721e60107170a221f293e7a751c6b3d53772dfb3ce71e7ccbe699b57e8df36bf4a7d95efae41ac8f68cfeda2cd26c0afedaa620c0e060e00060e0679bbd57dff4cb76070607030106090612efbe6d6e9749beecbefa16f8a6acfaf44c6cb0e858c0a000001c2c663a76283866647a2c140000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000d4bf9d624bb4dd6f57b8bbd7dd2bcab5e06000c080c04080c080408080c0c04000000000000000000000000000000000156a605f6e15633e7e656d3b6e5d513ed4bf9d624bb4dd6f57b8bbd7dd2bcab5f46a2adeaefa74baee9e4ab4b4fef84e156a605f6e15633e7e656d3b6e5d513ed0b0806040a0c06040a0a0c0c020c0a0000000000000000000000000000000005fb1857ef29d75df80e0a0e060a000e0b67b57abeb35d96e050f07070205030700e028f0b8ec2cdce6fadc2658aefcde050301060403050605030305050204034ff6d22dba4fd7fb7e89b47bdbbfaf546e9781feefb957aee4dbbb557fea97e9806060d86c94e0bcfe646cbaee5c50be33def67ffb1c61fe6f93bf57d7fcd36e804080c0c040c0c000c0804040804080275e7a0d457b324f5d273e6f1f74275820c0e060e00060e06783a747c7e4c366070607030106090612efbe6d6e9749beecbefa16f8a6acfaf44e6eb0ec5edab6275e7a0d457b324f5d273e6f1f74275820c0e060e00060e06f93bf57d7fcd36e000000000000000012eebe6c6e9648be0000000000000000000001000203010200000000000000006e119feae6ddbdda060305020701060fc9b7b66bfdb7d76f3ee6fc5af05eb46e58f6caf4768a4abc000000000000000000000000000000000d0f0207010605030506060105070207a65efa8cc4fab24e5ca63eee9e74a6585fb1857eea957ddf9ee1b9ee6ebd1bed80404080c000c040c000c08040c0c0803e677c5b715f346f59774a75770a4a3d47a18566e28565c780e0a0e060a000e0b67b57abeb35d96f000000000000000034c82cf0b8e820c000000000000000003e677c5b715f346f59774a75770a4a3d5fb1857eea957ddf80e0a0e060a000e0b67a56aaea34d86e0000000000000000050301060403050605030305050204034ff6d22dba4fd7fb748abe74deb0a65a6e9781feefb957ae0000000000000000946860dc6890e0a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000305070707010607060103050507050634ea6ef4bcca12ecfe36fe7272cc3ce200000000000000000000000000000000000000000000000000000000000000000080c040e00060f06890bc54d6fcd36e800080c0c060e0d010e8bc6c6e9649be8080c000e0a0a0f0f0486cb0ec5edab78000c080c0e0b04058a03cec9e74a758000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005030007060107050106030606030106fb1755eaae53ddf6ee119feae6ddbdda768b6db2bf69b6cfc9b7b66bfdb7d76f3ee6fc5af05eb46e58f6caf4768a4abc5fb1857eea957ddf9ee1b9ee6ebd1bedb67b57abeb35d96fee1bfaa56ddadca736cb2df2bfe936cf89f7b66b3df7d76f3ee7fc5bf15fb46f59f7caf5778a4abd0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+
+[font.ko]
+file = "malgun.ttf"
+size = 15
+
+[font.zh]
+file = "msyh.ttc"
+size = 13
+
+[[line]]
+address = 0x007700
+# en = 'I will accomplish my mission'
+ko = "필요하다면 홀로라도"  # 19 cells
+zh = "必要时我会独自"  # 14 cells
+
+[[line]]
+address = 0x007780
+# en = 'alone if I must!'
+ko = "임무를 완수하겠다!"  # 18 cells
+zh = "完成任务!"  # 9 cells
+
+[[line]]
+address = 0x007800
+# en = "Don't even try it."
+ko = "그런 짓은 통하지 않는다."  # 24 cells
+zh = "别白费力气了."  # 13 cells
+
+[[line]]
+address = 0x007900
+# en = 'I believe in my own'
+ko = "나는 나만의"  # 11 cells
+zh = "我相信自己的"  # 12 cells
+
+[[line]]
+address = 0x007980
+# en = 'justice!'
+ko = "정의를 믿는다!"  # 14 cells
+zh = "正义!"  # 5 cells
+
+[[line]]
+address = 0x007a00
+# en = "Get back! You're"
+ko = "물러서! 너 때문에"  # 17 cells
+zh = "退后! 你会拖"  # 12 cells
+
+[[line]]
+address = 0x007a80
+# en = 'slowing me down!'
+ko = "속도가 늦어지잖아!"  # 18 cells
+zh = "我的后腿!"  # 9 cells
+
+[[line]]
+address = 0x007b00
+# en = 'Mission accomplished.'
+ko = "임무 완료."  # 10 cells
+zh = "任务完成."  # 9 cells
+
+[[line]]
+address = 0x007c00
+# en = 'Obstacles such as yourself'
+ko = "너 같은 장애물은"  # 16 cells
+zh = "像你这样的障碍"  # 14 cells
+
+[[line]]
+address = 0x007c80
+# en = 'shall be terminated!'
+ko = "제거하겠다!"  # 11 cells
+zh = "必须清除!"  # 9 cells
+
+[[line]]
+address = 0x007d00
+# en = 'Aaaaahahahahahah!'
+ko = "아하하하하하하!!"  # 16 cells
+zh = "啊哈哈哈哈哈哈!!"  # 16 cells
+
+[[line]]
+address = 0x007e00
+# en = 'Do you think this is a'
+ko = "이게 게임인 줄"  # 14 cells
+zh = "你以为这是"  # 10 cells
+
+[[line]]
+address = 0x007e80
+# en = 'game!?'
+ko = "알아!?"  # 6 cells
+zh = "游戏吗!?"  # 8 cells
+[[line]]
+address = 0x017000
+# en = 'You are weak!'
+ko = "넌 약하다!"  # 10 cells
+zh = "你太弱了!"  # 9 cells
+
+[[line]]
+address = 0x017100
+# en = 'Why do you even bother!?'
+ko = "왜 굳이 그러는 거지!?"  # 21 cells
+zh = "何必如此固执!?"  # 14 cells
+
+[[line]]
+address = 0x017200
+# en = "Nataku... Let's become"
+ko = "나타쿠... 우리"  # 14 cells
+zh = "娜塔库... 我们"  # 14 cells
+
+[[line]]
+address = 0x017280
+# en = 'strong together!'
+ko = "함께 강해지자!"  # 14 cells
+zh = "一起变强吧!"  # 11 cells
+
+[[line]]
+address = 0x017300
+# en = 'He who hesitates is lost!'
+ko = "망설이는 자는 진다!"  # 19 cells
+zh = "犹豫者必败!"  # 11 cells
+
+[[line]]
+address = 0x017400
+# en = 'The weak shall inevitably'
+ko = "약자는 결국"  # 11 cells
+zh = "弱者终将"  # 8 cells
+
+[[line]]
+address = 0x017480
+# en = 'fall in battle!'
+ko = "전장에서 쓰러진다!"  # 18 cells
+zh = "倒在战场上!"  # 11 cells
+
+[[line]]
+address = 0x017500
+# en = 'I knew from the start that'
+ko = "이렇게 될 줄"  # 12 cells
+zh = "我从一开始就"  # 12 cells
+
+[[line]]
+address = 0x017580
+# en = 'this would happen!'
+ko = "처음부터 알고 있었다!"  # 21 cells
+zh = "知道会这样!"  # 11 cells
+
+[[line]]
+address = 0x017600
+# en = 'Was I right?'
+ko = "내가 옳았을까?"  # 14 cells
+zh = "我做对了吗?"  # 11 cells
+
+[[line]]
+address = 0x017680
+# en = 'Please show me, Nataku...'
+ko = "보여줘, 나타쿠..."  # 17 cells
+zh = "告诉我吧, 娜塔库..."  # 19 cells
+
+[[line]]
+address = 0x017700
+# en = 'What do you think you'
+ko = "이제 와서 뭘"  # 12 cells
+zh = "事到如今你还"  # 12 cells
+
+[[line]]
+address = 0x017780
+# en = 'can do now!?'
+ko = "할 수 있다고 생각해!?"  # 21 cells
+zh = "能做什么!?"  # 10 cells
+
+[[line]]
+address = 0x017800
+# en = "We shouldn't be fighting"
+ko = "우리는 서로"  # 11 cells
+zh = "我们不该"  # 8 cells
+
+[[line]]
+address = 0x017880
+# en = 'each other!'
+ko = "싸우면 안 돼!"  # 13 cells
+zh = "自相残杀!"  # 9 cells
+
+[[line]]
+address = 0x017900
+# en = 'Sorry...'
+ko = "미안해..."  # 9 cells
+zh = "抱歉..."  # 7 cells
+
+[[line]]
+address = 0x017a00
+# en = "Let's protect the colony"
+ko = "함께 콜로니를"  # 13 cells
+zh = "一起守护"  # 8 cells
+
+[[line]]
+address = 0x017a80
+# en = 'together!'
+ko = "지키자!"  # 7 cells
+zh = "殖民地吧!"  # 9 cells
+
+[[line]]
+address = 0x017b00
+# en = "This is terrible! I'll call"
+ko = "큰일이다! 구급대를"  # 18 cells
+zh = "糟了! 我去叫"  # 12 cells
+
+[[line]]
+address = 0x017b80
+# en = 'the paramedics!'
+ko = "부르겠다!"  # 9 cells
+zh = "救护队!"  # 7 cells
+
+[[line]]
+address = 0x017c00
+# en = 'You should have'
+ko = "항복했어야"  # 10 cells
+zh = "你早该"  # 6 cells
+
+[[line]]
+address = 0x017c80
+# en = 'surrendered...'
+ko = "했는데..."  # 9 cells
+zh = "投降的..."  # 9 cells
+
+[[line]]
+address = 0x017d00
+# en = "I won't make any mistakes!"
+ko = "실수는 하지 않겠다!"  # 19 cells
+zh = "我不会失手!"  # 11 cells
+
+[[line]]
+address = 0x017e00
+# en = 'This war seems as if'
+ko = "이 전쟁은 끝나지"  # 16 cells
+zh = "这场战争仿佛"  # 12 cells
+
+[[line]]
+address = 0x017e80
+# en = 'it will never end...'
+ko = "않을 것 같다..."  # 15 cells
+zh = "永无止境..."  # 11 cells
+
+[[line]]
+address = 0x017f00
+# en = 'Alright! That was easier'
+ko = "좋아! 생각보다"  # 14 cells
+zh = "好! 比我想的"  # 12 cells
+
+[[line]]
+address = 0x017f80
+# en = "than I thought it'd be!"
+ko = "쉬웠어!"  # 7 cells
+zh = "还要轻松!"  # 9 cells
+
+[[line]]
+address = 0x026b00
+# en = 'This is meaningless.'
+ko = "이건 의미 없다."  # 15 cells
+zh = "这毫无意义."  # 11 cells
+
+[[line]]
+address = 0x026d00
+# en = "We're all incredible"
+ko = "우리 모두 엄청난"  # 16 cells
+zh = "我们都是"  # 8 cells
+
+[[line]]
+address = 0x026d80
+# en = 'fools...'
+ko = "바보들이다..."  # 13 cells
+zh = "大傻瓜..."  # 9 cells
+
+[[line]]
+address = 0x026e00
+# en = 'Your impatience is a'
+ko = "네 조급함이 가장"  # 16 cells
+zh = "你的急躁是"  # 10 cells
+
+[[line]]
+address = 0x026e80
+# en = 'most noticable flaw...'
+ko = "큰 단점이다..."  # 14 cells
+zh = "最明显的缺点..."  # 15 cells
+
+[[line]]
+address = 0x026f00
+# en = 'even for me...cult,'
+ko = "나조차도 힘들군,"  # 16 cells
+zh = "连我也很难办,"  # 13 cells
+
+[[line]]
+address = 0x027000
+# en = "I suppose that's the"
+ko = "그게 네 최선인가"  # 16 cells
+zh = "这就是你的"  # 10 cells
+
+[[line]]
+address = 0x027080
+# en = 'best you can do.'
+ko = "보군."  # 5 cells
+zh = "最好水平吗."  # 11 cells
+
+[[line]]
+address = 0x027100
+# en = "Sorry, but I don't have"
+ko = "미안하지만 이럴"  # 15 cells
+zh = "抱歉, 我没有"  # 12 cells
+
+[[line]]
+address = 0x027180
+# en = 'the time for this.'
+ko = "시간 없다."  # 10 cells
+zh = "时间陪你."  # 9 cells
+
+[[line]]
+address = 0x027200
+# en = 'Time and time again,'
+ko = "매번 똑같은"  # 11 cells
+zh = "一次又一次,"  # 11 cells
+
+[[line]]
+address = 0x027280
+# en = "it's always the same."
+ko = "일의 반복이군."  # 14 cells
+zh = "总是一个样."  # 11 cells
+
+[[line]]
+address = 0x027300
+# en = 'Yeah! Alright!'
+ko = "좋아! 이겼다!"  # 13 cells
+zh = "好! 赢了!"  # 9 cells
+
+[[line]]
+address = 0x027400
+# en = "Hey, I'm not done yet!"
+ko = "이봐, 아직 안 끝났어!"  # 21 cells
+zh = "喂, 我还没完呢!"  # 15 cells
+
+[[line]]
+address = 0x027500
+# en = 'Hey, that was fun!'
+ko = "재밌었어!"  # 9 cells
+zh = "真有意思!"  # 9 cells
+
+[[line]]
+address = 0x027580
+# en = 'Wanna do it again?'
+ko = "또 할래?"  # 8 cells
+zh = "再来一次?"  # 9 cells
+
+[[line]]
+address = 0x027600
+# en = 'Cower in fear!'
+ko = "두려움에 떨어라!"  # 16 cells
+zh = "在恐惧中颤抖吧!"  # 15 cells
+
+[[line]]
+address = 0x027700
+# en = 'Slice, chop, killkillkill!'
+ko = "베고 자르고 죽인다!"  # 19 cells
+zh = "砍! 剁! 杀杀杀!"  # 15 cells
+
+[[line]]
+address = 0x027800
+# en = 'All who see me must die!'
+ko = "날 본 자는 죽는다!"  # 18 cells
+zh = "见我者必死!"  # 11 cells
+
+[[line]]
+address = 0x027900
+# en = "What's wrong? Cat got"
+ko = "왜 그래? 말문이"  # 15 cells
+zh = "怎么了? 说不出"  # 14 cells
+
+[[line]]
+address = 0x027980
+# en = 'your tongue? Hah.'
+ko = "막혔나? 하."  # 11 cells
+zh = "话来了? 哈."  # 11 cells
+
+[[line]]
+address = 0x027a00
+# en = "Heh, you're pretty weak,"
+ko = "흥, 꽤 약하군,"  # 14 cells
+zh = "哼, 你挺弱的,"  # 13 cells
+
+[[line]]
+address = 0x027a80
+# en = 'huh?'
+ko = "안 그래?"  # 8 cells
+zh = "是吧?"  # 5 cells
+
+[[line]]
+address = 0x02c900
+# en = 'On your feet!'
+ko = "일어나!"  # 7 cells
+zh = "站起来!"  # 7 cells
+
+[[line]]
+address = 0x02ca00
+# en = 'You did quite well.'
+ko = "꽤 잘했다."  # 10 cells
+zh = "你干得不错."  # 11 cells
+
+[[line]]
+address = 0x02cb00
+# en = "What's wrong?"
+ko = "왜 그래?"  # 8 cells
+zh = "怎么了?"  # 7 cells
+
+[[line]]
+address = 0x02cb80
+# en = 'Having a bad day?'
+ko = "오늘 안 좋아?"  # 13 cells
+zh = "今天不顺吗?"  # 11 cells
+
+[[line]]
+address = 0x02cc00
+# en = 'Never visit any mercy'
+ko = "적에게 자비를"  # 13 cells
+zh = "绝不要对敌人"  # 12 cells
+
+[[line]]
+address = 0x02cc80
+# en = 'upon your foes!'
+ko = "베풀지 마라!"  # 12 cells
+zh = "心慈手软!"  # 9 cells
+
+[[line]]
+address = 0x02cd00
+# en = 'I was hoping to get a bit'
+ko = "좀 더 연습하고"  # 14 cells
+zh = "本想多练一会,"  # 13 cells
+
+[[line]]
+address = 0x02cd80
+# en = 'more practice, but...'
+ko = "싶었는데..."  # 11 cells
+zh = "可惜..."  # 7 cells
+
+[[line]]
+address = 0x02ce00
+# en = "I'm sorry... but this"
+ko = "미안하지만..."  # 13 cells
+zh = "抱歉... 但这"  # 12 cells
+
+[[line]]
+address = 0x02ce80
+# en = 'is war.'
+ko = "이게 전쟁이다."  # 14 cells
+zh = "就是战争."  # 9 cells
+
+[[line]]
+address = 0x02cf00
+# en = 'Well fought, but in the'
+ko = "잘 싸웠지만 결국"  # 16 cells
+zh = "打得不错, 但"  # 12 cells
+
+[[line]]
+address = 0x02cf80
+# en = 'end, I am the victor!'
+ko = "승자는 나다!"  # 12 cells
+zh = "赢家是我!"  # 9 cells
+
+[[line]]
+address = 0x02d000
+# en = 'Did you learn anything'
+ko = "이번 싸움에서"  # 13 cells
+zh = "这一战你"  # 8 cells
+
+[[line]]
+address = 0x02d080
+# en = 'from the battle?'
+ko = "뭘 배웠나?"  # 10 cells
+zh = "学到什么了?"  # 11 cells
+
+[[line]]
+address = 0x02d100
+# en = 'It seems you need more'
+ko = "연습이 더 필요해"  # 16 cells
+zh = "看来你还需要"  # 12 cells
+
+[[line]]
+address = 0x02d180
+# en = 'practice!'
+ko = "보인다!"  # 7 cells
+zh = "多加练习!"  # 9 cells
+
+[[line]]
+address = 0x02d200
+# en = 'That was surprising!'
+ko = "놀라운걸!"  # 9 cells
+zh = "真令人吃惊!"  # 11 cells
+
+[[line]]
+address = 0x02d300
+# en = "It's been ages since I"
+ko = "이렇게 치열하게"  # 15 cells
+zh = "好久没打过"  # 10 cells
+
+[[line]]
+address = 0x02d380
+# en = 'last fought that hard!'
+ko = "싸운 건 오랜만이다!"  # 19 cells
+zh = "这么激烈的仗了!"  # 15 cells
+
+[[line]]
+address = 0x02d400
+# en = "You're not crying for the"
+ko = "설마 엘리트 때문에"  # 18 cells
+zh = "你不会是为精英"  # 14 cells
+
+[[line]]
+address = 0x02d480
+# en = 'elite, are you?'
+ko = "우는 건 아니지?"  # 15 cells
+zh = "哭鼻子吧?"  # 9 cells
+
+[[line]]
+address = 0x02d500
+# en = 'Wow, that was pretty'
+ko = "우와, 꽤"  # 8 cells
+zh = "哇, 那可真是"  # 12 cells
+
+[[line]]
+address = 0x02d580
+# en = 'bad...'
+ko = "심각했는데..."  # 13 cells
+zh = "惨啊..."  # 7 cells
+
+[[line]]
+address = 0x02d600
+# en = "This war's gone on for"
+ko = "이 전쟁은 너무"  # 14 cells
+zh = "这场战争"  # 8 cells
+
+[[line]]
+address = 0x02d680
+# en = 'too long...'
+ko = "오래 끌었다..."  # 14 cells
+zh = "拖得太久了..."  # 13 cells
+
+[[line]]
+address = 0x02d700
+# en = "Looks like you couldn't"
+ko = "견디지 못한 모양이군,"  # 21 cells
+zh = "看来你撑不住了,"  # 15 cells
+
+[[line]]
+address = 0x02d780
+# en = 'take it, huh?'
+ko = "그렇지?"  # 7 cells
+zh = "是吧?"  # 5 cells
+
+[[line]]
+address = 0x02d800
+# en = 'Raise a white flag and'
+ko = "백기를 들면"  # 11 cells
+zh = "举起白旗"  # 8 cells
+
+[[line]]
+address = 0x02d880
+# en = "you won't be harmed..."
+ko = "해치지 않겠다..."  # 16 cells
+zh = "就不会受伤..."  # 13 cells
+
+[[line]]
+address = 0x02d900
+# en = 'I fight for Duke Treize!'
+ko = "트레이즈 공을 위해 싸운다!"  # 26 cells
+zh = "我为特列斯阁下而战!"  # 19 cells
+
+[[line]]
+address = 0x02da00
+# en = 'Hmm? Something the matter?'
+ko = "흠? 무슨 일이지?"  # 16 cells
+zh = "嗯? 有什么事吗?"  # 15 cells
+
+[[line]]
+address = 0x02db00
+# en = 'Howl like the dog you are!!'
+ko = "개처럼 짖어봐라!!"  # 17 cells
+zh = "像狗一样嚎叫吧!!"  # 16 cells
+
+[[line]]
+address = 0x02dc00
+# en = 'Look, is it alright if I'
+ko = "저기, 한마디"  # 12 cells
+zh = "那个, 我能"  # 10 cells
+
+[[line]]
+address = 0x02dc80
+# en = 'say something?'
+ko = "해도 될까?"  # 10 cells
+zh = "说句话吗?"  # 9 cells
+
+[[line]]
+address = 0x02dd00
+# en = 'Duke Treize wants me to'
+ko = "트레이즈 공이"  # 13 cells
+zh = "特列斯阁下"  # 10 cells
+
+[[line]]
+address = 0x02dd80
+# en = 'fight!'
+ko = "싸우라 하셨다!"  # 14 cells
+zh = "命我出战!"  # 9 cells
+
+[[line]]
+address = 0x02de00
+# en = 'Catch that pilot!'
+ko = "저 파일럿을 잡아라!"  # 19 cells
+zh = "抓住那个驾驶员!"  # 15 cells
+
+[[line]]
+address = 0x02df00
+# en = 'Fool...'
+ko = "어리석군..."  # 11 cells
+zh = "蠢货..."  # 7 cells
+
+[[line]]
+address = 0x02e000
+# en = 'Perhaps you should try a'
+ko = "다른 방법을"  # 11 cells
+zh = "或许你该换"  # 10 cells
+
+[[line]]
+address = 0x02e080
+# en = 'different approach...'
+ko = "써보는 게 어떨까..."  # 19 cells
+zh = "个方法..."  # 9 cells

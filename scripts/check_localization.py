@@ -24,6 +24,7 @@ SCRIPT_CHECKS = (
     "scripts/generate_option_cjk_patch.py",
     "scripts/generate_intro_caption_patch.py",
     "scripts/generate_dialogue_patch.py",
+    "scripts/generate_dialogue_cjk_patch.py",
     "scripts/audit_localization_coverage.py",
     "scripts/render_dialogue_previews.py",
     "scripts/render_title_menu_overlay_preview.py",
@@ -106,6 +107,8 @@ def main() -> int:
     run(root, [sys.executable, "scripts/generate_dialogue_accent_patch.py",
                "--check"])
     run(root, [sys.executable, "scripts/generate_dialogue_patch.py"])
+    run(root, [sys.executable, "scripts/generate_dialogue_cjk_patch.py",
+               "--check"])
     validate_patch_widths(root)
     run(root, [sys.executable, "scripts/audit_localization_coverage.py"])
     if not args.skip_previews:
