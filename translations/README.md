@@ -223,7 +223,26 @@ python scripts\generate_dialogue_patch.py
 The dialogue generator currently supports the recovered Latin tile set:
 `A-Z`, `a-z`, space, `.`, `,`, `'`, `?`, `!`, inverted question mark, and
 inverted exclamation mark. It intentionally fails on unsupported glyphs rather
-than emitting bytes that would draw unrelated tiles. Two Spanish reference rows
+than emitting bytes that would draw unrelated tiles.
+
+Accented letters come from the five dialogue-font cells that no tilemap
+references (`0x001`, `0x06a`, `0x06b`, `0x06e`, `0x06f`), repurposed PER
+LANGUAGE by `generate_dialogue_accent_patch.py` from
+`endless_duel_dialogue_accents.toml`:
+
+| language | cells used | characters |
+|---|---|---|
+| fr | 4 | `é è à ê` |
+| it | 5 | `è à ù ì ò` |
+| pt | 5 | `ã é ê á ç` |
+
+The art is composed from the English base letter plus a stamped diacritic, in a
+cleared band either above the x-height or - for the cedilla - below the baseline
+in the descender rows. Any accented character outside a language's allocation is
+a hard error: reword the line (the pt header comment in
+`endless_duel_dialogue_targets.toml` records which rewordings exist and why).
+`translations/dialogue_previews/dialogue_accents_<lang>.png` shows the composed
+cells. Two Spanish reference rows
 currently report top/bottom tile mismatches, `0x017e00` and `0x027580`; treat
 them as visual-QA targets before using those rows as authoritative translation
 examples.
@@ -261,6 +280,19 @@ The highest-value spans are the `reference_diff_unmapped` ranges: English and
 Spanish differ there, but the current table has no French/Italian/Portuguese
 override. Those ranges are the next places to decode into text, tilemaps, or
 external-rendered overlays.
+
+The headline tally is an ANY-of-fr/it/pt test, so a patch carrying two of the
+three still reads as mapped. The `Per-language effective reference-diff gap`
+block at the end re-runs the byte-owner pass requiring one language at a time -
+that is the number to read when asking "does <lang> still fall back to English
+anywhere?". All three are currently 0 bytes. The residual
+`reference_glyph_art_diff` bytes are font CELL art the two reference hacks each
+repurposed for their own punctuation (dialogue cell `0x069` = the Spanish `ñ`,
+and the crawl font's `ó` at `0x02eb42`/`0x02ec40`); they are not text and not
+per-language work under the current mechanisms. Giving the CRAWL font
+per-language accented cells would need a new subsystem (free-cell audit plus
+per-language crawl glyph art), which is why the Portuguese crawl lines are
+unaccented while the Portuguese dialogue is not.
 
 For a lower-level pass against the original fan-patch IPS files, extract the
 English and Spanish archives and run:

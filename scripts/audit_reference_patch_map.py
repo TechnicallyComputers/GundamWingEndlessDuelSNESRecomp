@@ -41,13 +41,34 @@ def patch_len(patch: dict) -> int:
 
 def lang_hex(patch: dict, lang: str) -> str | None:
     value = patch.get(f"{lang}_hex")
-    return value.lower() if isinstance(value, str) else None
+    if isinstance(value, str):
+        return value.lower()
+    if lang != "en":
+        return None
+    # An imported reference fragment carries en_hex explicitly and guards on the
+    # ORIGINAL (Japanese) bytes. A generated aggregate patch omits en_hex
+    # because its source_hex already IS the English reference row - see
+    # generate_dialogue_patch.py. Without this fallback those patches look
+    # "English payload absent", get filed as spanish_only_unmapped, and a
+    # language missing from them is invisible to the gap tally: that is exactly
+    # how 53 pt-less dialogue rows scored a 0-byte pt gap.
+    source = patch.get("source_hex", patch.get("src_hex"))
+    return source.lower() if isinstance(source, str) else None
 
 
-def category(patch: dict) -> str:
+def category(patch: dict, require: tuple[str, ...] = NATIVE_LATIN_LANGS) -> str:
+    """Classify one patch.
+
+    ``require`` is the set of native languages that count as "mapped". The
+    default (any of fr/it/pt) answers "is this byte still reference-only
+    anywhere?". Passing a single language answers the per-language question
+    "does THIS language still fall back here?" - which the any-of default
+    hides completely: a patch carrying fr+it but no pt is mapped by the
+    default and unmapped for pt.
+    """
     en = lang_hex(patch, "en")
     es = lang_hex(patch, "es")
-    has_native = any(lang_hex(patch, lang) is not None for lang in NATIVE_LATIN_LANGS)
+    has_native = any(lang_hex(patch, lang) is not None for lang in require)
     if has_native:
         return "native_latin_mapped"
     if en is not None and es is not None:
@@ -74,7 +95,9 @@ def is_blank_fill(*payloads: bytes | None) -> bool:
     return all(set(p) <= BLANK_FILL_BYTES for p in present)
 
 
-def byte_owner_categories(patches: list[dict]) -> dict[int, str]:
+def byte_owner_categories(patches: list[dict],
+                          require: tuple[str, ...] = NATIVE_LATIN_LANGS
+                          ) -> dict[int, str]:
     """Per-byte category honouring FILE-ORDER supersession.
 
     rom_patches are applied in file order, so a byte's fate is decided by the
@@ -87,7 +110,7 @@ def byte_owner_categories(patches: list[dict]) -> dict[int, str]:
     for patch in patches:
         address = int(patch.get("address", patch.get("addr", 0)))
         size = patch_len(patch)
-        cat = category(patch)
+        cat = category(patch, require)
         if cat != "reference_diff_unmapped":
             for offset in range(size):
                 owner[address + offset] = cat
@@ -199,6 +222,27 @@ def main() -> int:
     if not candidates:
         print("  (none - every reference-different byte is superseded by a "
               "patch with a native fr/it/pt payload)")
+
+    # Per-language gap. The tally above is an ANY-of-fr/it/pt test, so a patch
+    # carrying only two of the three reads as fully mapped; this loop re-runs
+    # the same byte-owner pass requiring one language at a time, which is the
+    # only number that answers "does <lang> still fall back to English here?".
+    print()
+    print("Per-language effective reference-diff gap "
+          "(bytes where this language still has no native payload):")
+    for lang in NATIVE_LATIN_LANGS:
+        per_lang = byte_owner_categories(rom_patches, (lang,))
+        gap = Counter(per_lang.values())["reference_diff_unmapped"]
+        lang_spans = merge_spans(
+            [(address, 1, cat) for address, cat in sorted(per_lang.items())],
+            args.nearby_gap)
+        worst = sorted(
+            (s for s in lang_spans if s["category"] == "reference_diff_unmapped"),
+            key=lambda item: (-item["bytes"], item["start"]))[: args.limit]
+        detail = "" if not worst else "  largest: " + ", ".join(
+            f"{s['start']:#08x}-{s['end'] - 1:#08x} ({s['bytes']}B)"
+            for s in worst[:5])
+        print(f"  {lang}: {gap} bytes{detail}")
 
     print()
     print(

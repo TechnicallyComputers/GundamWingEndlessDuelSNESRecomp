@@ -562,7 +562,17 @@ def generate_section(root: Path, source: dict, geom: Geometry,
     return "\n".join(lines)
 
 
+# Sentinel left behind by strip_section so replace_section can put the
+# regenerated section back exactly where the old one lived. Without it the
+# stripped text has no markers to find and the section is appended at EOF,
+# silently RELOCATING it past every generated section that followed it - and
+# rom_patch file order is application order.
+PLACEHOLDER = "# CAPTION SECTION PLACEHOLDER (generator internal)"
+
+
 def replace_section(text: str, section: str) -> str:
+    if PLACEHOLDER in text:
+        return text.replace(PLACEHOLDER, section, 1)
     pattern = re.compile(
         re.escape(BEGIN_MARK) + r".*?" + re.escape(END_MARK), re.S)
     match = pattern.search(text)
@@ -575,7 +585,7 @@ def strip_section(text: str) -> str:
     pattern = re.compile(
         r"\n*" + re.escape(BEGIN_MARK) + r".*?" + re.escape(END_MARK) + r"\n*",
         re.S)
-    return pattern.sub("\n\n", text)
+    return pattern.sub("\n\n" + PLACEHOLDER + "\n\n", text)
 
 
 # --------------------------------------------------------------------------

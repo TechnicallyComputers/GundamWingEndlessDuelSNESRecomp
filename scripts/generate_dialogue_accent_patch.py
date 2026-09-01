@@ -89,11 +89,21 @@ def load_source(path: Path) -> dict:
         return tomllib.load(f)
 
 
-def marks_by_name(source: dict) -> dict[str, list[tuple[int, list[int]]]]:
-    marks: dict[str, list[tuple[int, list[int]]]] = {}
+def marks_by_name(source: dict) -> dict[str, list[tuple[str, int, list[int]]]]:
+    """name -> [(half, row, cols)].
+
+    ``half`` is "top" (the default: a diacritic above the x-height, stamped in
+    the cleared band at the top of the top tile) or "bottom" (a diacritic below
+    the baseline - the cedilla - stamped in the cleared band at the bottom of
+    the bottom tile, where the font's own descenders live).
+    """
+    marks: dict[str, list[tuple[str, int, list[int]]]] = {}
     for entry in source.get("mark", []):
+        half = str(entry.get("half", "top"))
+        if half not in ("top", "bottom"):
+            raise GenError(f"mark {entry['name']!r}: bad half {half!r}")
         marks.setdefault(str(entry["name"]), []).append(
-            (int(entry["row"]), [int(c) for c in entry["cols"]])
+            (half, int(entry["row"]), [int(c) for c in entry["cols"]])
         )
     return marks
 
@@ -118,27 +128,41 @@ def compose_cell(source: dict, cell: dict, en_image: bytes) -> tuple[bytes, byte
 
     top = tile_to_pixels(en_image[tile_address(source, base_top):
                                   tile_address(source, base_top) + size])
-    bottom = bytes(en_image[tile_address(source, base_bottom):
-                            tile_address(source, base_bottom) + size])
+    bottom = tile_to_pixels(en_image[tile_address(source, base_bottom):
+                                     tile_address(source, base_bottom) + size])
 
     background = int(source["background"])
     ink = int(source["ink"])
-    for row in range(int(source["clear_top_rows"]) + 1):
+    clear_top = int(source["clear_top_rows"])
+    clear_bottom = int(source.get("clear_bottom_rows", 0))
+    if not 0 <= clear_bottom <= 8:
+        raise GenError(f"clear_bottom_rows {clear_bottom} is out of range 0..8")
+    for row in range(clear_top + 1):
         top[row] = [background] * 8
+    for row in range(8 - clear_bottom, 8):
+        bottom[row] = [background] * 8
 
     marks = marks_by_name(source)
     mark_name = str(cell["mark"])
     if mark_name not in marks:
         raise GenError(f"unknown diacritic {mark_name!r}")
-    for row, cols in marks[mark_name]:
-        if not 0 <= row <= int(source["clear_top_rows"]):
-            raise GenError(
-                f"{mark_name} row {row} is outside the cleared band "
-                f"0..{source['clear_top_rows']}")
+    for half, row, cols in marks[mark_name]:
+        if half == "top":
+            if not 0 <= row <= clear_top:
+                raise GenError(
+                    f"{mark_name} top row {row} is outside the cleared band "
+                    f"0..{clear_top}")
+            target = top
+        else:
+            if not 8 - clear_bottom <= row <= 7:
+                raise GenError(
+                    f"{mark_name} bottom row {row} is outside the cleared band "
+                    f"{8 - clear_bottom}..7")
+            target = bottom
         for col in cols:
-            top[row][col] = ink
+            target[row][col] = ink
 
-    return pixels_to_tile(top), bottom
+    return pixels_to_tile(top), pixels_to_tile(bottom)
 
 
 def allocations(source: dict) -> dict[str, dict[str, int]]:
@@ -244,7 +268,17 @@ def generate_section(source: dict, rom: bytes, en_image: bytes) -> str:
     return "\n".join(lines)
 
 
+# Sentinel left behind by strip_section so replace_section can put the
+# regenerated section back exactly where the old one lived. Without it the
+# stripped text has no markers to find and the section is appended at EOF,
+# silently RELOCATING it past every generated section that followed it - and
+# rom_patch file order is application order.
+PLACEHOLDER = "# ACCENT SECTION PLACEHOLDER (generator internal)"
+
+
 def replace_section(text: str, section: str) -> str:
+    if PLACEHOLDER in text:
+        return text.replace(PLACEHOLDER, section, 1)
     pattern = re.compile(
         re.escape(BEGIN_MARK) + r".*?" + re.escape(END_MARK), re.S)
     match = pattern.search(text)
@@ -254,7 +288,7 @@ def replace_section(text: str, section: str) -> str:
 
 
 def strip_section(text: str) -> str:
-    """Remove this generator's own section.
+    """Remove this generator's own section, leaving PLACEHOLDER in its place.
 
     Idempotence: the splitter must never see the entries this generator
     emitted on a previous run - they cover the owned rects exactly, so it
@@ -263,7 +297,7 @@ def strip_section(text: str) -> str:
     pattern = re.compile(
         r"\n*" + re.escape(BEGIN_MARK) + r".*?" + re.escape(END_MARK) + r"\n*",
         re.S)
-    return pattern.sub("\n\n", text)
+    return pattern.sub("\n\n" + PLACEHOLDER + "\n\n", text)
 
 
 # ---------------------------------------------------------------------------

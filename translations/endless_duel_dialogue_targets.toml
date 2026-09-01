@@ -5,8 +5,22 @@
 # The dialogue font supports A-Z, a-z, space, . , ' ? ! plus, per language, the
 # accented cells allocated in translations/endless_duel_dialogue_accents.toml
 # (fr: e-acute e-grave a-grave e-circumflex; it: e-grave a-grave u-grave
-# i-grave o-grave). Any other accented character is a hard error: rewrite the
-# line rather than dropping the accent.
+# i-grave o-grave; pt: a-tilde e-acute e-circumflex a-acute c-cedilla). Any
+# other accented character is a hard error: rewrite the line rather than
+# dropping the accent.
+#
+# Portuguese consequences of that five-cell budget, so the wording is not
+# "re-fixed" later by someone who assumes the accent was forgotten:
+#   * no i-acute -> "devemos" not "deveríamos", "grandes tolos" not
+#     "tolos incríveis", "bem claro" not "bem visível", "grave" not "terrível",
+#     "duro" not "difícil", "Perdeu a fala?" not "Comeu sua língua?"
+#   * no o-acute  -> "um contra o outro" not "entre nós"
+#   * no o-circumflex -> "nosso lar" not "a colônia" / "as colônias",
+#     "Que ironia" not "Que irônico"
+#   * no UPPERCASE accented letter (the mark band overlaps the cap height) ->
+#     "  Um duelo sem fim..." not "  É um duelo sem fim..."
+# The accented intro caption ("Após Colônia") is free-form sprite art and has
+# no cell budget, so it keeps its real spelling.
 
 schema = 1
 
@@ -14,7 +28,7 @@ schema = 1
 address = 0x017000
 fr = "Tu es faible!"
 it = "Sei debole!"
-pt = "Voce e fraco!"
+pt = "Você é fraco!"
 
 [[line]]
 address = 0x017100
@@ -50,13 +64,13 @@ pt = "Os fracos certamente"
 address = 0x017480
 fr = "forcement au combat!"
 it = "sempre in battaglia!"
-pt = "cairao em batalha!"
+pt = "cairão em batalha!"
 
 [[line]]
 address = 0x017500
 fr = "Je savais depuis le debut"
 it = "Lo sapevo fin dall'inizio"
-pt = "Eu sabia desde o comeco"
+pt = "Eu sabia desde o começo"
 
 [[line]]
 address = 0x017580
@@ -80,7 +94,7 @@ pt = "Mostre me, Nataku..."
 address = 0x017700
 fr = "Que crois tu pouvoir"
 it = "Cosa pensi di poter"
-pt = "O que voce acha que"
+pt = "O que você acha que"
 
 [[line]]
 address = 0x017780
@@ -92,13 +106,13 @@ pt = "pode fazer agora!?"
 address = 0x017800
 fr = "On ne devrait pas se battre"
 it = "Non dovremmo combattere"
-pt = "Nao deviamos lutar"
+pt = "Não devemos lutar"
 
 [[line]]
 address = 0x017880
 fr = "entre nous!"
 it = "tra noi!"
-pt = "entre nos!"
+pt = "um contra o outro!"
 
 [[line]]
 address = 0x017900
@@ -110,7 +124,7 @@ pt = "Desculpe..."
 address = 0x017a00
 fr = "Protegeons la colonie"
 it = "Proteggiamo la colonia"
-pt = "Vamos proteger a colonia"
+pt = "Vamos proteger nosso lar"
 
 [[line]]
 address = 0x017a80
@@ -122,19 +136,19 @@ pt = "juntos!"
 address = 0x017b00
 fr = "C'est terrible! J'appelle"
 it = "E terribile! Chiamo"
-pt = "Isto e terrivel! Chamarei"
+pt = "Isto é grave! Chamarei"
 
 [[line]]
 address = 0x017b80
 fr = "les secours!"
 it = "i soccorsi!"
-pt = "os medicos!"
+pt = "os médicos!"
 
 [[line]]
 address = 0x017c00
 fr = "Tu aurais du"
 it = "Avresti dovuto"
-pt = "Voce deveria ter"
+pt = "Você deveria ter"
 
 [[line]]
 address = 0x017c80
@@ -146,7 +160,7 @@ pt = "se rendido..."
 address = 0x017d00
 fr = "Je ne ferai plus d'erreur!"
 it = "Non faro piu errori!"
-pt = "Nao cometerei erros!"
+pt = "Não cometerei erros!"
 
 [[line]]
 address = 0x017e00
@@ -164,7 +178,7 @@ pt = "nunca acabar..."
 address = 0x017f00
 fr = "Bien! C'etait plus facile"
 it = "Bene! Era piu facile"
-pt = "Certo! Foi mais facil"
+pt = "Certo! Foi mais fácil"
 
 [[line]]
 address = 0x017f80
@@ -176,7 +190,7 @@ pt = "do que eu pensei!"
 address = 0x026b00
 fr = "Cela n'a pas de sens."
 it = "Non ha senso."
-pt = "Isto nao faz sentido."
+pt = "Isto não faz sentido."
 
 [[line]]
 address = 0x026c00
@@ -194,25 +208,25 @@ pt = "Somos todos uns"
 address = 0x026d80
 fr = "idiots incroyables..."
 it = "sciocchi incredibili..."
-pt = "tolos incriveis..."
+pt = "grandes tolos..."
 
 [[line]]
 address = 0x026e00
 fr = "Ton impatience est un"
 it = "La tua impazienza e un"
-pt = "Sua impaciencia e um"
+pt = "Sua impaciência é um"
 
 [[line]]
 address = 0x026e80
 fr = "defaut trop visible..."
 it = "difetto molto evidente..."
-pt = "defeito bem visivel..."
+pt = "defeito bem claro..."
 
 [[line]]
 address = 0x026f00
 fr = "Il ne faut pas ceder."
 it = "Non devi arrenderti."
-pt = "Nao se deve desistir."
+pt = "Não se deve desistir."
 
 [[line]]
 address = 0x027000
@@ -230,7 +244,7 @@ pt = "o melhor que sabe."
 address = 0x027100
 fr = "Desole, mais je n'ai pas"
 it = "Scusa, ma non ho"
-pt = "Desculpe, mas nao tenho"
+pt = "Desculpe, mas não tenho"
 
 [[line]]
 address = 0x027180
@@ -248,7 +262,7 @@ pt = "De novo e de novo,"
 address = 0x027280
 fr = "c'est toujours pareil."
 it = "e sempre lo stesso."
-pt = "e sempre igual."
+pt = "é sempre igual."
 
 [[line]]
 address = 0x027300
@@ -260,7 +274,7 @@ pt = "Isso! Muito bem!"
 address = 0x027400
 fr = "He! Je n'ai pas fini!"
 it = "Ehi, non ho finito!"
-pt = "Ei, ainda nao acabei!"
+pt = "Ei, ainda não acabei!"
 
 [[line]]
 address = 0x027500
@@ -290,25 +304,25 @@ pt = "Corta, fatia, mata mata!"
 address = 0x027800
 fr = "Qui me voit doit mourir!"
 it = "Chi mi vede deve morire!"
-pt = "Quem me ve deve morrer!"
+pt = "Quem me vê deve morrer!"
 
 [[line]]
 address = 0x027900
 fr = "Alors? Le chat a"
 it = "Che c'e? Il gatto ti"
-pt = "O que foi? O gato"
+pt = "O que foi? Perdeu a"
 
 [[line]]
 address = 0x027980
 fr = "pris ta langue? Ha."
 it = "ha preso la lingua? Ah."
-pt = "comeu sua lingua? Ha."
+pt = "fala? Há."
 
 [[line]]
 address = 0x027a00
 fr = "He, tu es bien faible,"
 it = "Eh, sei piuttosto debole,"
-pt = "He, voce e bem fraco,"
+pt = "Há, você é bem fraco,"
 
 [[line]]
 address = 0x027a80
@@ -320,55 +334,55 @@ pt = "hein?"
 address = 0x03eb00
 fr = "Regarde avec ton coeur,"
 it = "Guarda col cuore, e"
-pt = "Veja com seu coracao, e"
+pt = "Veja com seu coração, e"
 
 [[line]]
 address = 0x03eb80
 fr = "tout deviendra clair."
 it = "tutto sara chiaro."
-pt = "tudo ficara claro."
+pt = "tudo ficará claro."
 
 [[line]]
 address = 0x03ec00
 fr = "Regarde avec ton coeur,"
 it = "Guarda col cuore, e"
-pt = "Veja com seu coracao, e"
+pt = "Veja com seu coração, e"
 
 [[line]]
 address = 0x03ec80
 fr = "tout deviendra clair."
 it = "tutto sara chiaro."
-pt = "tudo ficara claro."
+pt = "tudo ficará claro."
 
 [[line]]
 address = 0x03ed00
 fr = "Regarde avec ton coeur,"
 it = "Guarda col cuore, e"
-pt = "Veja com seu coracao, e"
+pt = "Veja com seu coração, e"
 
 [[line]]
 address = 0x03ed80
 fr = "tout deviendra clair."
 it = "tutto sara chiaro."
-pt = "tudo ficara claro."
+pt = "tudo ficará claro."
 
 [[line]]
 address = 0x03ee00
 fr = "Regarde avec ton coeur,"
 it = "Guarda col cuore, e"
-pt = "Veja com seu coracao, e"
+pt = "Veja com seu coração, e"
 
 [[line]]
 address = 0x03ee80
 fr = "tout deviendra clair."
 it = "tutto sara chiaro."
-pt = "tudo ficara claro."
+pt = "tudo ficará claro."
 
 [[line]]
 address = 0x03ef00
 fr = "Je ne chercherai plus"
 it = "Non inventero piu"
-pt = "Nao vou mais inventar"
+pt = "Não vou mais inventar"
 
 [[line]]
 address = 0x03ef80
@@ -380,7 +394,7 @@ pt = "desculpas!"
 address = 0x03f000
 fr = "Je ne chercherai plus"
 it = "Non inventero piu"
-pt = "Nao vou mais inventar"
+pt = "Não vou mais inventar"
 
 [[line]]
 address = 0x03f080
@@ -392,7 +406,7 @@ pt = "desculpas!"
 address = 0x03f100
 fr = "Je ne chercherai plus"
 it = "Non inventero piu"
-pt = "Nao vou mais inventar"
+pt = "Não vou mais inventar"
 
 [[line]]
 address = 0x03f180
@@ -404,7 +418,7 @@ pt = "desculpas!"
 address = 0x03f200
 fr = "Je ne chercherai plus"
 it = "Non inventero piu"
-pt = "Nao vou mais inventar"
+pt = "Não vou mais inventar"
 
 [[line]]
 address = 0x03f280
@@ -416,7 +430,7 @@ pt = "desculpas!"
 address = 0x03f300
 fr = "Alors, mon Epyon a ete"
 it = "Dunque, il mio Epyon e"
-pt = "Entao, meu Epyon foi"
+pt = "Então, meu Epyon foi"
 
 [[line]]
 address = 0x03f380
@@ -428,7 +442,7 @@ pt = "vencido."
 address = 0x03f400
 fr = "Chacun a sans doute"
 it = "Suppongo che tutti abbiano"
-pt = "Suponho que todos tem"
+pt = "Suponho que todos têm"
 
 [[line]]
 address = 0x03f480
@@ -440,7 +454,7 @@ pt = "um estilo diferente..."
 address = 0x03f500
 fr = "A part ca, tu as"
 it = "A parte cio, hai"
-pt = "Fora isso, voce"
+pt = "Fora isso, você"
 
 [[line]]
 address = 0x03f580
@@ -458,19 +472,19 @@ pt = "A guerra... acabou,"
 address = 0x03f680
 fr = "demandes?"
 it = "chiedi?"
-pt = "voce pergunta?"
+pt = "você pergunta?"
 
 [[line]]
 address = 0x03f700
 fr = "Non. L'humanite survit."
 it = "No. L'umanita prospera."
-pt = "Nao. A humanidade prospera."
+pt = "Não. A humanidade prospera."
 
 [[line]]
 address = 0x03f800
 fr = "Tu devras sans doute"
 it = "Probabilmente dovrai"
-pt = "Voce provavelmente tera"
+pt = "Você provavelmente terá"
 
 [[line]]
 address = 0x03f880
@@ -494,13 +508,13 @@ pt = "Esta guerra..."
 address = 0x03fa80
 fr = "  C'est un duel sans fin..."
 it = "  E un duello senza fine..."
-pt = "  E um duelo sem fim..."
+pt = "  Um duelo sem fim..."
 
 [[line]]
 address = 0x05e000
 fr = "Toute la mission est"
 it = "L'intera missione e"
-pt = "Toda a missao esta"
+pt = "Toda a missão está"
 
 [[line]]
 address = 0x05e080
@@ -530,13 +544,13 @@ pt = "Ufa! Isso foi bem"
 address = 0x05e280
 fr = "dur, hein Deathscythe?"
 it = "duro, eh Deathscythe?"
-pt = "dificil, hein Deathscythe?"
+pt = "duro, hein Deathscythe?"
 
 [[line]]
 address = 0x05e300
 fr = "Tu les as bien demolis!"
 it = "Li hai proprio distrutti!"
-pt = "Voce acabou com eles!"
+pt = "Você acabou com eles!"
 
 [[line]]
 address = 0x05e400
@@ -554,7 +568,7 @@ pt = "tenho gente a proteger."
 address = 0x05e500
 fr = "Certains continueront"
 it = "Alcuni continueranno"
-pt = "Alguns vao continuar"
+pt = "Alguns vão continuar"
 
 [[line]]
 address = 0x05e580
@@ -572,13 +586,13 @@ pt = "Pai... Eu consegui!"
 address = 0x05e700
 fr = "Grace a mes efforts, la paix"
 it = "Grazie ai miei sforzi,"
-pt = "Gracas aos meus esforcos, a"
+pt = "Graças aos meus esforços, a"
 
 [[line]]
 address = 0x05e780
 fr = "revint aux colonies!"
 it = "pace torna alle colonie!"
-pt = "paz voltou as colonias!"
+pt = "paz voltou ao nosso lar!"
 
 [[line]]
 address = 0x05e800
@@ -596,7 +610,7 @@ pt = "guerra. Eu estava certo."
 address = 0x05e900
 fr = "N'est ce pas, Nataku..."
 it = "Non e cosi, Nataku..."
-pt = "Nao e assim, Nataku..."
+pt = "Não é assim, Nataku..."
 
 [[line]]
 address = 0x05ea00
@@ -614,7 +628,7 @@ pt = "para lidar com coisas..."
 address = 0x05eb00
 fr = "Alors j'ai cesse de montrer"
 it = "Cosi smisi di mostrare"
-pt = "Entao parei de mostrar"
+pt = "Então parei de mostrar"
 
 [[line]]
 address = 0x05eb80
@@ -650,7 +664,7 @@ pt = "pelo Duque Treize..."
 address = 0x05ee00
 fr = "Nous avons gagne la paix"
 it = "Abbiamo ottenuto la pace"
-pt = "Alcancamos a paz"
+pt = "Alcançamos a paz"
 
 [[line]]
 address = 0x05ee80
@@ -662,7 +676,7 @@ pt = "lutando numa guerra..."
 address = 0x05ef00
 fr = "Quelle ironie..."
 it = "Che ironia..."
-pt = "Que ironico..."
+pt = "Que ironia..."
 
 # --- battle_dialogue_0 + battle_dialogue_4 (pre-fight / win-lose quotes) ---
 # Added 2026-08 with the accented glyph cells; see
@@ -674,263 +688,316 @@ pt = "Que ironico..."
 address = 0x007700
 fr = "J'accomplirai ma mission"
 it = "Compirò la mia missione"
+pt = "Vou cumprir minha missão"
 
 [[line]]
 address = 0x007780
 fr = "seul s'il le faut!"
 it = "anche da solo!"
+pt = "sozinho se preciso!"
 
 [[line]]
 address = 0x007800
 fr = "N'essaie même pas."
 it = "Non provarci nemmeno."
+pt = "Nem tente."
 
 [[line]]
 address = 0x007900
 fr = "Je crois en ma propre"
 it = "Credo nella mia"
+pt = "Acredito na minha"
 
 [[line]]
 address = 0x007980
 fr = "justice!"
 it = "giustizia!"
+pt = "justiça!"
 
 [[line]]
 address = 0x007a00
 fr = "Recule! Tu me"
 it = "Indietro! Mi stai"
+pt = "Para trás! Você está"
 
 [[line]]
 address = 0x007a80
 fr = "ralentis!"
 it = "rallentando!"
+pt = "me atrasando!"
 
 [[line]]
 address = 0x007b00
 fr = "Mission accomplie."
 it = "Missione compiuta."
+pt = "Missão cumprida."
 
 [[line]]
 address = 0x007c00
 fr = "Les obstacles comme toi"
 it = "Gli ostacoli come te"
+pt = "Obstáculos como você"
 
 [[line]]
 address = 0x007c80
 fr = "seront éliminés!"
 it = "saranno eliminati!"
+pt = "serão eliminados!"
 
 [[line]]
 address = 0x007d00
 fr = "Aaaaahahahahahah!"
 it = "Aaaaahahahahahah!"
+pt = "Aaaaahahahahahah!"
 
 [[line]]
 address = 0x007e00
 fr = "Tu crois que c'est un"
 it = "Credi che sia un"
+pt = "Você acha que isto é um"
 
 [[line]]
 address = 0x007e80
 fr = "jeu!?"
 it = "gioco!?"
+pt = "jogo!?"
 
 [[line]]
 address = 0x02c900
 fr = "Debout!"
 it = "In piedi!"
+pt = "De pé!"
 
 [[line]]
 address = 0x02ca00
 fr = "Tu t'es bien battu."
 it = "Ti sei battuto bene."
+pt = "Você lutou muito bem."
 
 [[line]]
 address = 0x02cb00
 fr = "Un problème?"
 it = "Qualcosa non va?"
+pt = "O que houve?"
 
 [[line]]
 address = 0x02cb80
 fr = "Mauvaise journée?"
 it = "Giornata storta?"
+pt = "Teve um dia ruim?"
 
 [[line]]
 address = 0x02cc00
 fr = "N'aie jamais pitié de"
 it = "Non avere mai pietà"
+pt = "Nunca tenha piedade"
 
 [[line]]
 address = 0x02cc80
 fr = "tes ennemis!"
 it = "dei tuoi nemici!"
+pt = "dos seus inimigos!"
 
 [[line]]
 address = 0x02cd00
 fr = "J'espérais un peu plus"
 it = "Speravo di allenarmi"
+pt = "Eu esperava treinar um"
 
 [[line]]
 address = 0x02cd80
 fr = "d'exercice, mais..."
 it = "un po' di più, ma..."
+pt = "pouco mais, mas..."
 
 [[line]]
 address = 0x02ce00
 fr = "Désolé... mais c'est"
 it = "Mi dispiace... ma"
+pt = "Desculpe... mas isto"
 
 [[line]]
 address = 0x02ce80
 fr = "la guerre."
 it = "questa è la guerra."
+pt = "é a guerra."
 
 [[line]]
 address = 0x02cf00
 fr = "Bien battu, mais à la"
 it = "Hai lottato bene, ma"
+pt = "Lutou bem, mas no fim"
 
 [[line]]
 address = 0x02cf80
 fr = "fin, c'est moi le vainqueur!"
 it = "alla fine vinco io!"
+pt = "quem vence sou eu!"
 
 [[line]]
 address = 0x02d000
 fr = "Tu as appris quelque"
 it = "Hai imparato qualcosa"
+pt = "Você aprendeu algo"
 
 [[line]]
 address = 0x02d080
 fr = "chose du combat?"
 it = "da questa battaglia?"
+pt = "com esta batalha?"
 
 [[line]]
 address = 0x02d100
 fr = "Il te faut encore de"
 it = "Ti serve ancora"
+pt = "Parece que precisa de"
 
 [[line]]
 address = 0x02d180
 fr = "la pratique!"
 it = "allenamento!"
+pt = "mais treino!"
 
 [[line]]
 address = 0x02d200
 fr = "C'était surprenant!"
 it = "Che sorpresa!"
+pt = "Isso foi surpreendente!"
 
 [[line]]
 address = 0x02d300
 fr = "Il y a longtemps que"
 it = "Era tanto che non"
+pt = "Faz tempo que não lutava"
 
 [[line]]
 address = 0x02d380
 fr = "je n'avais lutté ainsi!"
 it = "combattevo così!"
+pt = "com tanta força assim!"
 
 [[line]]
 address = 0x02d400
 fr = "Tu ne pleures pas pour"
 it = "Non piangi mica per"
+pt = "Você não está chorando"
 
 [[line]]
 address = 0x02d480
 fr = "l'élite, si?"
 it = "l'elite, vero?"
+pt = "pela elite, né?"
 
 [[line]]
 address = 0x02d500
 fr = "Ouah, c'était vraiment"
 it = "Wow, è stato proprio"
+pt = "Uau, isso foi bem"
 
 [[line]]
 address = 0x02d580
 fr = "mauvais..."
 it = "brutto..."
+pt = "ruim..."
 
 [[line]]
 address = 0x02d600
 fr = "Cette guerre dure"
 it = "Questa guerra dura"
+pt = "Esta guerra já dura"
 
 [[line]]
 address = 0x02d680
 fr = "depuis trop longtemps..."
 it = "da troppo tempo..."
+pt = "tempo demais..."
 
 [[line]]
 address = 0x02d700
 fr = "On dirait que tu n'as"
 it = "Sembra che tu non"
+pt = "Parece que você não"
 
 [[line]]
 address = 0x02d780
 fr = "pas tenu le coup, hein?"
 it = "abbia retto, eh?"
+pt = "aguentou, hein?"
 
 [[line]]
 address = 0x02d800
 fr = "Hisse un drapeau blanc"
 it = "Alza bandiera bianca"
+pt = "Erga a bandeira branca"
 
 [[line]]
 address = 0x02d880
 fr = "et tu seras épargné..."
 it = "e non ti farò nulla..."
+pt = "e não será ferido..."
 
 [[line]]
 address = 0x02d900
 fr = "Je me bats pour Treize!"
 it = "Combatto per Treize!"
+pt = "Luto pelo Duque Treize!"
 
 [[line]]
 address = 0x02da00
 fr = "Hmm? Quelque chose ne va pas?"
 it = "Hmm? Qualche problema?"
+pt = "Hmm? Algum problema?"
 
 [[line]]
 address = 0x02db00
 fr = "Hurle, chien que tu es!!"
 it = "Ulula, cane che sei!!"
+pt = "Uive, cão que você é!!"
 
 [[line]]
 address = 0x02dc00
 fr = "Dis, je peux te dire"
 it = "Senti, posso dirti"
+pt = "Escute, posso dizer uma"
 
 [[line]]
 address = 0x02dc80
 fr = "quelque chose?"
 it = "una cosa?"
+pt = "coisa?"
 
 [[line]]
 address = 0x02dd00
 fr = "Le duc Treize veut que"
 it = "Il duca Treize vuole"
+pt = "O Duque Treize quer que"
 
 [[line]]
 address = 0x02dd80
 fr = "je me batte!"
 it = "che io combatta!"
+pt = "eu lute!"
 
 [[line]]
 address = 0x02de00
 fr = "Attrapez ce pilote!"
 it = "Prendete quel pilota!"
+pt = "Peguem aquele piloto!"
 
 [[line]]
 address = 0x02df00
 fr = "Imbécile..."
 it = "Sciocco..."
+pt = "Tolo..."
 
 [[line]]
 address = 0x02e000
 fr = "Tu devrais essayer une"
 it = "Forse dovresti provare"
+pt = "Talvez deva tentar uma"
 
 [[line]]
 address = 0x02e080
 fr = "autre approche..."
 it = "un altro approccio..."
+pt = "abordagem diferente..."

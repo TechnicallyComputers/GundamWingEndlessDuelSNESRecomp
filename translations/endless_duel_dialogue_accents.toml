@@ -19,10 +19,22 @@
 # Spanish art is preserved byte-for-byte by the baseline payloads recorded
 # below.
 #
+# Per-language budgets: fr uses 4 cells, it 5, pt 5. Portuguese wants more
+# diacritics than five cells can hold, so the allocation below is the set the
+# authored pt corpus actually needs - a-tilde, e-acute, e-circumflex, a-acute
+# and c-cedilla - and translations/endless_duel_dialogue_targets.toml is worded
+# to avoid every other accent (no i-acute, o-acute, o-circumflex, o-tilde,
+# u-acute, a-grave, a-circumflex, and no UPPERCASE accented letter: the mark
+# band overlaps the cap height). The generator hard-fails on any unallocated
+# accented character; keep it that way.
+#
 # Glyph art is COMPOSED, never hand-drawn: the base letter's cell is copied out
-# of the English font image and the diacritic is stamped into the empty rows
-# above the x-height (the Spanish tilde sits on top-tile row 3; these marks use
-# rows 2-3). Regenerate with:
+# of the English font image and the diacritic is stamped into a cleared band.
+# Marks above the x-height go in the empty rows at the top of the top tile (the
+# Spanish tilde sits on top-tile row 3; these marks use rows 2-3). A mark BELOW
+# the baseline (`half = "bottom"`, the cedilla) goes in the empty rows at the
+# bottom of the bottom tile - cell rows 14-15, where the font's own p/g/q
+# descenders live, so it reads as part of the letter. Regenerate with:
 #
 #   py -3 scripts/generate_dialogue_accent_patch.py --write
 #
@@ -45,8 +57,15 @@ background = 1
 # also removes the tittle of 'i' so that grave/acute sit correctly on it.
 clear_top_rows = 4
 
-# Diacritic shapes: one entry per row, "row" is the top-tile row index and
-# "cols" the pixel columns (0 = leftmost) that receive ink.
+# Rows 6..7 of the bottom tile (cell rows 14-15) are cleared before stamping so
+# a below-baseline mark has a clean band. Every accent base letter used here
+# (a e i o u c) is empty there in the reference font, so clearing is a no-op for
+# fr/it and their art is unchanged.
+clear_bottom_rows = 2
+
+# Diacritic shapes: one entry per row. "row" is the row index inside the half
+# named by "half" ("top", the default, or "bottom"), and "cols" the pixel
+# columns (0 = leftmost) that receive ink.
 [[mark]]
 name = "acute"
 row = 2
@@ -73,6 +92,25 @@ cols = [3, 4]
 name = "circumflex"
 row = 3
 cols = [2, 5]
+
+# The tilde reuses the shape the Spanish hack drew for n-tilde at cell 0x069:
+# a single flat bar on top-tile row 3, columns 2-5. Proven legible in-game.
+[[mark]]
+name = "tilde"
+row = 3
+cols = [2, 3, 4, 5]
+
+# Cedilla: a stub under the bowl, hooking left, in the descender band.
+[[mark]]
+name = "cedilla"
+half = "bottom"
+row = 6
+cols = [4]
+[[mark]]
+name = "cedilla"
+half = "bottom"
+row = 7
+cols = [2, 3, 4]
 
 # ---------------------------------------------------------------------------
 # Allocations. `base` names the character whose cell art is copied; `mark` names
@@ -142,6 +180,41 @@ char = "ò"
 tile = 0x001
 base = "o"
 mark = "grave"
+
+[[cell]]
+lang = "pt"
+char = "ã"
+tile = 0x06e
+base = "a"
+mark = "tilde"
+
+[[cell]]
+lang = "pt"
+char = "é"
+tile = 0x06f
+base = "e"
+mark = "acute"
+
+[[cell]]
+lang = "pt"
+char = "ê"
+tile = 0x06a
+base = "e"
+mark = "circumflex"
+
+[[cell]]
+lang = "pt"
+char = "á"
+tile = 0x06b
+base = "a"
+mark = "acute"
+
+[[cell]]
+lang = "pt"
+char = "ç"
+tile = 0x001
+base = "c"
+mark = "cedilla"
 
 # Captured pre-split reference art for every owned tile.
 # scripts/generate_dialogue_accent_patch.py --capture-baseline
