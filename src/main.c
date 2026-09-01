@@ -47,6 +47,7 @@
  * this file compiles out with it. */
 #include "recomp_launcher.h"
 #include "launcher_profile.h"
+#include "launcher_binds.h"  /* launcher_ini_kv_write — persist Display toggles */
 #endif
 
 #if defined(SNES_HAS_LOBBY_CLIENT)
@@ -399,6 +400,25 @@ static int game_pad_name_to_button(const char *name)
 #define GAME_FPS 60.0988
 
 static int g_vsync = 1;
+
+/* ── Frame blending ───────────────────────────────────────────────────────
+ *
+ * This game fakes transparency by drawing thrusters, explosions and beam
+ * flashes on alternate frames only — a trick that reads as translucency on
+ * a CRT's persistence but relies on every guest frame being shown exactly
+ * once, whole, in order. A desktop display breaks that both ways: vsync on
+ * duplicates a frame every ~10 s (the 60.00 vs 60.0988 beat above), showing
+ * the same flicker phase twice; vsync off tears mid-scanout, splitting the
+ * on-frame and the off-frame across one visible field.
+ *
+ * Averaging each presented frame with the previous one makes both phases
+ * present in every displayed frame, so the flicker becomes steady 50%
+ * translucency and stops caring about pacing at all. Costs half a frame of
+ * motion ghosting, so it is a Display-settings checkbox, off by default.
+ * Persisted as [Video] FrameBlend in config.ini. */
+static int g_frame_blend = 0;
+static uint32_t g_blend_prev[GAME_WIDTH * GAME_HEIGHT];
+static int g_blend_prev_valid = 0;
 
 static int game_config_int(const char *section, const char *key, int fallback)
 {
@@ -785,6 +805,7 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     uint32_t crc;
     char assets_dir[1024];
     int lr;
+    int fb_seed;
 
     /* recomp-ui resolves its staged assets (assets/fonts, assets/img) relative
      * to the executable; the argument exists for hosts with other layouts. */
@@ -798,6 +819,10 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     ls.audio_freq    = 32000;
     ls.volume        = 100;
     ls.player_src[0] = 1;      /* keyboard */
+    /* Seed the Display "Frame blending" checkbox from its persisted home so
+     * the box shows the current state rather than resetting every boot. */
+    fb_seed = game_config_int("[Video]", "FrameBlend", 0) ? 1 : 0;
+    ls.frame_blend   = fb_seed;
 
     memset(&gi, 0, sizeof(gi));
     /* One profile call sets the whole SNES identity — theme, pad art, platform
@@ -806,6 +831,10 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     gi.name        = "Gundam Wing Endless Duel";
     gi.region      = "(JPN)";
     gi.num_players = 2;
+    /* Display → Frame blending checkbox. Per-game opt-in: this title leans
+     * on alternate-frame flicker for its transparency effects (thrusters,
+     * beam flashes), which is what the blend exists to steady. */
+    gi.has_frame_blend = 1;
     /* `sha` outlives the run_window call below, which is the only consumer. */
     if (expected_rom_sha256(sha)) {
         gi.known_sha256     = (const uint8_t (*)[32])&sha;
@@ -844,6 +873,13 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
                 ls.netplay_launch.peer_hostport, ls.netplay_launch.input_delay);
     }
 #endif
+    /* Persist a toggled Frame blending box before the game reads config.ini
+     * below (same surgical writer the launcher uses for [GamepadMap], so
+     * comments and unrelated keys survive). Only on change: an untouched
+     * launcher run must not invent a [Video] section in a fresh install. */
+    if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && ls.frame_blend != fb_seed)
+        launcher_ini_kv_write("config.ini", "Video", "FrameBlend",
+                              ls.frame_blend ? "1" : "0");
     if (lr == RECOMP_LAUNCHER_RESULT_QUIT)
         return -1;
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && out[0])
@@ -905,6 +941,26 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture *texture,
         int pitch = 0;
         if (snesrecomp_sdl_lock_texture(texture, NULL, &pixels, &pitch)) {
             RtlDrawPpuFrame((uint8 *)pixels, (size_t)pitch, 0);
+            /* Frame blending (see g_frame_blend above). The texture gets the
+             * average of this frame and the last; g_blend_prev keeps the
+             * unblended frame so the mix never feeds back on itself. The
+             * PPU's own renderBuffer stays pure for thumbnails/captures. */
+            if (g_frame_blend) {
+                int y, x;
+                for (y = 0; y < GAME_HEIGHT; ++y) {
+                    uint32_t *row =
+                        (uint32_t *)((uint8 *)pixels + (size_t)y * pitch);
+                    uint32_t *prev = g_blend_prev + (size_t)y * GAME_WIDTH;
+                    for (x = 0; x < GAME_WIDTH; ++x) {
+                        uint32_t cur = row[x];
+                        if (g_blend_prev_valid)
+                            row[x] = (cur & prev[x]) +
+                                     (((cur ^ prev[x]) >> 1) & 0x7F7F7F7Fu);
+                        prev[x] = cur;
+                    }
+                }
+                g_blend_prev_valid = 1;
+            }
             SDL_UnlockTexture(texture);
         }
         /* Offer the composited frame as the next save's thumbnail. Must come
@@ -1133,6 +1189,14 @@ session_reboot:
                       : NULL;
     fprintf(stderr, "[video] vsync %s (config.ini [Video] Vsync)\n",
             g_vsync ? "on" : "off — pacing on the 60.0988 Hz SNES clock");
+    /* Launcher Display checkbox lands here via the [Video] FrameBlend
+     * write-back in run_gui_launcher, so this read is the single source of
+     * truth for both the GUI and text-mode boot paths. */
+    g_frame_blend = game_config_int("[Video]", "FrameBlend", 0) != 0;
+    g_blend_prev_valid = 0;   /* never blend across a session reboot */
+    if (g_frame_blend)
+        fprintf(stderr,
+                "[video] frame blending on (config.ini [Video] FrameBlend)\n");
     texture = renderer
         ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                             SDL_TEXTUREACCESS_STREAMING,
