@@ -53,7 +53,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-LANGS = ("en", "es", "fr", "it", "pt", "tl", "id", "zh", "ko")
+LANGS = ("en", "es", "fr", "it", "pt", "tl", "id", "zh", "ko", "th")
 
 BEGIN_MARK = "# BEGIN GENERATED INTRO CAPTION PATCHES"
 END_MARK = "# END GENERATED INTRO CAPTION PATCHES"
@@ -320,6 +320,44 @@ def raster_cell(strings: list[str], face: dict, box_widths: list[int],
     return size, masks
 
 
+def raster_gdi(strings: list[str], face: dict, box_widths: list[int],
+               height: int):
+    """Render complex-script text through GDI/Uniscribe on a shared baseline.
+
+    Same contract as raster_proportional, but the shaping is done by GDI because
+    Pillow in this tree has no libraqm and stacks no marks -- see
+    scripts/gdi_text.py.  The caption is free-form sprite art with a 24px band,
+    which is taller than a Thai line needs, so nothing is band-compressed here:
+    the largest size that fits both boxes wins.
+    """
+    from gdi_text import GdiRenderer
+    threshold = int(face.get("threshold", 110))
+    pad = int(face.get("shadow_pad", 1))
+    for size in range(int(face["max_size"]), int(face["min_size"]) - 1, -1):
+        renderer = GdiRenderer(str(face["font"]), size)
+        renderer.render(strings)
+        boxes = [renderer.ink_box(text) for text in strings]
+        if any(box is None for box in boxes):
+            continue
+        if any(box[2] - box[0] > box_w - pad
+               for box, box_w in zip(boxes, box_widths)):
+            continue
+        top = min(box[1] for box in boxes)
+        bottom = max(box[3] for box in boxes)
+        if bottom - top > height - pad:
+            continue
+        masks = []
+        for text, box in zip(strings, boxes):
+            crop = renderer.mask(text).crop((box[0], top, box[2], bottom))
+            pixels = crop.load()
+            masks.append([[pixels[x, y] >= threshold for x in range(crop.width)]
+                          for y in range(crop.height)])
+        return size, masks
+    raise GenError(
+        f"no font size in [{face['min_size']}, {face['max_size']}] fits "
+        f"{strings!r} into {box_widths} x {height} through GDI")
+
+
 def paint(canvas: list[list[int]], mask, box_x: int, box_w: int,
           y0: int, y1: int, body: int, shadow: int) -> None:
     height = len(mask)
@@ -362,6 +400,8 @@ def render_line(spec: dict, line_id: str, geom: Geometry, faces: dict,
         _, masks = raster_proportional(texts, face, widths, band)
     elif mode == "cell":
         _, masks = raster_cell(texts, face, widths, band)
+    elif mode == "gdi":
+        _, masks = raster_gdi(texts, face, widths, band)
     else:
         raise GenError(f"unknown face mode {mode!r}")
     canvas = [[0] * (line["tiles"] * 8) for _ in range(len(line["rows"]) * 8)]

@@ -86,6 +86,18 @@ cell = 16
 size = 16
 threshold = 110
 
+[face.th]
+# Thai needs shaping, and Pillow here has no libraqm, so this face rasterises
+# through GDI/Uniscribe (mode = "gdi", scripts/gdi_text.py).  The caption band is
+# 24px -- taller than a Thai line needs -- so nothing is band-compressed: the
+# renderer takes the largest size in [min, max] that fits both 48px boxes.
+font = "LeelawUI.ttf"
+mode = "gdi"
+max_size = 22
+min_size = 10
+threshold = 110
+shadow_pad = 1
+
 [face.zh]
 font = "msyh.ttc"
 mode = "cell"
@@ -141,6 +153,15 @@ line2 = "keep"
 face = "ko"
 line1_left = "애프터"
 line1_right = "콜로니"
+line2 = "keep"
+
+[language.th]
+# "หลัง โคโลนี" -- literally "after the colony", the same after-plus-colony
+# reading es/fr/it/pt/tl/id take, rather than a transliteration of the English
+# "After Colony".  line2 keeps the English "195" digits like every language.
+face = "th"
+line1_left = "หลัง"
+line1_right = "โคโลนี"
 line2 = "keep"
 
 [language.zh]

@@ -51,6 +51,53 @@ map of current assets, commands, and open surfaces.
   common contiguous run 0x07a-0x0ff, 134 tiles. Peak page use is 0x0c5 (ko
   `ending`), leaving 58 tiles of headroom on the tightest surface.
 
+- `th` (Thai): exposed in the launcher; native for the option menu, key config,
+  intro caption, and all three dialogue surfaces (95 quotes / 161 rows). Thai
+  cannot use the one-codepoint-per-cell model the CJK path uses — it stacks up to
+  two vowel/tone marks over a base consonant plus one vowel below and it needs
+  shaping — so it takes two new mechanisms, both inside the existing generators:
+
+  - **Dialogue: line as image** (`mode = "line"` in
+    `endless_duel_dialogue_cjk.toml`'s `[font.th]`). The whole row is shaped by
+    GDI/Uniscribe at 16px em from Leelawadee UI, band-compressed into the 16-row
+    line (above-mark and below-vowel bands squashed 2:1, base-consonant band kept
+    at full height, fixed baseline), sliced into 8x8 tiles and deduped; the ROM
+    row addresses those tiles positionally. Page sizes 10-66 tiles, worst-case
+    highest tile 0x0ca on `ending` (53 tiles of headroom); widest authored line
+    162px of the 224px budget. The zero-dedup ceiling is 112 tiles, below every
+    surface window, so line mode can never overflow.
+  - **Option / key-config: cluster per font code.** One free font code
+    (0x60-0x9f) per orthographic CLUSTER rather than per codepoint — a pre-base
+    vowel (เ แ โ ใ ไ) is its own advancing cell, a consonant carries its own
+    above and below marks inside its 8x16 cell. 36 distinct clusters over all 28
+    records, against 64 free codes; every record fits its original byte span. The
+    masks are 8x14 (the packer now centres any mask up to 14 rows in the cell)
+    and are RENDERED through GDI rather than hand-authored into
+    `endless_duel_title_glyphs.toml`, because that atlas is keyed by single
+    codepoint and cannot express a cluster.
+
+  Both paths go through `scripts/gdi_text.py`, which shells out to
+  `scripts/render_text_gdi.ps1`. That is a **build-host** dependency (Windows,
+  GDI, an installed Leelawadee UI) at GENERATION time only — the shipped table
+  holds baked tile bytes.
+
+  Two `th` surfaces are deliberately still English, and are follow-up work:
+
+  - **Title mode-selector labels.** `LABEL_LAYOUT` gives 11px of height and the
+    glyph atlas has no zero-advance path for a combining mark, so Thai there
+    needs both a cluster key in `generate_title_menu_vram_patch.py`'s reader and
+    painter AND hand-authored 11px cluster letterforms. Width is free (25-66px
+    needed against 64-96px budgets); height and the atlas model are the blockers.
+    With no `th` payload the label tile patches no-op and the stock English art
+    shows — verified live, no garble.
+  - **Opening/fight crawl.** The crawl's 16x16 cells are tall enough, but ko and
+    zh SHARE the surveyed tile run 0x0120-0x01cf, i.e. 44 glyph cells, and a
+    deliberately terse 10-line Thai crawl measures **47 distinct clusters**. It
+    also needs cluster support in `generate_cjk_glyph_tiles.ps1`, which splits
+    text with `.ToCharArray()`. Closing it means either a fresh crawl VRAM
+    capture to survey tiles past 0x01cf or a wording pass down to <=44 clusters,
+    plus that PS1 change. `th` falls back to the English crawl until then.
+
 Every surface is drawn by the game itself; nothing is drawn over the presented
 frame.
 

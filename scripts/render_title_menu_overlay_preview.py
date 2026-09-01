@@ -10,7 +10,7 @@ import tomllib
 from pathlib import Path
 
 
-LANGS = ("en", "es", "fr", "it", "pt", "tl", "id", "zh", "ko")
+LANGS = ("en", "es", "fr", "it", "pt", "tl", "id", "zh", "ko", "th")
 
 DEFAULT_TITLE_GLYPHS = {
     " ": (5, (0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)),

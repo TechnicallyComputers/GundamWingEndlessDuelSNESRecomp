@@ -24,7 +24,7 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-ALL_LANGS = ("en", "es", "fr", "it", "pt", "tl", "id", "zh", "ko")
+ALL_LANGS = ("en", "es", "fr", "it", "pt", "tl", "id", "zh", "ko", "th")
 
 
 def repo_root() -> Path:

@@ -1,7 +1,7 @@
 param(
     [string]$RomPath = $env:SNESRECOMP_ROM,
     [string]$BuildDir = "build-local-xlate-trace",
-    [string[]]$Languages = @("en", "es", "fr", "it", "pt", "tl", "id", "off"),
+    [string[]]$Languages = @("en", "es", "fr", "it", "pt", "tl", "id", "th", "off"),
     [int]$CaptureSecond = 60,
     [string]$OutDir = "",
     [int]$BasePort = 5270

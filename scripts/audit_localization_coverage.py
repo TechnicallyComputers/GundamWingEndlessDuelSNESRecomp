@@ -10,7 +10,7 @@ from collections import Counter
 from pathlib import Path
 
 
-LANGS = ("en", "es", "fr", "it", "pt", "tl", "id", "zh", "ko")
+LANGS = ("en", "es", "fr", "it", "pt", "tl", "id", "zh", "ko", "th")
 PATCH_KINDS = ("rom_patch", "ram_patch", "vram_patch", "glyph_label", "entry")
 
 

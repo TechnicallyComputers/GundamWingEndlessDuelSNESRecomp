@@ -138,6 +138,43 @@ entries over the font tile region (`generate_cjk_crawl_patch.py`).
 (`generate_dialogue_patch.py`). Formats in
 `TRANSLATION_TILEMAP_REFERENCE.md`.
 
+**When the script is not one-codepoint-per-cell: line as image.** Thai
+stacks up to two vowel/tone marks over a base consonant plus one vowel
+below, and it needs shaping, so *no* per-character cell model can express
+it — the marks would occupy their own advancing cells. The answer is to
+stop allocating per character and allocate per **8x8 tile of a rendered
+line**: shape and rasterise the whole row as one strip, slice it, dedup by
+tile bytes, and have the ROM row address those tiles positionally
+(`mode = "line"` in `generate_dialogue_cjk_patch.py`). Three things this
+changed, all reusable:
+
+- **Shaping must not go through Pillow** unless it was built against
+  libraqm (`PIL.features.check("raqm")`). Without it Pillow does no
+  complex-script layout and the marks advance as spacing glyphs — which
+  looks like a font bug and is not one. `scripts/gdi_text.py` shells out
+  to GDI/Uniscribe instead (`scripts/render_text_gdi.ps1`), a
+  GENERATION-time dependency on Windows plus an installed Thai font. The
+  shipped table is baked tile bytes, so players depend on neither.
+- **Band compression is what makes a tall script fit a short line.**
+  A Thai line needs 17-20 rows at a fixed baseline for any em size where
+  the base consonants keep the loops that tell ก/ถ/ภ, ด/ต, บ/ป apart, but
+  the dialogue line is 16. Render at the larger em and squash the
+  above-mark and below-vowel bands 2:1 while keeping the base-consonant
+  band at full height — exactly what hand-made Thai pixel fonts do.
+  Measure the band boundaries from the font's own rendering of probe
+  strings; never hardcode pixel rows, and never centre per line (the
+  baseline has to be constant or the text bounces line to line).
+- **The all-background tile is not the blank cell.** In these boxes an
+  empty tile is colour index 1 (the box's black fill), not 0, so it can
+  NOT be replaced by the game's own blank map word — that word is tile 0
+  under a different palette. Emit it as a real page tile; dedup collapses
+  every blank column onto that one.
+
+Line mode is also a strict budget WIN: the zero-dedup ceiling is
+2 rows x 28 columns x 2 halves = 112 tiles, below the tightest page
+window, so it can never overflow. And the fit test becomes pixels rather
+than cells, so horizontal budget stops being a constraint at all.
+
 ### 3b. Display-list text through a runtime font (option / key-config)
 
 **Recognition:** ROM contains readable ASCII near opcode-looking words;
@@ -436,6 +473,10 @@ real time once; none should waste it twice.
 | a language code that collides with a source table's own key — `id` (Indonesian) vs `id = "story_mode"` | `tomllib`: "Cannot overwrite a value"; and every per-entry audit counts the identity string as an `id` translation | never name an entry-identity key after anything that could be an ISO 639-1 code; rename it (`label_id`, `record_id`) the moment you add such a language |
 | a generator that appends a NEW `<lang>_hex` line at the end of a `[[rom_patch]]` block | the key lands *after* a following `# BEGIN GENERATED …` marker, i.e. inside the next generator's section, and that generator's next `--write` silently deletes it | blocks run to the next `[[rom_patch]]`, so insert new keys after the LAST existing `*_hex` line, never at block end |
 | `Path.write_text(..., encoding=…)` without `newline="\n"` | one generator's `--write` rewrites the whole LF table as CRLF and every other generator's `--check` diffs | always pass `newline="\n"` when writing the runtime table |
+| Pillow built without libraqm | Thai/Indic marks render as SPACING glyphs, one advance each — looks like bad authoring, isn't | check `PIL.features.check("raqm")`; if False, shape through GDI/Uniscribe (`scripts/gdi_text.py`) — do NOT lay out complex scripts in Pillow |
+| a per-line vertical centring in a fixed-height band | the text bounces line to line as the tallest mark changes | derive ONE band geometry from the font and reuse it for every line; the baseline must be constant |
+| a glyph atlas keyed by single codepoint | a cluster script (Thai) cannot be expressed at all — combining marks each take their own advance | either allocate per CLUSTER (option screens here) or per rendered tile (dialogue here); check for a zero-advance path before assuming an atlas can carry a script |
+| the launcher font is Latin + Japanese only | a non-Latin `[[option.choice]] label` renders as tofu | keep the language label ASCII (`label = "Thai"`), as ko/zh already do, unless you extend recomp-ui's font ranges |
 | assuming a font has the ASCII glyph its code implies | the option font drew `MAH.` as `MAHL` — code 0x2e's cell is not a period on these screens | render the label live before shipping punctuation; the Latin option font here is safe for A-Z and space only |
 
 ---

@@ -40,7 +40,36 @@ import sys
 import tomllib
 from pathlib import Path
 
-LANGS = ("ko", "zh")
+LANGS = ("ko", "zh", "th")
+
+# Thai is not one-codepoint-per-cell, so a font code is allocated per
+# orthographic CLUSTER instead of per codepoint: a pre-base vowel (เ แ โ ใ ไ) is
+# its own advancing cell, and a base consonant carries its own above and below
+# marks inside its 8x16 cell.  Line-as-image (what the dialogue surface uses)
+# was considered and rejected here: ~224 columns across 28 records overruns the
+# 64 free font codes roughly three-fold, while cluster-per-code needs ~30.
+THAI_ABOVE = frozenset(
+    [0x0E31] + list(range(0x0E34, 0x0E38)) + list(range(0x0E47, 0x0E4F)))
+THAI_BELOW = frozenset(range(0x0E38, 0x0E3B))
+THAI_COMBINING = THAI_ABOVE | THAI_BELOW
+THAI_RANGE = range(0x0E00, 0x0E80)
+
+
+def thai_clusters(text: str) -> list[str]:
+    """Split into cells: a combining mark joins the cell before it."""
+    cells: list[str] = []
+    for char in text:
+        if (ord(char) in THAI_COMBINING and cells
+                and ord(cells[-1][0]) in THAI_RANGE):
+            cells[-1] += char
+            continue
+        cells.append(char)
+    return cells
+
+
+def cells_of(text: str) -> list[str]:
+    """One entry per font cell the record needs, for any script."""
+    return thai_clusters(text)
 
 BEGIN_MARK = "# BEGIN GENERATED OPTION CJK PATCHES"
 END_MARK = "# END GENERATED OPTION CJK PATCHES"
@@ -51,6 +80,23 @@ FREE_CODE_LO = 0x60
 FREE_CODE_HI = 0x9F
 TILE_BYTES = 16
 GLYPH_ROWS = 8
+# The cell is 8x16, but the top and bottom rows are the label pitch's breathing
+# room, so a mask may be up to 8x14.  ko/zh ship 8x8 masks from the authored
+# atlas; Thai needs the extra rows for its mark stacks.
+MAX_MASK_ROWS = 14
+CELL_ROWS = 16
+# Thai cluster cells are rendered through GDI (see scripts/gdi_text.py) rather
+# than hand-authored into endless_duel_title_glyphs.toml: the atlas is keyed by
+# single codepoint and cannot express a cluster, and ~30 hand-authored 8x14
+# masks would be ~420 hand-entered hex values with no way to review them except
+# the preview this generator already emits.  Generation-time dependency only.
+# 16px em band-compresses to exactly 14 rows (3 above + 9 base + 2 below), so
+# the base consonants keep 9 rows -- 13px em leaves them 8 and the loops close
+# up.  Threshold 100 was picked by rendering the whole cluster set at 72 / 100 /
+# 110: 72 over-inks the 2px strokes into blobs, 110 drops the thin tone marks.
+THAI_FONT_FILE = "LeelawUI.ttf"
+THAI_FONT_SIZE = 16
+THAI_MASK_THRESHOLD = 100
 
 ROM_NAME = "Shin Kidou Senki Gundam W - Endless Duel (J).smc"
 RECORD_TERMINATOR = 0xFF
@@ -85,11 +131,12 @@ def load_masks(glyph_path: Path) -> dict[str, list[int]]:
         char = chr(int(text, 16))
         width = int(entry["width"])
         height = int(entry.get("height", GLYPH_ROWS))
-        if width != GLYPH_ROWS or height != GLYPH_ROWS:
+        if width != GLYPH_ROWS or not 1 <= height <= MAX_MASK_ROWS:
             raise ValueError(
-                f"glyph U+{ord(char):04X}: option font needs an "
-                f"{GLYPH_ROWS}x{GLYPH_ROWS} mask, got {width}x{height}")
-        rows = [int(str(entry[f"row{i}"]), 16) for i in range(GLYPH_ROWS)]
+                f"glyph U+{ord(char):04X}: option font needs a {GLYPH_ROWS}px "
+                f"wide mask of at most {MAX_MASK_ROWS} rows, got "
+                f"{width}x{height}")
+        rows = [int(str(entry[f"row{i}"]), 16) for i in range(height)]
         for index, row in enumerate(rows):
             if not 0 <= row <= 0xFF:
                 raise ValueError(
@@ -118,18 +165,19 @@ def record_span(record: dict) -> int:
 
 def allocate(records: list[dict], lang: str,
              masks: dict[str, list[int]]) -> dict[str, int]:
-    """char -> font code, assigned deterministically over the sorted charset."""
+    """cell -> font code, assigned deterministically over the sorted cell set."""
     chars = sorted({
-        char
+        cell
         for record in records
-        for char in str(record[lang])
-        if ord(char) > 0x7F
+        for cell in cells_of(str(record[lang]))
+        if ord(cell[0]) > 0x7F
     })
     missing = [c for c in chars if c not in masks]
     if missing:
         raise ValueError(
             f"{lang}: no glyph mask for " +
-            ", ".join(f"U+{ord(c):04X}" for c in missing))
+            ", ".join("+".join(f"U+{ord(ch):04X}" for ch in c)
+                      for c in missing))
     budget = FREE_CODE_HI - FREE_CODE_LO + 1
     if len(chars) > budget:
         raise ValueError(
@@ -143,8 +191,8 @@ def encode(record: dict, lang: str, codes: dict[str, int]) -> bytes:
     out = bytearray()
     if record.get("cursor"):
         out.append(CURSOR_BYTE)
-    for char in str(record[lang]):
-        if ord(char) > 0x7F:
+    for char in cells_of(str(record[lang])):
+        if ord(char[0]) > 0x7F:
             out.append(codes[char])
             continue
         value = ord(char)
@@ -197,20 +245,41 @@ def verify_against_rom(root: Path, records: list[dict]) -> bool:
 
 
 def pack_cell(mask: list[int]) -> tuple[bytes, bytes]:
-    """8x8 mask -> (top tile, bottom tile) 2bpp bytes, vertically centred.
+    """8xN mask (N <= 14) -> (top tile, bottom tile) 2bpp bytes, centred.
 
-    The mask occupies the middle 8 rows of the 16px cell: rows 0-3 land in the
-    top tile's rows 4-7 and rows 4-7 in the bottom tile's rows 0-3. Both
-    bitplanes carry the mask so lit pixels use palette colour index 3.
+    The mask is centred in the 16-row cell -- an 8-row mask lands in rows 4-11,
+    exactly where the ko/zh cells have always sat, and a 14-row Thai cluster
+    lands in rows 1-14.  Both bitplanes carry the mask so lit pixels use palette
+    colour index 3.
     """
-    top = bytearray(TILE_BYTES)
-    bottom = bytearray(TILE_BYTES)
-    for i in range(4):
-        top[(4 + i) * 2] = mask[i]
-        top[(4 + i) * 2 + 1] = mask[i]
-        bottom[i * 2] = mask[4 + i]
-        bottom[i * 2 + 1] = mask[4 + i]
-    return bytes(top), bytes(bottom)
+    if not 1 <= len(mask) <= MAX_MASK_ROWS:
+        raise ValueError(f"mask is {len(mask)} rows, at most {MAX_MASK_ROWS}")
+    tiles = (bytearray(TILE_BYTES), bytearray(TILE_BYTES))
+    offset = (CELL_ROWS - len(mask)) // 2
+    for index, row in enumerate(mask):
+        y = offset + index
+        tile = tiles[y // 8]
+        tile[(y % 8) * 2] = row
+        tile[(y % 8) * 2 + 1] = row
+    return bytes(tiles[0]), bytes(tiles[1])
+
+
+_THAI_CELL: list = []
+
+
+def thai_masks(clusters) -> dict[str, list[int]]:
+    """Render each Thai cluster into an 8x14 cell mask, in one GDI batch."""
+    from gdi_text import BandGeometry, GdiRenderer, cluster_mask
+    if not _THAI_CELL:
+        renderer = GdiRenderer(THAI_FONT_FILE, THAI_FONT_SIZE)
+        _THAI_CELL.append(
+            (renderer, BandGeometry.measure(renderer, MAX_MASK_ROWS)))
+    renderer, geometry = _THAI_CELL[0]
+    wanted = sorted(set(clusters))
+    renderer.render(wanted)
+    return {cluster: cluster_mask(renderer, geometry, cluster, GLYPH_ROWS,
+                                  THAI_MASK_THRESHOLD)
+            for cluster in wanted}
 
 
 def generate_section(root: Path) -> str:
@@ -219,6 +288,17 @@ def generate_section(root: Path) -> str:
     masks = load_masks(
         root / "translations" / "endless_duel_title_glyphs.toml")
     rom_verified = verify_against_rom(root, records)
+
+    # Thai cluster cells are rendered, not authored; merge them into the mask
+    # table before allocation so the "no glyph mask" gate still covers them.
+    thai_cells = sorted({
+        cell
+        for record in records
+        for cell in cells_of(str(record["th"]))
+        if ord(cell[0]) > 0x7F})
+    if thai_cells:
+        masks = dict(masks)
+        masks.update(thai_masks(thai_cells))
 
     allocations = {lang: allocate(records, lang, masks) for lang in LANGS}
 
@@ -246,8 +326,10 @@ def generate_section(root: Path) -> str:
         f"# ROM source bytes verified against {ROM_NAME}: "
         f"{'yes' if rom_verified else 'ROM absent, not verified'}",
         "#",
-        "# code | " + " | ".join(f"{lang:^6}" for lang in LANGS),
     ]
+    width = max(6, max(len(cell) for codes in allocations.values()
+                       for cell in codes) * 7)
+    lines.append("# code | " + " | ".join(f"{lang:^{width}}" for lang in LANGS))
     highest = max(FREE_CODE_LO + len(codes) - 1
                   for codes in allocations.values())
     for code in range(FREE_CODE_LO, highest + 1):
@@ -255,7 +337,8 @@ def generate_section(root: Path) -> str:
         for lang in LANGS:
             char = next((c for c, v in allocations[lang].items() if v == code),
                         None)
-            cells.append(f"{'U+%04X' % ord(char) if char else '-':^6}")
+            label = "+".join(f"U+{ord(ch):04X}" for ch in char) if char else "-"
+            cells.append(f"{label:^{width}}")
         lines.append(f"# 0x{code:02x} | " + " | ".join(cells))
     lines.append("")
 
@@ -287,15 +370,69 @@ def generate_section(root: Path) -> str:
     return "\n".join(line.rstrip() for line in lines)
 
 
+def write_previews(root: Path, out_dir: Path) -> list[Path]:
+    """One PNG per language, every record replayed through its own font cells.
+
+    Painted from the SAME bytes the generated section emits: the record's font
+    codes indexed into the 8x16 cells built from the allocated masks, so what the
+    preview shows is what the screen will show.
+    """
+    from PIL import Image, ImageDraw
+    records = load_records(root / "translations" / "endless_duel_option_text.toml")
+    masks = load_masks(root / "translations" / "endless_duel_title_glyphs.toml")
+    thai_cells = sorted({cell for record in records
+                         for cell in cells_of(str(record["th"]))
+                         if ord(cell[0]) > 0x7F})
+    if thai_cells:
+        masks = dict(masks)
+        masks.update(thai_masks(thai_cells))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = []
+    for lang in LANGS:
+        codes = allocate(records, lang, masks)
+        cells = {code: pack_cell(masks[cell]) for cell, code in codes.items()}
+        rows = 18
+        image = Image.new("RGB", (16 * 8 + 140, len(records) * rows + 8),
+                          (0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        for index, record in enumerate(records):
+            y = 4 + index * rows
+            draw.text((4, y + 3), record["record_id"][:18], fill=(120, 170, 220))
+            payload = encode(record, lang, codes)
+            for column, code in enumerate(payload):
+                if code not in cells:
+                    continue
+                top, bottom = cells[code]
+                for half, data in ((0, top), (1, bottom)):
+                    for row in range(8):
+                        bits = data[row * 2]
+                        for bit in range(8):
+                            if (bits >> (7 - bit)) & 1:
+                                image.putpixel((132 + column * 8 + bit,
+                                                y + half * 8 + row),
+                                               (255, 255, 255))
+        path = out_dir / f"option_{lang}.png"
+        image.resize((image.width * 3, image.height * 3),
+                     Image.NEAREST).save(path)
+        written.append(path)
+    return written
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true",
                         help="rewrite the generated section in the table")
     parser.add_argument("--check", action="store_true",
                         help="fail if the generated section differs")
+    parser.add_argument("--previews", action="store_true",
+                        help="render one review PNG per language")
     args = parser.parse_args()
 
     root = repo_root()
+    if args.previews:
+        for path in write_previews(
+                root, root / "translations" / "option_cjk_previews"):
+            print(f"preview {path}")
     table_path = root / "translations" / "endless_duel.toml"
     section = generate_section(root)
 

@@ -21,6 +21,12 @@ def in_script_range(address: int) -> bool:
 
 REFERENCE_LANGS = ("en", "es")
 NATIVE_LATIN_LANGS = ("fr", "it", "pt", "tl", "id")
+# The per-language gap loop asks "does <lang> still fall back to English on any
+# reference-different byte?".  That question is script-agnostic, so it covers
+# Thai too -- th is NOT in NATIVE_LATIN_LANGS because the any-of default and the
+# Latin sub-span fragment categories are about ASCII text patches, which Thai
+# does not use, but its coverage still has to be measured.
+GAP_LANGS = NATIVE_LATIN_LANGS + ("th",)
 
 
 def repo_root() -> Path:
@@ -230,7 +236,7 @@ def main() -> int:
     print()
     print("Per-language effective reference-diff gap "
           "(bytes where this language still has no native payload):")
-    for lang in NATIVE_LATIN_LANGS:
+    for lang in GAP_LANGS:
         per_lang = byte_owner_categories(rom_patches, (lang,))
         gap = Counter(per_lang.values())["reference_diff_unmapped"]
         lang_spans = merge_spans(

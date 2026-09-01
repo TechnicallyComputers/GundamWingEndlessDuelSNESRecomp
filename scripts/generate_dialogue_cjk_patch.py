@@ -38,6 +38,43 @@ Guards are proved unique, per language, against every dialogue row any surface
 will actually render -- the CJK rows of every surface plus the Latin rows every
 surface keeps -- so a guard can never match a row it does not own, whichever
 screen that row draws on.
+
+TWO RENDER MODES
+================
+
+`[font.<lang>].mode` in the source file selects how a page is laid out:
+
+  "cell" (default, ko/zh)
+      One 16x16 cell per DISTINCT full-width character, 4 tiles each, ASCII
+      drawn from the game's own Latin cells.  A page costs 4 tiles per distinct
+      character.
+
+  "line" (th)
+      LINE AS IMAGE.  The whole row is shaped and rasterised as one 16 x 224
+      strip, sliced into 8x8 tiles and deduplicated by tile bytes; the ROM row
+      then addresses those tiles positionally, column by column.  Thai needs
+      this because it is not one-codepoint-per-cell: it stacks up to two vowel
+      or tone marks over a base consonant plus one vowel below, and it needs
+      shaping, so no per-character cell model can express it.  See
+      scripts/gdi_text.py for the shaping (GDI/Uniscribe -- Pillow in this tree
+      has no libraqm and renders Thai marks as spacing glyphs) and for the band
+      compression that lands a 16px-em line inside the 16-row line height.
+
+      Line mode is a strict WIN on budget: the absolute ceiling with zero dedup
+      is 2 rows x 28 columns x 2 halves = 112 tiles, which is below the tightest
+      surface budget, so a line-mode page can never overflow its window.  It
+      also removes the cell quantisation horizontally -- the fit test is pixels,
+      not cells.
+
+      BUILD-HOST NOTE: line mode shells out to PowerShell/GDI and needs a Thai
+      font (Leelawadee UI) installed on the machine running the generator.  This
+      is a generation-time dependency only; the shipped table holds baked tile
+      bytes.
+
+      An all-background tile in line mode is colour index 1 (the box's black
+      fill), NOT index 0, so it can NOT be replaced by the game's own blank cell
+      0x0800 (that is tile 0 under palette 2).  It is emitted as a real page
+      tile, and dedup collapses every blank column onto that one tile.
 """
 
 from __future__ import annotations
@@ -54,7 +91,8 @@ from decode_reference_tilemaps import CHAR_BY_TILE
 
 BEGIN_MARKER = "# BEGIN GENERATED DIALOGUE CJK PAGE PATCHES"
 END_MARKER = "# END GENERATED DIALOGUE CJK PAGE PATCHES"
-LANGS = ("ko", "zh")
+LANGS = ("ko", "zh", "th")
+CELL_MODE, LINE_MODE = "cell", "line"
 TILE_BY_CHAR = {char: tile for tile, char in CHAR_BY_TILE.items()}
 ROW_WORDS = 32
 ROW_BYTES = ROW_WORDS * 2
@@ -171,6 +209,66 @@ def quad_tiles(char: str, lang: str, spec: dict) -> tuple[bytes, ...]:
 
 
 # --------------------------------------------------------------------------
+# line-as-image rendering (mode = "line")
+# --------------------------------------------------------------------------
+
+# A dialogue line is exactly two BG3 map rows tall.  Line mode uses all 16 rows:
+# the box frame sits on the rows above and below the text pair, so unlike the
+# 16x16 cells there is no MAX_GLYPH_H clearance to reserve (verified live).
+LINE_HEIGHT = 16
+
+_LINE_CACHE: dict[tuple[str, int], tuple] = {}
+
+
+def font_mode(spec: dict) -> str:
+    mode = str(spec.get("mode", CELL_MODE))
+    if mode not in (CELL_MODE, LINE_MODE):
+        raise ValueError(f"unknown font mode {mode!r}")
+    return mode
+
+
+def line_renderer(spec: dict):
+    """(GdiRenderer, BandGeometry) for a line-mode font spec, measured once."""
+    key = (str(spec["file"]), int(spec["size"]))
+    if key not in _LINE_CACHE:
+        from gdi_text import BandGeometry, GdiRenderer
+        renderer = GdiRenderer(key[0], key[1])
+        _LINE_CACHE[key] = (renderer,
+                            BandGeometry.measure(renderer, LINE_HEIGHT))
+    return _LINE_CACHE[key]
+
+
+def line_page(text: str, spec: dict, cells: int
+              ) -> tuple[list[bytes], list[tuple[int, int]]]:
+    """(unique 8x8 tiles in emission order, per-column (top, bottom) indices).
+
+    Trailing all-background columns are dropped -- the row encoder fills the
+    rest of the line with the game's own blank cell, exactly as cell mode does.
+    """
+    from gdi_text import compress_line
+    renderer, geometry = line_renderer(spec)
+    grid = compress_line(renderer, geometry, text, cells * 8)
+    used = 0
+    for col in range(cells):
+        if any(grid[y][col * 8 + x] != PIX_BG
+               for y in range(LINE_HEIGHT) for x in range(8)):
+            used = col + 1
+    unique: dict[bytes, int] = {}
+    order: list[bytes] = []
+    columns: list[tuple[int, int]] = []
+    for col in range(used):
+        pair = []
+        for half in (0, 8):
+            data = encode_2bpp(grid, col * 8, half)
+            if data not in unique:
+                unique[data] = len(order)
+                order.append(data)
+            pair.append(unique[data])
+        columns.append((pair[0], pair[1]))
+    return order, columns
+
+
+# --------------------------------------------------------------------------
 # surface model
 # --------------------------------------------------------------------------
 
@@ -261,14 +359,23 @@ class Surface:
 
 class Quote:
     def __init__(self, surface: Surface, index: int, addresses: list[int],
-                 texts: list[str], lang: str):
+                 texts: list[str], lang: str, mode: str = CELL_MODE):
         self.surface = surface
         self.index = index
         self.addresses = addresses
         self.texts = texts
         self.lang = lang
+        self.mode = mode
         self.base = 0
         self.tiles: dict[str, int] = {}
+        # line mode only: the page's deduped tiles, and per ROM row the
+        # (top index, bottom index) pair for each map column.
+        self.page: list[bytes] = []
+        self.columns: list[list[tuple[int, int]]] = []
+
+    @property
+    def tile_count(self) -> int:
+        return len(self.page) if self.mode == LINE_MODE else 4 * len(self.chars)
 
     @property
     def chars(self) -> list[str]:
@@ -298,6 +405,12 @@ def row_cells(text: str, quote: Quote) -> list[tuple[int, int]]:
         bottom = tile if char == " " else tile + 0x10
         cells.append((0x0400 | tile, 0x0400 | bottom))
     return cells
+
+
+def line_row_cells(quote: Quote, row_index: int) -> list[tuple[int, int]]:
+    """Line mode's (top word, bottom word) per map column, positionally."""
+    return [(0x0400 | (quote.base + top), 0x0400 | (quote.base + bottom))
+            for top, bottom in quote.columns[row_index]]
 
 
 def encode_row(source_hex: str, start_col: int,
@@ -374,8 +487,33 @@ class Build:
             out[address] = (surface, entry)
         return out
 
+    def font_spec(self, lang: str) -> dict:
+        try:
+            return self.source["font"][lang]
+        except KeyError:
+            raise ValueError(f"no [font.{lang}] spec in the source file") from None
+
+    def mode(self, lang: str) -> str:
+        return font_mode(self.font_spec(lang))
+
+    def _prerender(self, authored: dict) -> None:
+        """Rasterise every line-mode row in ONE renderer batch.
+
+        Line mode shells out to PowerShell; one process for all 161 rows instead
+        of one per row is the difference between seconds and minutes.
+        """
+        for lang in LANGS:
+            spec = self.font_spec(lang)
+            if font_mode(spec) != LINE_MODE:
+                continue
+            texts = [str(entry[lang]) for _, entry in authored.values()
+                     if entry.get(lang)]
+            if texts:
+                line_renderer(spec)[0].render(texts)
+
     def _build(self) -> None:
         authored = self._authored()
+        self._prerender(authored)
         for surface in self.surfaces:
             self.quotes[surface.index] = {}
             mine = sorted(a for a, (s, _) in authored.items()
@@ -385,6 +523,8 @@ class Build:
             # continuation line.  Both render from the same page.
             starts = [a for a in mine if not (a & 0x80)]
             for lang in LANGS:
+                mode = self.mode(lang)
+                spec = self.font_spec(lang)
                 quotes: list[Quote] = []
                 for start in starts:
                     addresses, texts = [], []
@@ -402,8 +542,9 @@ class Build:
                         texts.append(str(entry[1][lang]))
                     if not addresses:
                         continue
-                    quote = Quote(surface, len(quotes), addresses, texts, lang)
-                    if not quote.chars:
+                    quote = Quote(surface, len(quotes), addresses, texts, lang,
+                                  mode)
+                    if mode == CELL_MODE and not quote.chars:
                         # Pure-ASCII translation (e.g. "......") needs no page
                         # and no rewritten row: the Latin cells render it.
                         continue
@@ -414,19 +555,35 @@ class Build:
                 # verbatim); the pages themselves overlap.
                 for quote in quotes:
                     quote.base = surface.page_tile_first + quote.index
-                    need = 4 * len(quote.chars)
+                    if mode == LINE_MODE:
+                        # Rasterise every row of the quote, concatenating their
+                        # deduped tiles into one page.  Dedup is per row: two
+                        # rows sharing a blank column each keep their own copy,
+                        # which costs at most one tile and keeps the row->page
+                        # index mapping local and readable.
+                        for text in quote.texts:
+                            tiles, columns = line_page(text, spec,
+                                                       surface.text_cells)
+                            offset = len(quote.page)
+                            quote.page.extend(tiles)
+                            quote.columns.append(
+                                [(top + offset, bottom + offset)
+                                 for top, bottom in columns])
+                    else:
+                        for slot, char in enumerate(quote.chars):
+                            quote.tiles[char] = quote.base + 4 * slot
+                    need = quote.tile_count
                     if quote.base + need - 1 > surface.page_tile_last:
                         raise ValueError(
                             f"{surface.name} {lang} 0x{quote.addresses[0]:06x}: "
                             f"page needs {need} tiles from 0x{quote.base:03x}, "
                             f"past the window end 0x{surface.page_tile_last:03x} "
                             f"(window is {surface.page_tiles} tiles)")
-                    for slot, char in enumerate(quote.chars):
-                        quote.tiles[char] = quote.base + 4 * slot
                 # ROM row payloads.
                 for quote in quotes:
-                    for address, text in zip(quote.addresses, quote.texts):
-                        if text_cells(text) > surface.text_cells:
+                    for index, (address, text) in enumerate(
+                            zip(quote.addresses, quote.texts)):
+                        if mode == CELL_MODE and text_cells(text) > surface.text_cells:
                             raise ValueError(
                                 f"{surface.name} {lang} 0x{address:06x}: "
                                 f"{text!r} is {text_cells(text)} cells, budget "
@@ -437,8 +594,10 @@ class Build:
                                 f"0x{address:06x}: start_col {row['start_col']} "
                                 f"differs from {surface.name}'s "
                                 f"{surface.text_start_col}")
+                        cells = (line_row_cells(quote, index)
+                                 if mode == LINE_MODE else row_cells(text, quote))
                         payload = encode_row(row["en_hex"], surface.text_start_col,
-                                             row_cells(text, quote))
+                                             cells)
                         self.rows.setdefault(address, {})[lang] = payload
                 self.quotes[surface.index][lang] = quotes
         self._verify_guards()
@@ -512,10 +671,13 @@ class Build:
     # -- emission --------------------------------------------------------
     def page_payload(self, quote: Quote) -> tuple[int, str, str]:
         surface = quote.surface
-        spec = self.source["font"][quote.lang]
+        spec = self.font_spec(quote.lang)
         payload = bytearray()
-        for char in quote.chars:
-            payload += b"".join(quad_tiles(char, quote.lang, spec))
+        if quote.mode == LINE_MODE:
+            payload += b"".join(quote.page)
+        else:
+            for char in quote.chars:
+                payload += b"".join(quad_tiles(char, quote.lang, spec))
         offset = (quote.base - surface.page_tile_first) * 16
         source = surface.page_blob[offset:offset + len(payload)]
         if len(source) != len(payload):
@@ -540,7 +702,10 @@ class Build:
                         f"# {surface.name} {lang} quote "
                         f"0x{quote.addresses[0]:06x} ({en})",
                         f"# page base tile 0x{quote.base:03x}, "
-                        f"{len(quote.chars)} glyphs, {4 * len(quote.chars)} tiles",
+                        + (f"line-as-image, {quote.tile_count} tiles"
+                           if quote.mode == LINE_MODE else
+                           f"{len(quote.chars)} glyphs, "
+                           f"{quote.tile_count} tiles"),
                         f"address = 0x{address:04x}",
                         f'source_hex = "{source_hex}"',
                         f'{lang}_hex = "{payload_hex}"',
@@ -620,11 +785,16 @@ def write_previews(build: Build, out_dir: Path, count: int = 6) -> list[Path]:
                 # Replay the real path: page tiles into a tile bank, then the
                 # rows' map words through the surface's own word transform into
                 # pixels, painted with the surface's own CGRAM palette row.
-                spec = build.source["font"][lang]
+                spec = build.font_spec(lang)
                 bank: dict[int, bytes] = {}
-                for char in quote.chars:
-                    for offset, tile in enumerate(quad_tiles(char, lang, spec)):
-                        bank[quote.tiles[char] + offset] = tile
+                if quote.mode == LINE_MODE:
+                    for offset, tile in enumerate(quote.page):
+                        bank[quote.base + offset] = tile
+                else:
+                    for char in quote.chars:
+                        for offset, tile in enumerate(
+                                quad_tiles(char, lang, spec)):
+                            bank[quote.tiles[char] + offset] = tile
                 font = latin_font(build.root)
                 for tile in range(0x80):
                     bank.setdefault(tile, font[tile * 16:tile * 16 + 16])
@@ -650,6 +820,12 @@ def write_previews(build: Build, out_dir: Path, count: int = 6) -> list[Path]:
                                     px[(col - 2) * 8 + x,
                                        row_index * 16 + half * 8 + y] = \
                                         palette[value]
+                # 1x is what the player actually sees; 3x is for reviewing the
+                # mark stacks, which are unreadable to a human at 1x on a
+                # desktop monitor but are exactly the pixels the SNES shows.
+                path = out_dir / f"{lang}_{quote.addresses[0]:06x}_1x.png"
+                img.save(path)
+                written.append(path)
                 path = out_dir / f"{lang}_{quote.addresses[0]:06x}.png"
                 img.resize((width * 3, height * 3), Image.NEAREST).save(path)
                 written.append(path)
@@ -694,10 +870,10 @@ def main() -> int:
                 if not quotes:
                     print(f"  {lang}: no pages")
                     continue
-                tiles = [4 * len(q.chars) for q in quotes]
-                highest = max(q.base + 4 * len(q.chars) - 1 for q in quotes)
+                tiles = [q.tile_count for q in quotes]
+                highest = max(q.base + q.tile_count - 1 for q in quotes)
                 guards = [len(build.guards[lang][q.addresses[0]]) for q in quotes]
-                print(f"  {lang}: {len(quotes)} pages, "
+                print(f"  {lang} ({build.mode(lang)}): {len(quotes)} pages, "
                       f"{sum(len(q.addresses) for q in quotes)} rows, "
                       f"pages {min(tiles)}-{max(tiles)} tiles, highest tile "
                       f"0x{highest:03x}, headroom "

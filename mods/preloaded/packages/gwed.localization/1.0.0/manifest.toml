@@ -65,6 +65,14 @@ value = "ko"
 label = "Korean"
 
 [[option.choice]]
+# The launcher's font is Latin-only (recomp-ui loads LatoLatin plus a Japanese
+# subset and symbol/emoji ranges; U+0E00-U+0E7F is in none of them), so the
+# label stays ASCII -- "ไทย (Thai)" would render as tofu.  Same reason the
+# Korean and Chinese choices are labelled in English.
+value = "th"
+label = "Thai"
+
+[[option.choice]]
 value = "off"
 label = "Original Japanese"
 

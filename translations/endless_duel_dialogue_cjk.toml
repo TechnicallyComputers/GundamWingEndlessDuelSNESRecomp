@@ -137,622 +137,736 @@ size = 15
 file = "msyh.ttc"
 size = 13
 
+# Thai renders LINE AS IMAGE (mode = "line"): the whole row is shaped by
+# GDI/Uniscribe and band-compressed into the 16-row line, then sliced into
+# deduped 8x8 tiles.  Leelawadee UI is the better of the two Thai faces
+# Windows ships (Tahoma is 1-2 rows taller at every size tested) and 16px
+# em is the size at which the base consonants keep the loops that tell
+# them apart.  See scripts/gdi_text.py.
+[font.th]
+file = "LeelawUI.ttf"
+size = 16
+mode = "line"
+
 [[line]]
 address = 0x007700
 # en = 'I will accomplish my mission'
 ko = "필요하다면 홀로라도"  # 19 cells
 zh = "必要时我会独自"  # 14 cells
+th = "ข้าจะทำภารกิจให้สำเร็จ"  # 137px
 
 [[line]]
 address = 0x007780
 # en = 'alone if I must!'
 ko = "임무를 완수하겠다!"  # 18 cells
 zh = "完成任务!"  # 9 cells
+th = "ลำพังก็ได้ถ้าจำเป็น!"  # 115px
 
 [[line]]
 address = 0x007800
 # en = "Don't even try it."
 ko = "그런 짓은 통하지 않는다."  # 24 cells
 zh = "别白费力气了."  # 13 cells
+th = "อย่าคิดแม้แต่จะลอง"  # 111px
 
 [[line]]
 address = 0x007900
 # en = 'I believe in my own'
 ko = "나는 나만의"  # 11 cells
 zh = "我相信自己的"  # 12 cells
+th = "ข้าเชื่อในความยุติธรรม"  # 135px
 
 [[line]]
 address = 0x007980
 # en = 'justice!'
 ko = "정의를 믿는다!"  # 14 cells
 zh = "正义!"  # 5 cells
+th = "ของข้าเอง!"  # 63px
 
 [[line]]
 address = 0x007a00
 # en = "Get back! You're"
 ko = "물러서! 너 때문에"  # 17 cells
 zh = "退后! 你会拖"  # 12 cells
+th = "ถอยไป! เพราะแก"  # 100px
 
 [[line]]
 address = 0x007a80
 # en = 'slowing me down!'
 ko = "속도가 늦어지잖아!"  # 18 cells
 zh = "我的后腿!"  # 9 cells
+th = "ข้าจึงช้าลง!"  # 67px
 
 [[line]]
 address = 0x007b00
 # en = 'Mission accomplished.'
 ko = "임무 완료."  # 10 cells
 zh = "任务完成."  # 9 cells
+th = "ภารกิจสำเร็จ"  # 76px
 
 [[line]]
 address = 0x007c00
 # en = 'Obstacles such as yourself'
 ko = "너 같은 장애물은"  # 16 cells
 zh = "像你这样的障碍"  # 14 cells
+th = "อุปสรรคอย่างแก"  # 95px
 
 [[line]]
 address = 0x007c80
 # en = 'shall be terminated!'
 ko = "제거하겠다!"  # 11 cells
 zh = "必须清除!"  # 9 cells
+th = "จะถูกกำจัด!"  # 68px
 
 [[line]]
 address = 0x007d00
 # en = 'Aaaaahahahahahah!'
 ko = "아하하하하하하!!"  # 16 cells
 zh = "啊哈哈哈哈哈哈!!"  # 16 cells
+th = "อ่าฮ่าฮ่าฮ่าฮ่า!!"  # 88px
 
 [[line]]
 address = 0x007e00
 # en = 'Do you think this is a'
 ko = "이게 게임인 줄"  # 14 cells
 zh = "你以为这是"  # 10 cells
+th = "คิดว่านี่เป็น"  # 65px
 
 [[line]]
 address = 0x007e80
 # en = 'game!?'
 ko = "알아!?"  # 6 cells
 zh = "游戏吗!?"  # 8 cells
+th = "เกมหรือไง!?"  # 70px
 [[line]]
 address = 0x017000
 # en = 'You are weak!'
 ko = "넌 약하다!"  # 10 cells
 zh = "你太弱了!"  # 9 cells
+th = "แกอ่อนแอ!"  # 63px
 
 [[line]]
 address = 0x017100
 # en = 'Why do you even bother!?'
 ko = "왜 굳이 그러는 거지!?"  # 21 cells
 zh = "何必如此固执!?"  # 14 cells
+th = "จะดิ้นรนไปทำไม!?"  # 107px
 
 [[line]]
 address = 0x017200
 # en = "Nataku... Let's become"
 ko = "나타쿠... 우리"  # 14 cells
 zh = "娜塔库... 我们"  # 14 cells
+th = "นาทาคุ... มาแข็งแกร่ง"  # 125px
 
 [[line]]
 address = 0x017280
 # en = 'strong together!'
 ko = "함께 강해지자!"  # 14 cells
 zh = "一起变强吧!"  # 11 cells
+th = "ไปด้วยกัน!"  # 62px
 
 [[line]]
 address = 0x017300
 # en = 'He who hesitates is lost!'
 ko = "망설이는 자는 진다!"  # 19 cells
 zh = "犹豫者必败!"  # 11 cells
+th = "ผู้ลังเลย่อมพ่ายแพ้!"  # 112px
 
 [[line]]
 address = 0x017400
 # en = 'The weak shall inevitably'
 ko = "약자는 결국"  # 11 cells
 zh = "弱者终将"  # 8 cells
+th = "ผู้อ่อนแอต้องล้มลง"  # 108px
 
 [[line]]
 address = 0x017480
 # en = 'fall in battle!'
 ko = "전장에서 쓰러진다!"  # 18 cells
 zh = "倒在战场上!"  # 11 cells
+th = "ในสนามรบ!"  # 71px
 
 [[line]]
 address = 0x017500
 # en = 'I knew from the start that'
 ko = "이렇게 될 줄"  # 12 cells
 zh = "我从一开始就"  # 12 cells
+th = "ข้ารู้ตั้งแต่แรกว่า"  # 94px
 
 [[line]]
 address = 0x017580
 # en = 'this would happen!'
 ko = "처음부터 알고 있었다!"  # 21 cells
 zh = "知道会这样!"  # 11 cells
+th = "มันจะเป็นเช่นนี้!"  # 93px
 
 [[line]]
 address = 0x017600
 # en = 'Was I right?'
 ko = "내가 옳았을까?"  # 14 cells
 zh = "我做对了吗?"  # 11 cells
+th = "ข้าคิดถูกหรือไม่?"  # 99px
 
 [[line]]
 address = 0x017680
 # en = 'Please show me, Nataku...'
 ko = "보여줘, 나타쿠..."  # 17 cells
 zh = "告诉我吧, 娜塔库..."  # 19 cells
+th = "บอกข้าที นาทาคุ..."  # 107px
 
 [[line]]
 address = 0x017700
 # en = 'What do you think you'
 ko = "이제 와서 뭘"  # 12 cells
 zh = "事到如今你还"  # 12 cells
+th = "ป่านนี้แกคิดว่า"  # 85px
 
 [[line]]
 address = 0x017780
 # en = 'can do now!?'
 ko = "할 수 있다고 생각해!?"  # 21 cells
 zh = "能做什么!?"  # 10 cells
+th = "จะทำอะไรได้!?"  # 82px
 
 [[line]]
 address = 0x017800
 # en = "We shouldn't be fighting"
 ko = "우리는 서로"  # 11 cells
 zh = "我们不该"  # 8 cells
+th = "เราไม่ควรสู้กันเอง"  # 102px
 
 [[line]]
 address = 0x017880
 # en = 'each other!'
 ko = "싸우면 안 돼!"  # 13 cells
 zh = "自相残杀!"  # 9 cells
+th = "เลยนะ!"  # 40px
 
 [[line]]
 address = 0x017900
 # en = 'Sorry...'
 ko = "미안해..."  # 9 cells
 zh = "抱歉..."  # 7 cells
+th = "ขอโทษ..."  # 52px
 
 [[line]]
 address = 0x017a00
 # en = "Let's protect the colony"
 ko = "함께 콜로니를"  # 13 cells
 zh = "一起守护"  # 8 cells
+th = "มาปกป้องโคโลนี"  # 99px
 
 [[line]]
 address = 0x017a80
 # en = 'together!'
 ko = "지키자!"  # 7 cells
 zh = "殖民地吧!"  # 9 cells
+th = "ด้วยกัน!"  # 47px
 
 [[line]]
 address = 0x017b00
 # en = "This is terrible! I'll call"
 ko = "큰일이다! 구급대를"  # 18 cells
 zh = "糟了! 我去叫"  # 12 cells
+th = "แย่แล้ว! ข้าจะเรียก"  # 107px
 
 [[line]]
 address = 0x017b80
 # en = 'the paramedics!'
 ko = "부르겠다!"  # 9 cells
 zh = "救护队!"  # 7 cells
+th = "หน่วยพยาบาล!"  # 89px
 
 [[line]]
 address = 0x017c00
 # en = 'You should have'
 ko = "항복했어야"  # 10 cells
 zh = "你早该"  # 6 cells
+th = "แกน่าจะ"  # 48px
 
 [[line]]
 address = 0x017c80
 # en = 'surrendered...'
 ko = "했는데..."  # 9 cells
 zh = "投降的..."  # 9 cells
+th = "ยอมแพ้ไปเสีย..."  # 89px
 
 [[line]]
 address = 0x017d00
 # en = "I won't make any mistakes!"
 ko = "실수는 하지 않겠다!"  # 19 cells
 zh = "我不会失手!"  # 11 cells
+th = "ข้าจะไม่ผิดพลาด!"  # 104px
 
 [[line]]
 address = 0x017e00
 # en = 'This war seems as if'
 ko = "이 전쟁은 끝나지"  # 16 cells
 zh = "这场战争仿佛"  # 12 cells
+th = "สงครามนี้ดูเหมือน"  # 106px
 
 [[line]]
 address = 0x017e80
 # en = 'it will never end...'
 ko = "않을 것 같다..."  # 15 cells
 zh = "永无止境..."  # 11 cells
+th = "จะไม่มีวันจบ..."  # 80px
 
 [[line]]
 address = 0x017f00
 # en = 'Alright! That was easier'
 ko = "좋아! 생각보다"  # 14 cells
 zh = "好! 比我想的"  # 12 cells
+th = "เยี่ยม! ง่ายกว่า"  # 82px
 
 [[line]]
 address = 0x017f80
 # en = "than I thought it'd be!"
 ko = "쉬웠어!"  # 7 cells
 zh = "还要轻松!"  # 9 cells
+th = "ที่คิดไว้เยอะ!"  # 69px
 
 [[line]]
 address = 0x026b00
 # en = 'This is meaningless.'
 ko = "이건 의미 없다."  # 15 cells
 zh = "这毫无意义."  # 11 cells
+th = "ไร้ความหมาย"  # 78px
 
 [[line]]
 address = 0x026d00
 # en = "We're all incredible"
 ko = "우리 모두 엄청난"  # 16 cells
 zh = "我们都是"  # 8 cells
+th = "พวกเราล้วนเป็น"  # 94px
 
 [[line]]
 address = 0x026d80
 # en = 'fools...'
 ko = "바보들이다..."  # 13 cells
 zh = "大傻瓜..."  # 9 cells
+th = "คนโง่สิ้นดี..."  # 69px
 
 [[line]]
 address = 0x026e00
 # en = 'Your impatience is a'
 ko = "네 조급함이 가장"  # 16 cells
 zh = "你的急躁是"  # 10 cells
+th = "ความใจร้อนของแก"  # 112px
 
 [[line]]
 address = 0x026e80
 # en = 'most noticable flaw...'
 ko = "큰 단점이다..."  # 14 cells
 zh = "最明显的缺点..."  # 15 cells
+th = "เป็นจุดอ่อนที่ชัดที่สุด..."  # 130px
 
 [[line]]
 address = 0x026f00
 # en = 'even for me...cult,'
 ko = "나조차도 힘들군,"  # 16 cells
 zh = "连我也很难办,"  # 13 cells
+th = "แม้แต่ข้าก็ยังยาก,"  # 101px
 
 [[line]]
 address = 0x027000
 # en = "I suppose that's the"
 ko = "그게 네 최선인가"  # 16 cells
 zh = "这就是你的"  # 10 cells
+th = "คงเป็นสุดฝีมือ"  # 83px
 
 [[line]]
 address = 0x027080
 # en = 'best you can do.'
 ko = "보군."  # 5 cells
 zh = "最好水平吗."  # 11 cells
+th = "ของแกแล้วสินะ"  # 90px
 
 [[line]]
 address = 0x027100
 # en = "Sorry, but I don't have"
 ko = "미안하지만 이럴"  # 15 cells
 zh = "抱歉, 我没有"  # 12 cells
+th = "เสียใจ ข้าไม่มีเวลา"  # 107px
 
 [[line]]
 address = 0x027180
 # en = 'the time for this.'
 ko = "시간 없다."  # 10 cells
 zh = "时间陪你."  # 9 cells
+th = "ให้เรื่องนี้"  # 50px
 
 [[line]]
 address = 0x027200
 # en = 'Time and time again,'
 ko = "매번 똑같은"  # 11 cells
 zh = "一次又一次,"  # 11 cells
+th = "ครั้งแล้วครั้งเล่า"  # 88px
 
 [[line]]
 address = 0x027280
 # en = "it's always the same."
 ko = "일의 반복이군."  # 14 cells
 zh = "总是一个样."  # 11 cells
+th = "ก็เหมือนเดิมทุกที"  # 98px
 
 [[line]]
 address = 0x027300
 # en = 'Yeah! Alright!'
 ko = "좋아! 이겼다!"  # 13 cells
 zh = "好! 赢了!"  # 9 cells
+th = "เย้! ชนะแล้ว!"  # 74px
 
 [[line]]
 address = 0x027400
 # en = "Hey, I'm not done yet!"
 ko = "이봐, 아직 안 끝났어!"  # 21 cells
 zh = "喂, 我还没完呢!"  # 15 cells
+th = "เฮ้ ยังไม่จบนะ!"  # 82px
 
 [[line]]
 address = 0x027500
 # en = 'Hey, that was fun!'
 ko = "재밌었어!"  # 9 cells
 zh = "真有意思!"  # 9 cells
+th = "เฮ้ สนุกดีนะ!"  # 73px
 
 [[line]]
 address = 0x027580
 # en = 'Wanna do it again?'
 ko = "또 할래?"  # 8 cells
 zh = "再来一次?"  # 9 cells
+th = "เอาอีกรอบไหม?"  # 91px
 
 [[line]]
 address = 0x027600
 # en = 'Cower in fear!'
 ko = "두려움에 떨어라!"  # 16 cells
 zh = "在恐惧中颤抖吧!"  # 15 cells
+th = "จงหวาดกลัวซะ!"  # 90px
 
 [[line]]
 address = 0x027700
 # en = 'Slice, chop, killkillkill!'
 ko = "베고 자르고 죽인다!"  # 19 cells
 zh = "砍! 剁! 杀杀杀!"  # 15 cells
+th = "ฟัน สับ ฆ่าให้เรียบ!"  # 111px
 
 [[line]]
 address = 0x027800
 # en = 'All who see me must die!'
 ko = "날 본 자는 죽는다!"  # 18 cells
 zh = "见我者必死!"  # 11 cells
+th = "ใครเห็นข้าต้องตาย!"  # 113px
 
 [[line]]
 address = 0x027900
 # en = "What's wrong? Cat got"
 ko = "왜 그래? 말문이"  # 15 cells
 zh = "怎么了? 说不出"  # 14 cells
+th = "เป็นอะไรไป? พูดไม่ออก"  # 135px
 
 [[line]]
 address = 0x027980
 # en = 'your tongue? Hah.'
 ko = "막혔나? 하."  # 11 cells
 zh = "话来了? 哈."  # 11 cells
+th = "แล้วหรือ? ฮึ"  # 68px
 
 [[line]]
 address = 0x027a00
 # en = "Heh, you're pretty weak,"
 ko = "흥, 꽤 약하군,"  # 14 cells
 zh = "哼, 你挺弱的,"  # 13 cells
+th = "เฮ้อ แกอ่อนไปนะ"  # 99px
 
 [[line]]
 address = 0x027a80
 # en = 'huh?'
 ko = "안 그래?"  # 8 cells
 zh = "是吧?"  # 5 cells
+th = "ว่าไหม?"  # 45px
 
 [[line]]
 address = 0x02c900
 # en = 'On your feet!'
 ko = "일어나!"  # 7 cells
 zh = "站起来!"  # 7 cells
+th = "ลุกขึ้นมา!"  # 58px
 
 [[line]]
 address = 0x02ca00
 # en = 'You did quite well.'
 ko = "꽤 잘했다."  # 10 cells
 zh = "你干得不错."  # 11 cells
+th = "แกทำได้ดีทีเดียว"  # 94px
 
 [[line]]
 address = 0x02cb00
 # en = "What's wrong?"
 ko = "왜 그래?"  # 8 cells
 zh = "怎么了?"  # 7 cells
+th = "เป็นอะไรไป?"  # 71px
 
 [[line]]
 address = 0x02cb80
 # en = 'Having a bad day?'
 ko = "오늘 안 좋아?"  # 13 cells
 zh = "今天不顺吗?"  # 11 cells
+th = "วันนี้ไม่ใช่วันของแก?"  # 123px
 
 [[line]]
 address = 0x02cc00
 # en = 'Never visit any mercy'
 ko = "적에게 자비를"  # 13 cells
 zh = "绝不要对敌人"  # 12 cells
+th = "อย่าเมตตาศัตรู"  # 86px
 
 [[line]]
 address = 0x02cc80
 # en = 'upon your foes!'
 ko = "베풀지 마라!"  # 12 cells
 zh = "心慈手软!"  # 9 cells
+th = "เป็นอันขาด!"  # 71px
 
 [[line]]
 address = 0x02cd00
 # en = 'I was hoping to get a bit'
 ko = "좀 더 연습하고"  # 14 cells
 zh = "本想多练一会,"  # 13 cells
+th = "อยากซ้อมให้มากกว่านี้"  # 132px
 
 [[line]]
 address = 0x02cd80
 # en = 'more practice, but...'
 ko = "싶었는데..."  # 11 cells
 zh = "可惜..."  # 7 cells
+th = "อีกหน่อย แต่..."  # 82px
 
 [[line]]
 address = 0x02ce00
 # en = "I'm sorry... but this"
 ko = "미안하지만..."  # 13 cells
 zh = "抱歉... 但这"  # 12 cells
+th = "ขอโทษ... แต่นี่"  # 83px
 
 [[line]]
 address = 0x02ce80
 # en = 'is war.'
 ko = "이게 전쟁이다."  # 14 cells
 zh = "就是战争."  # 9 cells
+th = "คือสงคราม"  # 64px
 
 [[line]]
 address = 0x02cf00
 # en = 'Well fought, but in the'
 ko = "잘 싸웠지만 결국"  # 16 cells
 zh = "打得不错, 但"  # 12 cells
+th = "สู้ได้ดี แต่สุดท้าย"  # 96px
 
 [[line]]
 address = 0x02cf80
 # en = 'end, I am the victor!'
 ko = "승자는 나다!"  # 12 cells
 zh = "赢家是我!"  # 9 cells
+th = "ข้าคือผู้ชนะ!"  # 73px
 
 [[line]]
 address = 0x02d000
 # en = 'Did you learn anything'
 ko = "이번 싸움에서"  # 13 cells
 zh = "这一战你"  # 8 cells
+th = "ได้เรียนรู้อะไร"  # 77px
 
 [[line]]
 address = 0x02d080
 # en = 'from the battle?'
 ko = "뭘 배웠나?"  # 10 cells
 zh = "学到什么了?"  # 11 cells
+th = "จากการรบนี้ไหม?"  # 104px
 
 [[line]]
 address = 0x02d100
 # en = 'It seems you need more'
 ko = "연습이 더 필요해"  # 16 cells
 zh = "看来你还需要"  # 12 cells
+th = "ดูท่าแกต้องฝึก"  # 84px
 
 [[line]]
 address = 0x02d180
 # en = 'practice!'
 ko = "보인다!"  # 7 cells
 zh = "多加练习!"  # 9 cells
+th = "อีกเยอะ!"  # 46px
 
 [[line]]
 address = 0x02d200
 # en = 'That was surprising!'
 ko = "놀라운걸!"  # 9 cells
 zh = "真令人吃惊!"  # 11 cells
+th = "น่าประหลาดใจ!"  # 90px
 
 [[line]]
 address = 0x02d300
 # en = "It's been ages since I"
 ko = "이렇게 치열하게"  # 15 cells
 zh = "好久没打过"  # 10 cells
+th = "ไม่ได้สู้หนักขนาดนี้"  # 113px
 
 [[line]]
 address = 0x02d380
 # en = 'last fought that hard!'
 ko = "싸운 건 오랜만이다!"  # 19 cells
 zh = "这么激烈的仗了!"  # 15 cells
+th = "มานานแล้ว!"  # 71px
 
 [[line]]
 address = 0x02d400
 # en = "You're not crying for the"
 ko = "설마 엘리트 때문에"  # 18 cells
 zh = "你不会是为精英"  # 14 cells
+th = "ไม่ได้ร้องไห้ให้พวกอีลิท"  # 134px
 
 [[line]]
 address = 0x02d480
 # en = 'elite, are you?'
 ko = "우는 건 아니지?"  # 15 cells
 zh = "哭鼻子吧?"  # 9 cells
+th = "ใช่ไหม?"  # 47px
 
 [[line]]
 address = 0x02d500
 # en = 'Wow, that was pretty'
 ko = "우와, 꽤"  # 8 cells
 zh = "哇, 那可真是"  # 12 cells
+th = "โอ้โฮ นั่นแย่"  # 71px
 
 [[line]]
 address = 0x02d580
 # en = 'bad...'
 ko = "심각했는데..."  # 13 cells
 zh = "惨啊..."  # 7 cells
+th = "เอาการเลย..."  # 72px
 
 [[line]]
 address = 0x02d600
 # en = "This war's gone on for"
 ko = "이 전쟁은 너무"  # 14 cells
 zh = "这场战争"  # 8 cells
+th = "สงครามนี้ยืดเยื้อ"  # 94px
 
 [[line]]
 address = 0x02d680
 # en = 'too long...'
 ko = "오래 끌었다..."  # 14 cells
 zh = "拖得太久了..."  # 13 cells
+th = "มานานเกินไป..."  # 90px
 
 [[line]]
 address = 0x02d700
 # en = "Looks like you couldn't"
 ko = "견디지 못한 모양이군,"  # 21 cells
 zh = "看来你撑不住了,"  # 15 cells
+th = "ดูท่าแกทนไม่ไหว"  # 98px
 
 [[line]]
 address = 0x02d780
 # en = 'take it, huh?'
 ko = "그렇지?"  # 7 cells
 zh = "是吧?"  # 5 cells
+th = "ใช่ไหมล่ะ?"  # 61px
 
 [[line]]
 address = 0x02d800
 # en = 'Raise a white flag and'
 ko = "백기를 들면"  # 11 cells
 zh = "举起白旗"  # 8 cells
+th = "ชูธงขาวเถิด"  # 70px
 
 [[line]]
 address = 0x02d880
 # en = "you won't be harmed..."
 ko = "해치지 않겠다..."  # 16 cells
 zh = "就不会受伤..."  # 13 cells
+th = "แล้วจะไม่เจ็บตัว..."  # 98px
 
 [[line]]
 address = 0x02d900
 # en = 'I fight for Duke Treize!'
 ko = "트레이즈 공을 위해 싸운다!"  # 26 cells
 zh = "我为特列斯阁下而战!"  # 19 cells
+th = "ข้าสู้เพื่อท่านเทรซ!"  # 109px
 
 [[line]]
 address = 0x02da00
 # en = 'Hmm? Something the matter?'
 ko = "흠? 무슨 일이지?"  # 16 cells
 zh = "嗯? 有什么事吗?"  # 15 cells
+th = "หืม? มีอะไรหรือ?"  # 95px
 
 [[line]]
 address = 0x02db00
 # en = 'Howl like the dog you are!!'
 ko = "개처럼 짖어봐라!!"  # 17 cells
 zh = "像狗一样嚎叫吧!!"  # 16 cells
+th = "หอนมาสิ เจ้าหมา!!"  # 109px
 
 [[line]]
 address = 0x02dc00
 # en = 'Look, is it alright if I'
 ko = "저기, 한마디"  # 12 cells
 zh = "那个, 我能"  # 10 cells
+th = "นี่ ขอพูดอะไร"  # 78px
 
 [[line]]
 address = 0x02dc80
 # en = 'say something?'
 ko = "해도 될까?"  # 10 cells
 zh = "说句话吗?"  # 9 cells
+th = "หน่อยได้ไหม?"  # 81px
 
 [[line]]
 address = 0x02dd00
 # en = 'Duke Treize wants me to'
 ko = "트레이즈 공이"  # 13 cells
 zh = "特列斯阁下"  # 10 cells
+th = "ท่านเทรซสั่งให้"  # 87px
 
 [[line]]
 address = 0x02dd80
 # en = 'fight!'
 ko = "싸우라 하셨다!"  # 14 cells
 zh = "命我出战!"  # 9 cells
+th = "ข้าสู้!"  # 30px
 
 [[line]]
 address = 0x02de00
 # en = 'Catch that pilot!'
 ko = "저 파일럿을 잡아라!"  # 19 cells
 zh = "抓住那个驾驶员!"  # 15 cells
+th = "จับนักบินคนนั้น!"  # 98px
 
 [[line]]
 address = 0x02df00
 # en = 'Fool...'
 ko = "어리석군..."  # 11 cells
 zh = "蠢货..."  # 7 cells
+th = "โง่เขลา..."  # 52px
 
 [[line]]
 address = 0x02e000
 # en = 'Perhaps you should try a'
 ko = "다른 방법을"  # 11 cells
 zh = "或许你该换"  # 10 cells
+th = "ลองเปลี่ยนวิธี"  # 78px
 
 [[line]]
 address = 0x02e080
 # en = 'different approach...'
 ko = "써보는 게 어떨까..."  # 19 cells
 zh = "个方法..."  # 9 cells
+th = "ดูบ้างสิ..."  # 49px
 
 # ===========================================================================
 # battle_dialogue_3 + ending_dialogue
@@ -774,180 +888,210 @@ address = 0x03eb00
 # en = 'Look with your heart, and'
 ko = "마음으로 보면"  # 13 cells
 zh = "用心去看,"  # 9 cells
+th = "มองด้วยหัวใจ"  # 77px
 
 [[line]]
 address = 0x03eb80
 # en = 'all shall become clear.'
 ko = "모든 것이 명확해진다."  # 21 cells
 zh = "一切终将明了."  # 13 cells
+th = "แล้วทุกอย่างจะกระจ่าง"  # 126px
 
 [[line]]
 address = 0x03ec00
 # en = 'Look with your heart, and'
 ko = "마음으로 보면"  # 13 cells
 zh = "用心去看,"  # 9 cells
+th = "มองด้วยหัวใจ"  # 77px
 
 [[line]]
 address = 0x03ec80
 # en = 'all shall become clear.'
 ko = "모든 것이 명확해진다."  # 21 cells
 zh = "一切终将明了."  # 13 cells
+th = "แล้วทุกอย่างจะกระจ่าง"  # 126px
 
 [[line]]
 address = 0x03ed00
 # en = 'Look with your heart, and'
 ko = "마음으로 보면"  # 13 cells
 zh = "用心去看,"  # 9 cells
+th = "มองด้วยหัวใจ"  # 77px
 
 [[line]]
 address = 0x03ed80
 # en = 'all shall become clear.'
 ko = "모든 것이 명확해진다."  # 21 cells
 zh = "一切终将明了."  # 13 cells
+th = "แล้วทุกอย่างจะกระจ่าง"  # 126px
 
 [[line]]
 address = 0x03ee00
 # en = 'Look with your heart, and'
 ko = "마음으로 보면"  # 13 cells
 zh = "用心去看,"  # 9 cells
+th = "มองด้วยหัวใจ"  # 77px
 
 [[line]]
 address = 0x03ee80
 # en = 'all shall become clear.'
 ko = "모든 것이 명확해진다."  # 21 cells
 zh = "一切终将明了."  # 13 cells
+th = "แล้วทุกอย่างจะกระจ่าง"  # 126px
 
 [[line]]
 address = 0x03ef00
 # en = "I'm not going to make any"
 ko = "더 이상 변명하지"  # 16 cells
 zh = "我不会再找"  # 10 cells
+th = "ข้าจะไม่แก้ตัว"  # 78px
 
 [[line]]
 address = 0x03ef80
 # en = 'more excuses!'
 ko = "않겠다!"  # 7 cells
 zh = "任何借口了!"  # 11 cells
+th = "อีกต่อไป!"  # 53px
 
 [[line]]
 address = 0x03f000
 # en = "I'm not going to make any"
 ko = "더 이상 변명하지"  # 16 cells
 zh = "我不会再找"  # 10 cells
+th = "ข้าจะไม่แก้ตัว"  # 78px
 
 [[line]]
 address = 0x03f080
 # en = 'more excuses!'
 ko = "않겠다!"  # 7 cells
 zh = "任何借口了!"  # 11 cells
+th = "อีกต่อไป!"  # 53px
 
 [[line]]
 address = 0x03f100
 # en = "I'm not going to make any"
 ko = "더 이상 변명하지"  # 16 cells
 zh = "我不会再找"  # 10 cells
+th = "ข้าจะไม่แก้ตัว"  # 78px
 
 [[line]]
 address = 0x03f180
 # en = 'more excuses!'
 ko = "않겠다!"  # 7 cells
 zh = "任何借口了!"  # 11 cells
+th = "อีกต่อไป!"  # 53px
 
 [[line]]
 address = 0x03f200
 # en = "I'm not going to make any"
 ko = "더 이상 변명하지"  # 16 cells
 zh = "我不会再找"  # 10 cells
+th = "ข้าจะไม่แก้ตัว"  # 78px
 
 [[line]]
 address = 0x03f280
 # en = 'more excuses!'
 ko = "않겠다!"  # 7 cells
 zh = "任何借口了!"  # 11 cells
+th = "อีกต่อไป!"  # 53px
 
 [[line]]
 address = 0x03f300
 # en = 'So, my Epyon has been'
 ko = "그래, 내 에피온이"  # 17 cells
 zh = "原来, 我的艾比安"  # 16 cells
+th = "เอพิออนของข้า"  # 90px
 
 [[line]]
 address = 0x03f380
 # en = 'beaten.'
 ko = "패배했다."  # 9 cells
 zh = "也被击败了."  # 11 cells
+th = "พ่ายแพ้แล้ว"  # 69px
 
 [[line]]
 address = 0x03f400
 # en = 'I suppose everyone has a'
 ko = "다들 자기만의"  # 13 cells
 zh = "看来每个人都有"  # 14 cells
+th = "ทุกคนย่อมมีวิธี"  # 86px
 
 [[line]]
 address = 0x03f480
 # en = 'different combat style...'
 ko = "방식이 있나 보군..."  # 19 cells
 zh = "自己的战斗风格..."  # 17 cells
+th = "การรบของตัวเอง..."  # 106px
 
 [[line]]
 address = 0x03f500
 # en = 'All that aside, you'
 ko = "그건 그렇고,"  # 12 cells
 zh = "撇开这些不谈,"  # 13 cells
+th = "อย่างไรก็ดี แก"  # 81px
 
 [[line]]
 address = 0x03f580
 # en = 'exceeded my expectations.'
 ko = "내 예상을 뛰어넘었다."  # 21 cells
 zh = "你超出了我的预期."  # 17 cells
+th = "เหนือความคาดหมายของข้า"  # 162px
 
 [[line]]
 address = 0x03f600
 # en = 'The war... is it over, you'
 ko = "전쟁이... 끝났냐고"  # 18 cells
 zh = "你问战争..."  # 11 cells
+th = "สงคราม... จบแล้วหรือ"  # 125px
 
 [[line]]
 address = 0x03f680
 # en = 'ask?'
 ko = "묻는 건가?"  # 10 cells
 zh = "是否已经结束?"  # 13 cells
+th = "แกถามงั้นหรือ?"  # 89px
 
 [[line]]
 address = 0x03f700
 # en = 'No. Humanity still thrives.'
 ko = "아니, 인류는 살아있다."  # 22 cells
 zh = "不. 人类依然繁盛."  # 17 cells
+th = "ไม่ มนุษย์ยังคงอยู่"  # 100px
 
 [[line]]
 address = 0x03f800
 # en = 'You will probably have to'
 ko = "너도 계속 싸워야"  # 16 cells
 zh = "你恐怕也要"  # 10 cells
+th = "แกก็คงต้องสู้"  # 73px
 
 [[line]]
 address = 0x03f880
 # en = 'continue to fight, too...'
 ko = "할 거다..."  # 10 cells
 zh = "继续战斗下去..."  # 15 cells
+th = "ต่อไปเช่นกัน..."  # 84px
 
 [[line]]
 address = 0x03f900
 # en = "It's all because..."
 ko = "이유가 있어서다..."  # 18 cells
 zh = "这一切都是因为..."  # 17 cells
+th = "ทั้งหมดเป็นเพราะ..."  # 108px
 
 [[line]]
 address = 0x03fa00
 # en = 'This war...'
 ko = "이 전쟁은..."  # 12 cells
 zh = "这场战争..."  # 11 cells
+th = "สงครามนี้..."  # 66px
 
 [[line]]
 address = 0x03fa80
 # en = "  'Tis an endless duel..."
 ko = "끝없는 결투다..."  # 16 cells
 zh = "是一场无尽的决斗..."  # 19 cells
+th = "คือการดวลที่ไม่สิ้นสุด..."  # 135px
 
 # --- ending_dialogue ---
 [[line]]
@@ -955,165 +1099,193 @@ address = 0x05e000
 # en = 'The entire mission is'
 ko = "드디어 임무를"  # 13 cells
 zh = "整个任务"  # 8 cells
+th = "ภารกิจทั้งหมด"  # 83px
 
 [[line]]
 address = 0x05e080
 # en = 'finally complete...'
 ko = "모두 완수했다..."  # 16 cells
 zh = "终于完成了..."  # 13 cells
+th = "สำเร็จลงในที่สุด..."  # 102px
 
 [[line]]
 address = 0x05e100
 # en = 'After all that, will I be'
 ko = "이제 내가 더"  # 12 cells
 zh = "经历这一切之后,"  # 15 cells
+th = "หลังจากทั้งหมดนี้ ข้าจะยัง"  # 148px
 
 [[line]]
 address = 0x05e180
 # en = 'able to fight anymore...?'
 ko = "싸울 수 있을까...?"  # 18 cells
 zh = "我还能再战斗吗...?"  # 18 cells
+th = "สู้ต่อได้อีกหรือไม่...?"  # 113px
 
 [[line]]
 address = 0x05e200
 # en = 'Whew! That was pretty'
 ko = "휴! 꽤 힘들었어,"  # 16 cells
 zh = "呼! 真是够呛,"  # 13 cells
+th = "ฮึ่ย! หนักเอาการนะ"  # 112px
 
 [[line]]
 address = 0x05e280
 # en = 'tough, huh Deathscythe?'
 ko = "데스사이즈?"  # 11 cells
 zh = "对吧, 死神高达?"  # 15 cells
+th = "ว่าไหม เดธไซธ์?"  # 94px
 
 [[line]]
 address = 0x05e300
 # en = 'You really kicked some ass!'
 ko = "정말 제대로 해냈군!"  # 19 cells
 zh = "你真是大显身手!"  # 15 cells
+th = "แกซัดมันเละไม่เหลือเลย!"  # 143px
 
 [[line]]
 address = 0x05e400
 # en = 'The battle was sad, but'
 ko = "슬픈 싸움이었지만"  # 17 cells
 zh = "战斗虽然悲伤,"  # 13 cells
+th = "การรบนั้นน่าเศร้า แต่"  # 124px
 
 [[line]]
 address = 0x05e480
 # en = 'I have people to protect.'
 ko = "지킬 사람이 있다."  # 17 cells
 zh = "但我有要守护的人."  # 17 cells
+th = "ข้ามีคนที่ต้องปกป้อง"  # 118px
 
 [[line]]
 address = 0x05e500
 # en = 'Some will just continue'
 ko = "누군가는 계속"  # 13 cells
 zh = "有些人只会"  # 10 cells
+th = "บางคนก็จะสู้"  # 72px
 
 [[line]]
 address = 0x05e580
 # en = 'to fight...'
 ko = "싸우겠지..."  # 11 cells
 zh = "继续战斗下去..."  # 15 cells
+th = "ต่อไปไม่หยุด..."  # 82px
 
 [[line]]
 address = 0x05e600
 # en = 'Father... I did it!'
 ko = "아버지... 해냈어요!"  # 19 cells
 zh = "父亲... 我做到了!"  # 17 cells
+th = "ท่านพ่อ... ข้าทำได้แล้ว!"  # 134px
 
 [[line]]
 address = 0x05e700
 # en = 'Thanks to my efforts, peace'
 ko = "내 노력 덕분에"  # 14 cells
 zh = "多亏了我的努力,"  # 15 cells
+th = "ด้วยความเพียรของข้า"  # 127px
 
 [[line]]
 address = 0x05e780
 # en = 'returned to the colonies!'
 ko = "콜로니에 평화가 왔다!"  # 21 cells
 zh = "殖民地重获和平!"  # 15 cells
+th = "สันติกลับคืนสู่โคโลนี!"  # 129px
 
 [[line]]
 address = 0x05e800
 # en = 'This means the end of the'
 ko = "이걸로 전쟁은 끝났다."  # 21 cells
 zh = "这意味着战争结束."  # 17 cells
+th = "นี่คือจุดสิ้นสุดของสงคราม"  # 152px
 
 [[line]]
 address = 0x05e880
 # en = 'war. It seems I was right.'
 ko = "내가 옳았던 모양이다."  # 21 cells
 zh = "看来我是对的."  # 13 cells
+th = "ดูท่าข้าคิดถูกแล้ว"  # 102px
 
 [[line]]
 address = 0x05e900
 # en = "Isn't that so, Nataku..."
 ko = "그렇지, 나타쿠..."  # 17 cells
 zh = "不是吗, 娜塔库..."  # 17 cells
+th = "จริงไหม นาทาคุ..."  # 100px
 
 [[line]]
 address = 0x05ea00
 # en = 'I really had some trouble'
 ko = "몇 가지 일 때문에"  # 17 cells
 zh = "有些事情处理起来"  # 16 cells
+th = "ข้าลำบากใจอยู่บ้าง"  # 110px
 
 [[line]]
 address = 0x05ea80
 # en = 'handling some things...'
 ko = "정말 애먹었다..."  # 16 cells
 zh = "确实让我头疼..."  # 15 cells
+th = "กับบางเรื่อง..."  # 74px
 
 [[line]]
 address = 0x05eb00
 # en = 'So I ceased showing emotion'
 ko = "그래서 릴레나가"  # 15 cells
 zh = "所以莉莉娜生气时,"  # 17 cells
+th = "จึงเลิกแสดงอารมณ์"  # 114px
 
 [[line]]
 address = 0x05eb80
 # en = 'when Relena got angry.'
 ko = "화낼 땐 감정을 숨겼다."  # 22 cells
 zh = "我不再流露情绪."  # 15 cells
+th = "เวลารีรีน่าโกรธ"  # 89px
 
 [[line]]
 address = 0x05ec00
 # en = 'Duke Treize! Enemy mobile'
 ko = "트레이즈 공! 적"  # 15 cells
 zh = "特列斯阁下! 敌方"  # 16 cells
+th = "ท่านเทรซ! ม็อบบิลสูท"  # 127px
 
 [[line]]
 address = 0x05ec80
 # en = 'suit neutralized!'
 ko = "모빌슈트 무력화했습니다!"  # 24 cells
 zh = "机动战士已瘫痪!"  # 15 cells
+th = "ของศัตรูถูกปลดแล้ว!"  # 122px
 
 [[line]]
 address = 0x05ed00
 # en = 'Huh? That suit was made'
 ko = "어? 저 기체는"  # 13 cells
 zh = "咦? 那台机体"  # 12 cells
+th = "หืม? เครื่องนั้น"  # 83px
 
 [[line]]
 address = 0x05ed80
 # en = 'by Duke Treize....'
 ko = "트레이즈 공이 만든 거다..."  # 26 cells
 zh = "是特列斯阁下造的..."  # 19 cells
+th = "ท่านเทรซสร้างเองนะ..."  # 127px
 
 [[line]]
 address = 0x05ee00
 # en = 'We achieved peace by'
 ko = "전쟁을 치러서"  # 13 cells
 zh = "我们通过战争"  # 12 cells
+th = "เราได้สันติมาด้วย"  # 101px
 
 [[line]]
 address = 0x05ee80
 # en = 'fighting a war...'
 ko = "평화를 얻었다..."  # 16 cells
 zh = "换来了和平..."  # 13 cells
+th = "การทำสงคราม..."  # 95px
 
 [[line]]
 address = 0x05ef00
 # en = 'How ironic...'
 ko = "참 아이러니하군..."  # 18 cells
 zh = "真是讽刺..."  # 11 cells
+th = "ช่างย้อนแย้ง..."  # 80px

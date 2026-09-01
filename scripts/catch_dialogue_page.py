@@ -37,6 +37,11 @@ def main(argv: list[str]) -> int:
 
     port, lang, state, name = int(argv[0]), argv[1], argv[2], argv[3]
     seconds = float(argv[4]) if len(argv) > 4 else 70.0
+    # "par" holds the published Pro Action Replay freezes (P1 invincible, P2 at
+    # 1 HP, timer pinned) while polling, so a mid-fight state ends its round and
+    # the victory-quote screen actually draws.  Without it a battle_quote poll
+    # can walk the whole window without the surface ever appearing.
+    par = "par" in argv[5:]
 
     build = Build(root)
     if lang not in build.quotes[0]:
@@ -62,6 +67,10 @@ def main(argv: list[str]) -> int:
         deadline = time.time() + seconds
         hit = None
         while time.time() < deadline and hit is None:
+            if par:
+                for write in ("1b70 ff70", "1b80 2c01", "1b74 0100",
+                              "1b84 0100", "060c 99"):
+                    conn.cmd("write_ram " + write)
             tcp.tap(conn, "a", 0.1, 0.25)
             vram = bytes.fromhex(conn.j("dump_vram 0 65536")["hex"])
             for surface, quote, address, payload, guard_at, guard in wanted:

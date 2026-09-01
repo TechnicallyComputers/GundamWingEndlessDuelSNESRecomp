@@ -21,6 +21,7 @@ address = 0x00c0d6
 source = "OPTION"
 ko = "  설정"
 zh = "  选项"
+th = "  ตั้งค่า"  # 6 cells
 
 [[record]]
 record_id = "list_level"
@@ -28,6 +29,7 @@ address = 0x00c0e9
 source = "  LEVEL"
 ko = "  난이도"
 zh = "  难度"
+th = "  ระดับ"  # 6 cells
 
 [[record]]
 record_id = "list_time"
@@ -35,6 +37,7 @@ address = 0x00c0f9
 source = "  TIME"
 ko = "  시간"
 zh = "  时间"
+th = "  เวลา"  # 6 cells
 
 [[record]]
 record_id = "list_sound"
@@ -42,6 +45,7 @@ address = 0x00c108
 source = "  SOUND"
 ko = "  사운드"
 zh = "  音效"
+th = "  เสียง"  # 6 cells
 
 [[record]]
 record_id = "list_key_config"
@@ -49,6 +53,7 @@ address = 0x00c118
 source = "  KEY CONFIG"
 ko = "  조작설정"
 zh = "  按键设置"
+th = "  ตั้งค่าปุ่ม"  # 8 cells
 
 [[record]]
 record_id = "list_exit"
@@ -56,6 +61,7 @@ address = 0x00c12d
 source = "  EXIT"
 ko = "  나가기"
 zh = "  退出"
+th = "  ออก"  # 5 cells
 
 [[record]]
 record_id = "level_selected"
@@ -64,6 +70,7 @@ cursor = true
 source = " LEVEL"
 ko = " 난이도"
 zh = " 难度"
+th = " ระดับ"  # 5 cells
 
 [[record]]
 record_id = "level_deselected"
@@ -71,6 +78,7 @@ address = 0x00c1a6
 source = "  LEVEL"
 ko = "  난이도"
 zh = "  难度"
+th = "  ระดับ"  # 6 cells
 
 [[record]]
 record_id = "level_easy"
@@ -78,6 +86,7 @@ address = 0x00c1d6
 source = "  EASY"
 ko = "  쉬움"
 zh = "  简单"
+th = "  ง่าย"  # 5 cells
 
 [[record]]
 record_id = "level_normal"
@@ -85,6 +94,7 @@ address = 0x00c1e7
 source = "NORMAL"
 ko = "  보통"
 zh = "  普通"
+th = "  ปกติ"  # 5 cells
 
 [[record]]
 record_id = "level_hard"
@@ -92,6 +102,7 @@ address = 0x00c1f8
 source = "  HARD"
 ko = " 어려움"
 zh = "  困难"
+th = "  ยาก"  # 5 cells
 
 [[record]]
 record_id = "time_selected"
@@ -100,6 +111,7 @@ cursor = true
 source = " TIME"
 ko = " 시간"
 zh = " 时间"
+th = " เวลา"  # 5 cells
 
 [[record]]
 record_id = "time_deselected"
@@ -107,6 +119,7 @@ address = 0x00c250
 source = "  TIME"
 ko = "  시간"
 zh = "  时间"
+th = "  เวลา"  # 6 cells
 
 [[record]]
 record_id = "time_limit"
@@ -114,6 +127,7 @@ address = 0x00c280
 source = "   LIMIT"
 ko = "   제한"
 zh = "   限时"
+th = "   จำกัด"  # 7 cells
 
 [[record]]
 record_id = "time_no_limit"
@@ -121,6 +135,7 @@ address = 0x00c293
 source = "NO LIMIT"
 ko = "  무제한"
 zh = "   无限"
+th = "  ไม่จำกัด"  # 8 cells
 
 [[record]]
 record_id = "sound_selected"
@@ -129,6 +144,7 @@ cursor = true
 source = " SOUND"
 ko = " 사운드"
 zh = " 音效"
+th = " เสียง"  # 5 cells
 
 [[record]]
 record_id = "sound_deselected"
@@ -136,6 +152,7 @@ address = 0x00c2ee
 source = "  SOUND"
 ko = "  사운드"
 zh = "  音效"
+th = "  เสียง"  # 6 cells
 
 [[record]]
 record_id = "sound_stereo"
@@ -143,6 +160,7 @@ address = 0x00c31c
 source = "  STEREO"
 ko = "  스테레오"
 zh = "  立体声"
+th = " สเตอริโอ"  # 8 cells
 
 [[record]]
 record_id = "sound_monaural"
@@ -150,6 +168,7 @@ address = 0x00c32f
 source = "MONAURAL"
 ko = "   모노"
 zh = "  单声道"
+th = "   โมโน"  # 7 cells
 
 [[record]]
 record_id = "key_config_selected"
@@ -158,6 +177,7 @@ cursor = true
 source = " KEY CONFIG"
 ko = " 조작설정"
 zh = " 按键设置"
+th = " ตั้งค่าปุ่ม"  # 7 cells
 
 [[record]]
 record_id = "key_config_deselected"
@@ -165,6 +185,7 @@ address = 0x00c405
 source = "  KEY CONFIG"
 ko = "  조작설정"
 zh = "  按键设置"
+th = "  ตั้งค่าปุ่ม"  # 8 cells
 
 [[record]]
 record_id = "exit_selected"
@@ -173,6 +194,7 @@ cursor = true
 source = " EXIT"
 ko = " 나가기"
 zh = " 退出"
+th = " ออก"  # 4 cells
 
 [[record]]
 record_id = "exit_deselected"
@@ -180,6 +202,7 @@ address = 0x00c464
 source = "  EXIT"
 ko = "  나가기"
 zh = "  退出"
+th = "  ออก"  # 5 cells
 
 [[record]]
 record_id = "key_header"
@@ -187,6 +210,7 @@ address = 0x00c4b2
 source = "KEY CONFIG"
 ko = "   키 설정"
 zh = "   按键设置"
+th = "  ตั้งค่าปุ่ม"  # 8 cells
 
 [[record]]
 record_id = "key_weak_punch"
@@ -194,6 +218,7 @@ address = 0x00c4e7
 source = "WEAK   PUNCH"
 ko = "약펀치"
 zh = "轻拳"
+th = "หมัดเบา"  # 6 cells
 
 [[record]]
 record_id = "key_strong_punch"
@@ -201,6 +226,7 @@ address = 0x00c500
 source = "STRONG PUNCH"
 ko = "강펀치"
 zh = "重拳"
+th = "หมัดหนัก"  # 6 cells
 
 [[record]]
 record_id = "key_weak_weapon"
@@ -208,6 +234,7 @@ address = 0x00c519
 source = "WEAK   WEAPON"
 ko = "약무기"
 zh = "轻武器"
+th = "อาวุธเบา"  # 7 cells
 
 [[record]]
 record_id = "key_strong_weapon"
@@ -215,3 +242,4 @@ address = 0x00c533
 source = "STRONG WEAPON"
 ko = "강무기"
 zh = "重武器"
+th = "อาวุธหนัก"  # 7 cells
