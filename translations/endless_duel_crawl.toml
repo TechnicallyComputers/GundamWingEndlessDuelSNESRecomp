@@ -1,0 +1,338 @@
+# Text source for the native Latin opening/fight crawl overlay.
+# Regenerate or verify the generated hex with:
+#   python scripts/generate_crawl_patch.py --check
+
+schema = 1
+patch_address = 0x02f23f
+row_width = 64
+rows = 12
+
+# Each line is written twice in the tilemap: once as top-half glyph entries
+# and once as bottom-half glyph entries. Coordinates are [row, column].
+[[line_slot]]
+top = [0, 4]
+bottom = [0, 36]
+
+[[line_slot]]
+top = [1, 4]
+bottom = [1, 36]
+
+[[line_slot]]
+top = [2, 34]
+bottom = [3, 2]
+
+[[line_slot]]
+top = [3, 34]
+bottom = [4, 2]
+
+[[line_slot]]
+top = [4, 34]
+bottom = [5, 2]
+
+[[line_slot]]
+top = [5, 34]
+bottom = [6, 2]
+
+[[line_slot]]
+top = [6, 34]
+bottom = [7, 2]
+
+[[line_slot]]
+top = [7, 35]
+bottom = [8, 3]
+
+[[line_slot]]
+top = [9, 37]
+bottom = [10, 5]
+
+[[line_slot]]
+top = [10, 37]
+bottom = [11, 5]
+
+[glyph." "]
+top = "2100"
+bottom = "2100"
+
+[glyph.A]
+top = "2120"
+bottom = "2130"
+
+[glyph.C]
+top = "2122"
+bottom = "2132"
+
+[glyph.E]
+top = "2124"
+bottom = "2134"
+
+[glyph.G]
+top = "2126"
+bottom = "2136"
+
+[glyph.L]
+top = "212b"
+bottom = "213b"
+
+[glyph.M]
+top = "212c"
+bottom = "213c"
+
+[glyph.P]
+top = "212f"
+bottom = "213f"
+
+[glyph.S]
+top = "2142"
+bottom = "2152"
+
+[glyph.T]
+top = "2143"
+bottom = "2153"
+
+[glyph.Y]
+top = "2148"
+bottom = "2158"
+
+[glyph.a]
+top = "214a"
+bottom = "215a"
+
+[glyph.b]
+top = "214b"
+bottom = "215b"
+
+[glyph.c]
+top = "214c"
+bottom = "215c"
+
+[glyph.d]
+top = "214d"
+bottom = "215d"
+
+[glyph.e]
+top = "214e"
+bottom = "215e"
+
+[glyph.f]
+top = "214f"
+bottom = "215f"
+
+[glyph.g]
+top = "2160"
+bottom = "2170"
+
+[glyph.h]
+top = "2161"
+bottom = "2171"
+
+[glyph.i]
+top = "2162"
+bottom = "2172"
+
+[glyph.j]
+top = "2163"
+bottom = "2173"
+
+[glyph.k]
+top = "2164"
+bottom = "2174"
+
+[glyph.l]
+top = "2165"
+bottom = "2175"
+
+[glyph.m]
+top = "2166"
+bottom = "2176"
+
+[glyph.n]
+top = "2167"
+bottom = "2177"
+
+[glyph.o]
+top = "2168"
+bottom = "2178"
+
+[glyph.p]
+top = "2169"
+bottom = "2179"
+
+[glyph.q]
+top = "216a"
+bottom = "217a"
+
+[glyph.r]
+top = "216b"
+bottom = "217b"
+
+[glyph.s]
+top = "216c"
+bottom = "217c"
+
+[glyph.t]
+top = "216d"
+bottom = "217d"
+
+[glyph.u]
+top = "216e"
+bottom = "217e"
+
+[glyph.v]
+top = "216f"
+bottom = "217f"
+
+[glyph.w]
+top = "2180"
+bottom = "2190"
+
+[glyph.y]
+top = "2182"
+bottom = "2192"
+
+[glyph.z]
+top = "2183"
+bottom = "2193"
+
+[glyph."5"]
+top = "2189"
+bottom = "2199"
+
+[glyph."."]
+top = "21a0"
+bottom = "21b0"
+
+[glyph.","]
+top = "21a1"
+bottom = "21b1"
+
+[glyph."'"]
+top = "21a3"
+bottom = "21b3"
+
+[glyph."\u00f3"]
+top = "21a4"
+bottom = "21b4"
+
+[languages.en]
+line_slot = [
+  { line = 6, top = [5, 36], bottom = [6, 4] },
+]
+lines = [
+  "Like shooting stars, five",
+  "youths descend to Earth.",
+  "Piloting Gundams, they were",
+  "given a top secret mission",
+  "of destroying the Alliance's",
+  "mobile suits, and to kill",
+  "any who pose a threat to the",
+  "completion of the task....",
+  "May they bring freedom",
+  "to the Earth Sphere...",
+]
+raw_tile = [
+  { row = 9, col = 59, hex = ["21b8", "21b9"] },
+]
+
+[languages.es]
+line_slot = [
+  { line = 2, top = [1, 3], bottom = [1, 35] },
+  { line = 4, top = [3, 35], bottom = [4, 3] },
+  { line = 6, top = [5, 35], bottom = [6, 3] },
+  { line = 8, top = [7, 34], bottom = [8, 2] },
+]
+lines = [
+  "Como estrellas fugaces, 5",
+  "j\u00f3venes llegan a la Tierra.",
+  "Piloteando Gundams, se les",
+  "dio la misi\u00f3n secreta de",
+  "destruir los mobile suits",
+  "de la Alianza, y matar a",
+  "aquel que sea una amenaza",
+  "para finalizar la tarea...",
+  "Y traer la libertad",
+  "a la Tierra...",
+]
+raw_tile = [
+  { row = 9, col = 59, hex = ["21b8", "21b9"] },
+]
+
+[languages.fr]
+lines = [
+  "Cinq jeunes,comme etoiles",
+  "tombent sur Terre.",
+  "Pilotant des Gundams,ils",
+  "recoivent mission secrete",
+  "detruire les Mobile Suits",
+  "de l'Alliance",
+  "et tuer toute menace a la",
+  "mission....",
+  "Puissent ils liberer la",
+  "Sphere terrestre...",
+]
+
+[languages.it]
+lines = [
+  "Stelle cadenti,cinque",
+  "giovani a Terra.",
+  "Pilotando Gundams,hanno",
+  "missione segreta",
+  "di distruggere Mobile Suit",
+  "dell'Alliance",
+  "e uccidere chi minaccia",
+  "il compito....",
+  "Possano portare liberta",
+  "alla Sfera terrestre...",
+]
+
+# Tagalog and Indonesian use the DEFAULT slot table (no line_slot overrides),
+# so the per-line budgets are 28,28,30,30,30,30,30,29,27,27 characters.
+#
+# The crawl glyph set above is what constrains the wording, not the language:
+# the only UPPERCASE letters that exist are A C E G L M P S T Y, there is no
+# lowercase 'x', and the only digit is '5'. Consequences recorded so they are
+# not "corrected" later:
+#   * tl/id: "bumi" / "mundo" (Earth) are lowercase - 'B' and 'M'... 'M' exists,
+#     'B' does not, so Indonesian "Bumi" must be written "bumi".
+#   * tl "Alyansa" and id "Aliansi" keep their capital A (allowed).
+#   * id sentence openers were chosen from S/M/A on purpose.
+[languages.tl]
+lines = [
+  "Tulad ng bulalakaw, limang",
+  "kabataan ay bumaba sa mundo.",
+  "Sa mga Gundam, sila ay",
+  "binigyan ng lihim na misyon",
+  "na sirain ang mga mobile",
+  "suit ng Alyansa, at patayin",
+  "ang sinumang humahadlang",
+  "sa misyon....",
+  "Sana ay maghatid sila ng",
+  "kalayaan sa mundo...",
+]
+
+[languages.id]
+lines = [
+  "Seperti bintang jatuh, lima",
+  "pemuda turun ke bumi.",
+  "Mengemudi Gundam, mereka",
+  "diberi misi sangat rahasia",
+  "menghancurkan mobile suit",
+  "Aliansi, dan membunuh",
+  "siapa pun yang mengancam",
+  "penyelesaian tugas....",
+  "Semoga mereka membawa",
+  "kebebasan ke bumi...",
+]
+
+[languages.pt]
+lines = [
+  "Estrelas cadentes,cinco",
+  "jovens a Terra.",
+  "Pilotando Gundams,recebem",
+  "uma missao secreta",
+  "destruir Mobile Suits da",
+  "Alianca",
+  "e matar quem ameaca a",
+  "missao....",
+  "que tragam liberdade a",
+  "Esfera terrestre...",
+]

@@ -1,0 +1,435 @@
+# Text source for fixed-width ASCII option-menu patches.
+# Regenerate or verify the generated hex with:
+#   python scripts/generate_option_patch.py --check
+
+schema = 1
+
+# These are fixed-size byte patches into strings recovered from the English and
+# Spanish reference patches. A few visible labels are split across multiple
+# entries because unchanged source bytes sit between translated spans.
+
+[[text_patch]]
+address = 0x00c0d8
+source = "T"
+es = "C"
+it = "Z"
+pt = "C"
+tl = "S"
+id = "S"
+
+[[text_patch]]
+address = 0x00c0d9
+source = "I"
+pt = "A"
+tl = "Y"
+id = "I"
+
+[[text_patch]]
+address = 0x00c0da
+source = "O"
+id = " "
+
+[[text_patch]]
+address = 0x00c0db
+source = "N"
+pt = " "
+id = " "
+
+[[text_patch]]
+address = 0x00c0ea
+source = " LEVEL"
+es = "NIVEL "
+fr = "NIVEAU"
+it = "LIVEL "
+pt = "NIVEL "
+tl = "ANTAS "
+
+[[text_patch]]
+address = 0x00c0fa
+source = " TI"
+es = "TIE"
+fr = "TEM"
+it = "TEM"
+pt = "TEM"
+tl = "ORA"
+id = "WAK"
+
+[[text_patch]]
+address = 0x00c0fd
+source = "M"
+fr = "P"
+it = "P"
+pt = "P"
+tl = "S"
+id = "T"
+
+[[text_patch]]
+address = 0x00c0fe
+source = "E"
+es = "P"
+fr = "S"
+it = "O"
+pt = "O"
+tl = " "
+id = "U"
+
+[[text_patch]]
+address = 0x00c109
+source = " SOUND"
+es = "SONIDO"
+fr = "SON   "
+it = "AUDIO "
+pt = "SOM   "
+tl = "TUNOG "
+id = "SUARA "
+
+[[text_patch]]
+address = 0x00c119
+source = " KEY CONFIG"
+es = "MANDO      "
+fr = "CONTROLES  "
+it = "COMANDI    "
+pt = "CONTROLES  "
+tl = "KONTROL    "
+id = "KONTROL    "
+
+[[text_patch]]
+address = 0x00c12e
+source = " EX"
+es = "SAL"
+fr = " FI"
+it = "ESC"
+pt = "SAI"
+tl = "LAB"
+id = "TUT"
+
+[[text_patch]]
+address = 0x00c131
+source = "I"
+fr = "N"
+pt = "R"
+tl = "A"
+id = "U"
+
+[[text_patch]]
+address = 0x00c132
+source = "T"
+es = "R"
+fr = " "
+it = " "
+pt = " "
+tl = "S"
+id = "P"
+
+[[text_patch]]
+address = 0x00c17a
+source = " LEVEL"
+es = "NIVEL "
+fr = "NIVEAU"
+it = "LIVEL "
+pt = "NIVEL "
+tl = "ANTAS "
+
+[[text_patch]]
+address = 0x00c1a7
+source = " LEVEL"
+es = "NIVEL "
+fr = "NIVEAU"
+it = "LIVEL "
+pt = "NIVEL "
+tl = "ANTAS "
+
+[[text_patch]]
+address = 0x00c1d6
+source = " "
+tl = "M"
+
+[[text_patch]]
+address = 0x00c1d7
+source = " EASY"
+es = "FACIL"
+fr = "FACIL"
+it = "FACIL"
+pt = "FACIL"
+tl = "ADALI"
+id = "MUDAH"
+
+[[text_patch]]
+address = 0x00c1e7
+source = "NORMAL"
+
+[[text_patch]]
+address = 0x00c1f9
+source = " HARD"
+es = "DIFIC"
+fr = "DUR  "
+it = "ARDUO"
+pt = "DIFIC"
+tl = "HIRAP"
+id = "SULIT"
+
+[[text_patch]]
+address = 0x00c283
+source = "LIMIT"
+
+[[text_patch]]
+address = 0x00c296
+source = "LIMIT"
+
+[[text_patch]]
+address = 0x00c225
+source = " TI"
+es = "TIE"
+fr = "TEM"
+it = "TEM"
+pt = "TEM"
+tl = "ORA"
+id = "WAK"
+
+[[text_patch]]
+address = 0x00c228
+source = "M"
+fr = "P"
+it = "P"
+pt = "P"
+tl = "S"
+id = "T"
+
+[[text_patch]]
+address = 0x00c229
+source = "E"
+es = "P"
+fr = "S"
+it = "O"
+pt = "O"
+tl = " "
+id = "U"
+
+[[text_patch]]
+address = 0x00c251
+source = " TI"
+es = "TIE"
+fr = "TEM"
+it = "TEM"
+pt = "TEM"
+tl = "ORA"
+id = "WAK"
+
+[[text_patch]]
+address = 0x00c254
+source = "M"
+fr = "P"
+it = "P"
+pt = "P"
+tl = "S"
+id = "T"
+
+[[text_patch]]
+address = 0x00c255
+source = "E"
+es = "P"
+fr = "S"
+it = "O"
+pt = "O"
+tl = " "
+id = "U"
+
+[[text_patch]]
+address = 0x00c2c2
+source = " SOUND"
+es = "SONIDO"
+fr = "SON   "
+it = "AUDIO "
+pt = "SOM   "
+tl = "TUNOG "
+id = "SUARA "
+
+[[text_patch]]
+address = 0x00c2ef
+source = " SOUND"
+es = "SONIDO"
+fr = "SON   "
+it = "AUDIO "
+pt = "SOM   "
+tl = "TUNOG "
+id = "SUARA "
+
+[[text_patch]]
+address = 0x00c31e
+source = "STEREO"
+
+[[text_patch]]
+address = 0x00c3d4
+source = " KEY CONFIG"
+es = "MANDO      "
+fr = "CONTROLES  "
+it = "COMANDI    "
+pt = "CONTROLES  "
+tl = "KONTROL    "
+id = "KONTROL    "
+
+[[text_patch]]
+address = 0x00c406
+source = " KEY CONFIG"
+es = "MANDO      "
+fr = "CONTROLES  "
+it = "COMANDI    "
+pt = "CONTROLES  "
+tl = "KONTROL    "
+id = "KONTROL    "
+
+[[text_patch]]
+address = 0x00c439
+source = " EX"
+es = "SAL"
+fr = " FI"
+it = "ESC"
+pt = "SAI"
+tl = "LAB"
+id = "TUT"
+
+[[text_patch]]
+address = 0x00c43c
+source = "I"
+fr = "N"
+pt = "R"
+tl = "A"
+id = "U"
+
+[[text_patch]]
+address = 0x00c43d
+source = "T"
+es = "R"
+fr = " "
+it = " "
+pt = " "
+tl = "S"
+id = "P"
+
+[[text_patch]]
+address = 0x00c465
+source = " EX"
+es = "SAL"
+fr = " FI"
+it = "ESC"
+pt = "SAI"
+tl = "LAB"
+id = "TUT"
+
+[[text_patch]]
+address = 0x00c468
+source = "I"
+fr = "N"
+pt = "R"
+tl = "A"
+id = "U"
+
+[[text_patch]]
+address = 0x00c469
+source = "T"
+es = "R"
+fr = " "
+it = " "
+pt = " "
+tl = "S"
+id = "P"
+
+[[text_patch]]
+address = 0x00c4b2
+source = "KEY CONFIG"
+es = "  MANDO   "
+fr = "CONTROLES "
+it = "COMANDI   "
+pt = "CONTROLES "
+tl = "KONTROL   "
+id = "KONTROL   "
+
+[[text_patch]]
+address = 0x00c4e7
+source = "WEAK"
+es = "PUNO"
+fr = "COUP"
+it = "COLP"
+pt = "SOCO"
+tl = "SUNT"
+id = "TINJ"
+
+[[text_patch]]
+address = 0x00c4eb
+source = " "
+tl = "O"
+id = "U"
+
+[[text_patch]]
+address = 0x00c4ec
+source = "  PUNCH"
+es = "DEBIL  "
+fr = "FAIBLE "
+it = "DEBOLE "
+pt = "FRACO  "
+tl = "K HINA "
+id = " LEMAH "
+
+[[text_patch]]
+address = 0x00c500
+source = "STR"
+es = "PUN"
+fr = "COU"
+it = "COL"
+pt = "SOC"
+tl = "SUN"
+id = "TIN"
+
+[[text_patch]]
+address = 0x00c503
+source = "O"
+fr = "P"
+it = "P"
+tl = "T"
+id = "J"
+
+[[text_patch]]
+address = 0x00c504
+source = "NG PUNCH"
+es = " FUERTE "
+fr = " FORT   "
+it = " FORTE  "
+pt = " FORTE  "
+tl = "OK LAKAS"
+id = "U KUAT  "
+
+[[text_patch]]
+address = 0x00c519
+source = "WEAK"
+es = "ARMA"
+fr = "ARME"
+it = "ARMA"
+pt = "ARMA"
+tl = "SAND"
+id = "SENJ"
+
+[[text_patch]]
+address = 0x00c51d
+source = " "
+tl = "A"
+id = "A"
+
+[[text_patch]]
+address = 0x00c51e
+source = "  WEAPON"
+es = "DEBIL   "
+fr = "FAIBLE  "
+it = "DEBOLE  "
+pt = "FRACA   "
+tl = "TA HINA "
+id = "TA LEMAH"
+
+[[text_patch]]
+address = 0x00c533
+source = "STRONG WEAPON"
+es = "ARMA FUERTE  "
+fr = "ARME FORTE   "
+it = "ARMA FORTE   "
+pt = "ARMA FORTE   "
+tl = "SANDATA LAKAS"
+id = "SENJATA KUAT "

@@ -1,0 +1,64 @@
+# CJK crawl translation candidates and active Korean source text.
+#
+# Chinese and Korean are consumed by scripts/generate_cjk_glyph_tiles.ps1 and
+# scripts/generate_cjk_crawl_patch.py to build active BG3 2bpp runtime crawl
+# patches.
+
+schema = 1
+
+[source.ja]
+lines = [
+  "流星のごとく、地球に",
+  "降り立った5人の少年。",
+  "ガンダムを駆る彼らに",
+  "託された極秘司令は、",
+  "連合のMSの破壊及び、",
+  "任務遂行を妨げる",
+  "一切の排除であった。",
+  "少年たちは戦う、",
+  "平和と自由を勝ちとるために",
+]
+
+[pending.zh]
+name = "Chinese"
+status = "pending native 16x16 Chinese tile assets"
+lines = [
+  "如流星般降临地球的五名少年。",
+  "他们驾驶高达，",
+  "受命执行一项极机密任务：",
+  "摧毁联盟的MS，",
+  "并排除一切阻碍任务的人。",
+  "少年们为赢得和平与自由而战。",
+]
+
+[prototype.zh_compact]
+name = "Chinese compact"
+status = "active compact 16x16 Chinese crawl tiles"
+lines = [
+  "五名少年",
+  "如流星般",
+  "降临地球",
+  "他们驾驶高达",
+  "执行极密任务",
+  "摧毁联盟MS",
+  "排除阻碍者",
+  "为了和平",
+  "与自由",
+  "奋战到底",
+]
+
+[pending.ko]
+name = "Korean"
+status = "active authored 16x16 Hangul crawl tiles"
+lines = [
+  "다섯 소년",
+  "유성처럼 지구로",
+  "건담에 올라",
+  "극비 임무를",
+  "수행한다",
+  "연합을 파괴",
+  "방해자는",
+  "모두 제거",
+  "평화와 자유를",
+  "위해 싸운다",
+]

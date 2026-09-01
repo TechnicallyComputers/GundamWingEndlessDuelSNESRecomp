@@ -25,13 +25,31 @@
 /input.ini
 
 .DS_Store
+__pycache__/
 
 # Diagnostic capture bundles (snes_frame_capture.py / snes_asset_decode.py).
 # These embed VRAM/CGRAM dumps taken from a running game, i.e. data derived
 # from the ROM — the same reason src/gen is never committed. Regenerate them
 # locally; they are evidence, not source.
 /analysis/
+translations/reference_tiles/
+translations/reference_tiles_2bpp/
+translations/reference_tilemaps/
+translations/reference_glyph_candidates/
+translations/reference_vram_tiles/
+translations/dialogue_previews/
+translations/title_menu_previews/
 analysis/oracle/scene.csv
 snes-diag.log
 snes-run.log
 mesen.log
+
+# Validation savestates: raw snes_saveload dumps, invalidated by any engine
+# change to the SNES state layout. tools/validation_states/README.md (committed)
+# documents each one and how to regenerate it.
+tools/validation_states/*.state
+tools/validation_states/stagehunt_log.json
+
+# Captures written by scripts/validate_from_state.ps1.
+/analysis/state_validation/
+translations/dialogue_cjk_previews/

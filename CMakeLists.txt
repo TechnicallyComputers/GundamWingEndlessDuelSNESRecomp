@@ -36,6 +36,8 @@ if(NOT EXISTS "${SNESRECOMP_ROOT}/runner/runner.cmake")
         "snesrecomp submodule missing at ${SNESRECOMP_ROOT}.\n"
         "Run: git submodule update --init --recursive")
 endif()
+set(SNESRECOMP_ENABLE_MODS ON CACHE BOOL
+    "Enable Endless Duel's built-in localization mod catalog" FORCE)
 include(${SNESRECOMP_ROOT}/runner/runner.cmake)
 
 # Generated recompiler output. Not committed: it is derived from a copyrighted
@@ -53,6 +55,7 @@ add_executable(GundamWingEndlessDuelSNESRecomp
     src/host_contract.c
     src/codegen_setup.c
     src/game_rtl.c
+    src/translation_mod.c
     src/gen_stubs.c
     ${GAME_GEN_SOURCES}
 )
@@ -90,6 +93,16 @@ include(${RECOMP_UI_ROOT}/recomp_ui.cmake)
 # fetch it with snesrecomp/tools/new_project/fetch_boxart.py and reconfigure.
 recomp_target_launcher_ui(GundamWingEndlessDuelSNESRecomp CONSOLE snes
     BOXART "${CMAKE_SOURCE_DIR}/launcher_assets/img/boxart.tga")
+
+add_custom_target(GundamWingEndlessDuelSNESRecompStageLocalization ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/mods"
+        "$<TARGET_FILE_DIR:GundamWingEndlessDuelSNESRecomp>/mods"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/translations"
+        "$<TARGET_FILE_DIR:GundamWingEndlessDuelSNESRecomp>/translations")
+add_dependencies(GundamWingEndlessDuelSNESRecompStageLocalization
+    GundamWingEndlessDuelSNESRecomp)
 
 # Delay-sync netplay + MotK lobby client (defines SNES_HAS_LOBBY_CLIENT, which
 # is what compiles the netplay blocks in src/main.c and lights the launcher's

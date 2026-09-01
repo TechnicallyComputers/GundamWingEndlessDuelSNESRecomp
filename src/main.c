@@ -33,13 +33,16 @@
 #include "snes/ppu.h"
 #include "snes/snes.h"       /* snes_free on session reboot */
 #include "debug_server.h"
-#include "snes_savestate_menu.h" /* Select+R save-state overlay */
+#include "snes_savestate_menu.h" /* Select+R / F7 save-state overlay */
 #include "cpu_trace.h"
 #include "desktop/sdl_compat.h"
 #include "host_paths.h"      /* snesrecomp_exe_dir_path */
 #include "launcher.h"        /* snesrecomp_launcher_resolve_rom_sha256 */
 #include "launcher_cache.h"  /* snesrecomp_rom_cache_read */
 #include "codegen_setup.h"   /* kGameCodegenIdentity - the ROM digests */
+#if SNESRECOMP_ENABLE_MODS
+#include "mod_runtime.h"
+#endif
 
 #if defined(RECOMP_LAUNCHER)
 /* Defined by recomp_target_launcher_ui() in CMakeLists.txt. Absent when the
@@ -95,6 +98,10 @@ static void host_lobby_ensure_init(void)
 #define GAME_HEIGHT 224
 
 extern Ppu *g_ppu;
+
+#if SNESRECOMP_ENABLE_MODS
+static int g_mods_ready;
+#endif
 
 /* Developer TCP debug server (opt in with -DSNESRECOMP_ENABLE_TRACE=ON).
  * debug_server.h replaces every entry point with a no-op static inline when
@@ -665,6 +672,54 @@ static uint16_t read_keyboard(void)
     return pad;
 }
 
+#define GAME_FAST_FORWARD_DEFAULT_FRAMES 6
+#define GAME_FAST_FORWARD_MAX_FRAMES 30
+#define GAME_SAVESTATE_MENU_GESTURE ((1u << 2) | (1u << 11))
+
+static int game_env_flag(const char *name)
+{
+    const char *value = getenv(name);
+    if (!value || !*value)
+        return 0;
+    return strcmp(value, "0") != 0 &&
+           strcmp(value, "false") != 0 &&
+           strcmp(value, "FALSE") != 0 &&
+           strcmp(value, "off") != 0 &&
+           strcmp(value, "OFF") != 0;
+}
+
+static int game_fast_forward_frames(void)
+{
+    static int inited;
+    static int frames = GAME_FAST_FORWARD_DEFAULT_FRAMES;
+    if (!inited) {
+        const char *value = getenv("SNESRECOMP_TURBO_FRAMES");
+        inited = 1;
+        if (value && *value) {
+            int parsed = atoi(value);
+            if (parsed < 1)
+                parsed = 1;
+            if (parsed > GAME_FAST_FORWARD_MAX_FRAMES)
+                parsed = GAME_FAST_FORWARD_MAX_FRAMES;
+            frames = parsed;
+        }
+    }
+    return frames;
+}
+
+static int game_fast_forward_active(void)
+{
+    const uint8_t *keys = snesrecomp_sdl_get_keyboard_state();
+    static int env_inited;
+    static int env_enabled;
+
+    if (!env_inited) {
+        env_enabled = game_env_flag("SNESRECOMP_TURBO");
+        env_inited = 1;
+    }
+    return env_enabled || (keys && keys[SDL_SCANCODE_TAB]);
+}
+
 #if defined(SNES_HAS_LOBBY_CLIENT)
 /* Barrier hooks: the admit pump stalls the sim until the peer's inputs
  * arrive, and needs the host to keep sampling the pad and pumping SDL so a
@@ -853,6 +908,9 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
         gi.expected_crc     = crc;
         gi.has_expected_crc = 1;
     }
+#if SNESRECOMP_ENABLE_MODS
+    gi.mods = g_mods_ready ? snes_mod_runtime_launcher_provider_c() : NULL;
+#endif
 #if defined(SNES_HAS_LOBBY_CLIENT)
     /* The netplay button is capability-gated: without these two fields the
      * launcher never shows it (which is exactly why a build without
@@ -1071,6 +1129,20 @@ int main(int argc, char **argv)
     if (!has_positional)
         find_rom_beside_exe(beside_exe, sizeof(beside_exe));
 
+#if SNESRECOMP_ENABLE_MODS
+    {
+        char mods_dir[1024];
+        if (snesrecomp_exe_dir_path("mods/preloaded", mods_dir, sizeof(mods_dir))) {
+            g_mods_ready = snes_mod_runtime_initialize_c(
+                mods_dir, "gwed-jp", kGameCodegenIdentity.expected_sha256);
+            if (!g_mods_ready) {
+                fprintf(stderr, "SNES mods unavailable: %s\n",
+                        snes_mod_runtime_last_error_c());
+            }
+        }
+    }
+#endif
+
 #if defined(RECOMP_LAUNCHER)
     /* A dummy video driver means CI or a screenshot harness: there is no one
      * to answer a GUI, and blocking on one would hang the job. */
@@ -1128,6 +1200,14 @@ int main(int argc, char **argv)
         }
     }
 
+#if SNESRECOMP_ENABLE_MODS
+    if (g_mods_ready && !snes_mod_runtime_commit_c(rom_path)) {
+        fprintf(stderr, "SNES mod plan rejected: %s\n",
+                snes_mod_runtime_last_error_c());
+        return 1;
+    }
+#endif
+
     rom = read_rom(rom_path, &rom_size);
     if (!rom)
         return 1;
@@ -1150,6 +1230,10 @@ session_reboot:
         fprintf(stderr, "GundamWingEndlessDuelSNESRecomp: SnesInit failed\n");
         return 1;
     }
+#if SNESRECOMP_ENABLE_MODS
+    if (g_mods_ready)
+        snes_mod_runtime_activate_plugins_c();
+#endif
 
     /* Give the PPU somewhere to composite into. Must happen after SnesInit
      * (which creates g_ppu) and before the first frame is drawn. */
@@ -1244,6 +1328,7 @@ session_reboot:
     while (running) {
         SDL_Event event;
         uint32 inputs;
+        int savestate_menu_hotkey = 0;
 
         while (SDL_PollEvent(&event)) {
             /* SDL2 spellings: sdl_compat.h defines SDL_ENABLE_OLD_NAMES for
@@ -1273,6 +1358,11 @@ session_reboot:
                 }
 #endif
                 running = 0;
+            }
+            if (event.type == SDL_KEYDOWN &&
+                !event.key.repeat &&
+                SNESRECOMP_SDL_EVENT_KEY(event) == SDLK_F7) {
+                savestate_menu_hotkey = 1;
             }
             /* Hotplug: a pad connected after launch must still work, and one
              * unplugged mid-game must not leave a dangling handle. */
@@ -1343,7 +1433,10 @@ session_reboot:
          * word before the seat-1 shift, because the overlay is a player-1
          * facility. */
         inputs = snes_savestate_menu_filter_guest_input(inputs);
-        if (snes_savestate_menu_poll_open(inputs)) {
+        if (savestate_menu_hotkey && !snes_savestate_menu_is_open())
+            (void)snes_savestate_menu_poll_open(GAME_SAVESTATE_MENU_GESTURE);
+        if (snes_savestate_menu_poll_open(inputs) ||
+            snes_savestate_menu_is_open()) {
             game_savestate_menu_loop(renderer, texture, &running);
             continue;   /* guest was frozen: no frame to run or present */
         }
@@ -1392,12 +1485,22 @@ session_reboot:
             if (ls >= 0)
                 RtlSaveLoad(kSaveLoad_Save, ls);
         }
-        RtlRunFrame(inputs);
+        {
+            int fast_forward = game_fast_forward_active();
+            int frames_this_iter =
+                fast_forward ? game_fast_forward_frames() : 1;
+            int ffi;
+
+            RtlAudioSetFastForward(fast_forward != 0);
+            for (ffi = 0; ffi < frames_this_iter; ffi++)
+                RtlRunFrame(inputs);
+        }
         game_present(renderer, texture, 1);
         if (!g_vsync)
             game_frame_limit();
     }
 
+    RtlAudioSetFastForward(0);
     game_close_pads();
     if (g_overlay_tex) {
         SDL_DestroyTexture(g_overlay_tex);

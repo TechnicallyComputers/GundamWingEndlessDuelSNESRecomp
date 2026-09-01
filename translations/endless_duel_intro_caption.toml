@@ -1,0 +1,228 @@
+# Intro caption ("After Colony 195") per-language tile art source.
+#
+# The caption is OBJ sprite text living in the uncompressed OBJ bank the
+# English fan translation writes at ROM 0x00e000-0x00ffff (OBJ VRAM
+# 0x8000-0x9fff is a byte-exact linear copy; tile n at 0xe000 + n*32, 4bpp).
+# OAM is byte-identical across languages, so only the tile art changes.
+#
+# Consumed by scripts/generate_intro_caption_patch.py, which emits the
+# BEGIN/END GENERATED INTRO CAPTION PATCHES section of endless_duel.toml.
+#
+# To fall a language back to English, replace its content keys with
+#     keep = "en"
+# The generator then emits no art for it (or, for languages with no
+# fallback_* chain to en, re-emits the English baseline verbatim).
+
+schema = 1
+
+[geometry]
+tile_bytes = 32
+
+# Line 1 - "After Colony". 12 tiles x 4 tile rows. Screen y79-110.
+# Tiles +0..+5 land at screen x64-111, tiles +6..+11 at x128-175: a hard
+# 16px gap at x112-127 sits between them, and its cell is the SHARED blank
+# tile 236, which is not part of this rectangle and must never be drawn.
+# Canvas row 0 (screen y79-86) is blank in every language; the usable text
+# band is canvas y8-31 (screen y87-110), 48x24 px per box.
+[geometry.line1]
+tiles = 12
+row_address = [0xf800, 0xfa00, 0xfc00, 0xfe00]
+text_y0 = 8
+text_y1 = 31
+screen_y0 = 79
+[[geometry.line1.box]]
+id = "left"
+x = 0
+width = 48
+screen_x = 64
+[[geometry.line1.box]]
+id = "right"
+x = 48
+width = 48
+screen_x = 128
+
+# Line 2 - "195". 7 tiles x 4 tile rows, screen y119-142 / x88-143.
+# Tiles 141-143 / 157-159 / 173-175 are the blinking-cursor sprite (JP
+# "年") and are deliberately outside this rectangle.
+[geometry.line2]
+tiles = 7
+row_address = [0xf0c0, 0xf2c0, 0xf4c0, 0xf6c0]
+text_y0 = 0
+text_y1 = 31
+screen_y0 = 119
+[[geometry.line2.box]]
+id = "digits"
+x = 0
+width = 56
+screen_x = 88
+
+# OBJ palette 7 (CGRAM 240-255) indices. Line 1 text uses the green ramp
+# 8-12; index 0 is transparent. Body is the light green, shadow the dark.
+[palette]
+body = 12
+shadow = 9
+
+# Type faces. "proportional" auto-fits one shared point size across both
+# boxes of a line and lands both strings on a common baseline. "cell" is
+# the fixed square-cell path the BG3 crawl CJK glyphs use
+# (scripts/generate_cjk_glyph_tiles.ps1), rendered here through Pillow.
+[face.latin]
+# Tahoma Bold: chosen over Impact / Arial Black after rendering all four
+# strings through every candidate face - it is the only bold on the box
+# that keeps the counters of "o"/"e"/"a" open once the 7-letter right box
+# forces the shared point size down to 12px.
+font = "tahomabd.ttf"
+mode = "proportional"
+max_size = 22
+min_size = 8
+threshold = 110
+shadow_pad = 1
+tracking = 0
+
+[face.ko]
+font = "malgun.ttf"
+mode = "cell"
+cell = 16
+size = 16
+threshold = 110
+
+[face.th]
+# Thai needs shaping, and Pillow here has no libraqm, so this face rasterises
+# through GDI/Uniscribe (mode = "gdi", scripts/gdi_text.py).  The caption band is
+# 24px -- taller than a Thai line needs -- so nothing is band-compressed: the
+# renderer takes the largest size in [min, max] that fits both 48px boxes.
+font = "LeelawUI.ttf"
+mode = "gdi"
+max_size = 22
+min_size = 10
+threshold = 110
+shadow_pad = 1
+
+[face.zh]
+font = "msyh.ttc"
+mode = "cell"
+cell = 16
+size = 16
+threshold = 110
+
+# --- content -------------------------------------------------------------
+# line2 = "keep" leaves the English "195" art in place.
+
+[language.es]
+face = "latin"
+line1_left = "Tras"
+line1_right = "Colonia"
+line2 = "keep"
+
+[language.fr]
+face = "latin"
+line1_left = "Après"
+line1_right = "Colonie"
+line2 = "keep"
+
+[language.it]
+face = "latin"
+line1_left = "Dopo"
+line1_right = "Colonia"
+line2 = "keep"
+
+[language.pt]
+face = "latin"
+line1_left = "Após"
+line1_right = "Colônia"
+line2 = "keep"
+
+# Tagalog / Indonesian. Free-form sprite art, so there is no glyph budget -
+# only the two 48x24px boxes. "Matapos ang Kolonya" and "Setelah Koloni" are
+# the natural renderings of "After Colony"; the geometry is two boxes, so the
+# Tagalog linker "ang" is dropped (the era name reads as a two-word label in
+# every other language too).
+[language.tl]
+face = "latin"
+line1_left = "Matapos"
+line1_right = "Kolonya"
+line2 = "keep"
+
+[language.id]
+face = "latin"
+line1_left = "Setelah"
+line1_right = "Koloni"
+line2 = "keep"
+
+[language.ko]
+face = "ko"
+line1_left = "애프터"
+line1_right = "콜로니"
+line2 = "keep"
+
+[language.th]
+# "หลัง โคโลนี" -- literally "after the colony", the same after-plus-colony
+# reading es/fr/it/pt/tl/id take, rather than a transliteration of the English
+# "After Colony".  line2 keeps the English "195" digits like every language.
+face = "th"
+line1_left = "หลัง"
+line1_right = "โคโลนี"
+line2 = "keep"
+
+[language.zh]
+face = "zh"
+line1_left = "後殖民"
+line1_right = "紀元"
+line2 = "keep"
+
+# --- baseline ------------------------------------------------------------
+# Captured from the pre-split table: the English art the 669 IPS fragments
+# used to produce inside the caption rectangles, and the sha256 of the full
+# 2MB ROM image the pre-split table produced for en and es. The generator
+# hard-fails if the current table stops reproducing these digests.
+[baseline]
+en_line1_hex = [
+  "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "00000000000000000000000000000000000000000000000000000000000000000000000000000000141c382a0e3e48790000000000000000223e003e003e047f0000000000000000010309090808080200000000000000000007000f020e000e000000000000000080808010181c040800000000000000000080049c001c001c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000090b230d001060410000000000000000040f003f69790071000000000000000000008080c0c080c000000000000000000000008000c000c00000000000000000040604040002000a0000000000000000000e0a0e040e040e000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "00000000000000000000000000000000000000000000000000000000000000006064304065740405c6a7d1e068f841c1037702770277c0e700e70aff06ff00c31612020a020880848a8208080086848c011f041f040e028e008e048e088e028e2b3a0f3f0408080800040004081c141084bf00bf101c001c101c101c001c081c082c40646500828240a14b2300200303003c127e006740e702ff84ff80e0a0e33333113d2a2f08083030000838281838003b023f103f2038083820380038003860f0d000a09040201090e0d00110582800f120f000f010f000f000f0207100790203090e000400080018009040d0108cc0c7000f101c101c001c0cdc04dc40dc8082c4c4c18166e6c6cbc1c181a3062d0c8e0ace0eef00ef20ef2eef40efc0ef3030687406c6000086860608c4c00204487880fc08ceccce48ce40ce0ace80ce80a092960eac26c60424840c88ec222645ed60fe40ee00ee48ee00ee00eec0ee83810165e064e2c22a7c5c580804183c40e702e700e600fe007e207c007c003c",
+  "0001000100000000000000000000000000010001000000000000000000000000c140804100000000000000000000000002c300c3000000000000000000000000c8c0080c00000000000000000000000006ce42ce00000000000000000000000009110102000000000000000000000000061f000f0000000000000000000000001607141c000000000000000000000000607f203c000000000000000000000000201828280000000000000000000000000038103800000000000000000000000008141809000000000000000000000000023f061f000000000000000000000000000102010000000000000000000000000e8f00070000000000000000000000008684000200000000000000000000000008ce888e00000000000000000000000010d4080800000000000000000000000028fc50780000000000000000000000004e22a4a800000001000000000000000080ee00ee000000010000000000000000082018083030b01050c000000000000000382038003000f000f0000000000000",
+]
+en_line2_hex = [
+  "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000001020000000000000000000000000001000300030000000000000000404000400080e040000000000000006000e000e000600060000000000000000b0e14163424704010300000000000000d000b001c007000700000000000000040406020a0c028382838000000000000c000c000f00018003000000000000000165b5d064000006040000000000000006d007b0060006000600000000000000050507020000000000000000000000000a800d800000000000000",
+  "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006040600020206020002020602000000020006000400040006000400060006000202060402020705070702c3c0f19080b40002000400030004000140016000f0010101000180820381018a8f85878c0d808001800100038002800d000a000580060406d0b3a316434003030700000000020006e004f005c0070005000000000000000c0c0a0c0b0f0283828380808001800004000e000c0001800300010001800",
+  "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020204020606000602020604020400000400060000000600040002000600000002020004030104060343409090b0a000040006000700070000c0016000d0000000000181028303818c0e020c040c000001800080038002800b000e000c000000020204020707040703c34091f090d000040006000100070000c0016000e0000000810180038200828b0b08040404000001800180038003800c000e000c0000000",
+  "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+]
+
+[baseline.rom_sha256]
+en = "121c97ce7ea47dbc999c4d37f7cef30ad2d4dd76ee9f4bfe5adcd1b0b8c7e3d2"
+# 2026-08: the es digest moved once, deliberately. The generated dialogue
+# overlays used to carry no es_hex; the table has no fallback_es, so an
+# es-less rom_patch restores source_hex - which for those patches IS the
+# English row. At three rows (0x03fa00, 0x05e080, 0x05ef00) the Spanish text
+# happened to equal one of the fr/it/pt payloads, so the guard matched and
+# Spanish rendered English. generate_dialogue_patch.py now emits an explicit
+# es_hex; those three rows are the only bytes that changed, and they now
+# match the decoded Spanish reference exactly. en is unchanged.
+es = "600b7eec097a7e25eb5452c9a5fe57df99fef8bc02293bde7d1245f53847f6bd"
+
+# --- preview -------------------------------------------------------------
+# OBJ palette 7 as captured live at the caption moment, used only by
+# --previews to render the rectangles for human review.
+[preview]
+scale = 3
+screen_width = 256
+background_rgb = [20, 20, 40]
+palette_rgb = [
+  [197, 123, 82],
+  [0, 0, 0],
+  [255, 255, 255],
+  [65, 106, 164],
+  [139, 205, 213],
+  [255, 255, 255],
+  [197, 246, 230],
+  [106, 156, 180],
+  [197, 246, 230],
+  [8, 123, 57],
+  [49, 164, 115],
+  [197, 255, 213],
+  [148, 255, 189],
+  [16, 131, 98],
+  [24, 213, 156],
+  [148, 255, 189],
+]

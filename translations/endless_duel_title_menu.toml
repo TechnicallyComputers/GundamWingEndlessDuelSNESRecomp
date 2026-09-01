@@ -1,0 +1,102 @@
+# Source data for the title-screen mode selector labels.
+#
+# These labels are visible in the presented title frame but are not reproduced
+# by the current raw BG/OAM helper renders. The runtime replacement path is a
+# screen-space host overlay keyed by language; a later pass can replace this
+# with VRAM/tile assets if the exact upload path is recovered.
+
+schema = 1
+source_capture = "scripts/probe_title_menu_vram.ps1"
+source_surface = "presented title mode menu"
+
+[palette]
+selected_text = [252, 244, 156]
+selected_shadow = [56, 120, 96]
+selected_fill = [0, 40, 48]
+inactive_text = [64, 120, 88]
+inactive_shadow = [24, 56, 48]
+inactive_fill = [18, 48, 48]
+
+[[label]]
+label_id = "story_mode"
+source = "STORY MODE"
+x = 76
+y = 136
+text_y = 139
+source_x = 86
+source_y = 139
+width = 104
+height = 18
+selected = true
+en = "STORY MODE"
+es = "HISTORIA"
+fr = "HISTOIRE"
+it = "STORIA"
+pt = "HISTORIA"
+tl = "KUWENTO"
+id = "CERITA"
+zh = "\u5267\u60c5"
+ko = "\uc2a4\ud1a0\ub9ac"
+
+[[label]]
+label_id = "vs_mode"
+source = "VS. MODE"
+x = 76
+y = 149
+text_y = 150
+source_x = 97
+source_y = 150
+width = 104
+height = 13
+selected = false
+en = "VS. MODE"
+es = "MODO VS"
+fr = "MODE VS"
+it = "MODO VS"
+pt = "MODO VS"
+tl = "LABANAN"
+id = "MODE VS"
+zh = "\u5bf9\u6218"
+ko = "\ub300\uc804"
+
+[[label]]
+label_id = "trial_mode"
+source = "TRIAL MODE"
+x = 76
+y = 160
+text_y = 161
+source_x = 88
+source_y = 161
+width = 104
+height = 13
+selected = false
+en = "TRIAL MODE"
+es = "PRUEBA"
+fr = "ESSAI"
+it = "PROVA"
+pt = "TREINO"
+tl = "PAGSUBOK"
+id = "LATIHAN"
+zh = "\u8bd5\u70bc"
+ko = "\uc5f0\uc2b5"
+
+[[label]]
+label_id = "option"
+source = "OPTION"
+x = 76
+y = 171
+text_y = 172
+source_x = 104
+source_y = 172
+width = 104
+height = 13
+selected = false
+en = "OPTION"
+es = "OPCIONES"
+fr = "OPTIONS"
+it = "OPZIONI"
+pt = "OPCOES"
+tl = "OPSYON"
+id = "OPSI"
+zh = "\u9009\u9879"
+ko = "\uc124\uc815"

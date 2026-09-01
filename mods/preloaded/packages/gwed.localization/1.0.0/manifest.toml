@@ -1,0 +1,81 @@
+format_version = 1
+id = "gwed.localization"
+version = "1.0.0"
+name = "Gundam Wing Endless Duel Localization"
+author = "Aeon Genesis; Max1323; runtime integration by mstan"
+description = "Runtime localization by asset interception: guarded in-memory ROM, WRAM, and VRAM patches that the game's own render path draws. Nothing is drawn over the presented frame, and the ROM file on disk is never modified. English and Spanish are reference fan-translation patch data. French, Italian, Portuguese, Filipino (Tagalog) and Bahasa Indonesia are native throughout — title mode selector, option and key-config labels, opening/fight crawl, intro caption sprites, and all 162 battle/ending dialogue rows; French, Italian and Portuguese also add accented glyph cells to the dialogue font, while Tagalog and Indonesian need none. Korean and Simplified Chinese are native for the title menu, option menu, key config, opening/fight crawl, intro caption, and the victory/defeat battle dialogue, the last delivered as per-quote 16x16 glyph pages injected into free VRAM tiles behind byte-exact tilemap guards; the post-final conversation and the per-pilot endings still show English under those two languages."
+license = "Fan translation reference material; runtime integration MIT"
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "gwed-jp"
+rom_sha256 = "dd94308d822636c6ddf73c5e2644c84f2eb8fb4d9201150fc5f37d44d6f423f1"
+
+[[feature]]
+id = "localization"
+name = "Localization"
+description = "Select the text language applied at runtime."
+group = "Language"
+default_enabled = true
+
+[[option]]
+feature = "localization"
+id = "language"
+label = "Language"
+description = "Runtime text language."
+group = "Language"
+type = "choice"
+default = "en"
+
+[[option.choice]]
+value = "en"
+label = "English"
+
+[[option.choice]]
+value = "es"
+label = "Spanish"
+
+[[option.choice]]
+value = "fr"
+label = "French"
+
+[[option.choice]]
+value = "it"
+label = "Italian"
+
+[[option.choice]]
+value = "pt"
+label = "Portuguese"
+
+[[option.choice]]
+value = "tl"
+label = "Filipino (Tagalog)"
+
+[[option.choice]]
+value = "id"
+label = "Bahasa Indonesia"
+
+[[option.choice]]
+value = "zh"
+label = "Chinese (Simplified)"
+
+[[option.choice]]
+value = "ko"
+label = "Korean"
+
+[[option.choice]]
+# The launcher's font is Latin-only (recomp-ui loads LatoLatin plus a Japanese
+# subset and symbol/emoji ranges; U+0E00-U+0E7F is in none of them), so the
+# label stays ASCII -- "ไทย (Thai)" would render as tofu.  Same reason the
+# Korean and Chinese choices are labelled in English.
+value = "th"
+label = "Thai (partial)"
+
+[[option.choice]]
+value = "off"
+label = "Original Japanese"
+
+[[plugin]]
+feature = "localization"
+id = "gwed.localization.runtime"
