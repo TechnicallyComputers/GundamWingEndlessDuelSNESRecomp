@@ -22,7 +22,7 @@ from generate_dialogue_cjk_patch import row_payloads as cjk_row_payloads
 
 BEGIN_MARKER = "# BEGIN GENERATED DIALOGUE TILEMAP PATCHES"
 END_MARKER = "# END GENERATED DIALOGUE TILEMAP PATCHES"
-TARGET_LANGS = ("fr", "it", "pt")
+TARGET_LANGS = ("fr", "it", "pt", "tl", "id")
 TILE_BY_CHAR = {char: tile for tile, char in CHAR_BY_TILE.items()}
 ROW_WORDS = 32
 ROW_BYTES = ROW_WORDS * 2

@@ -20,7 +20,7 @@ def in_script_range(address: int) -> bool:
 
 
 REFERENCE_LANGS = ("en", "es")
-NATIVE_LATIN_LANGS = ("fr", "it", "pt")
+NATIVE_LATIN_LANGS = ("fr", "it", "pt", "tl", "id")
 
 
 def repo_root() -> Path:

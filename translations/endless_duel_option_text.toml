@@ -16,49 +16,49 @@
 schema = 1
 
 [[record]]
-id = "header_option"
+record_id = "header_option"
 address = 0x00c0d6
 source = "OPTION"
 ko = "  설정"
 zh = "  选项"
 
 [[record]]
-id = "list_level"
+record_id = "list_level"
 address = 0x00c0e9
 source = "  LEVEL"
 ko = "  난이도"
 zh = "  难度"
 
 [[record]]
-id = "list_time"
+record_id = "list_time"
 address = 0x00c0f9
 source = "  TIME"
 ko = "  시간"
 zh = "  时间"
 
 [[record]]
-id = "list_sound"
+record_id = "list_sound"
 address = 0x00c108
 source = "  SOUND"
 ko = "  사운드"
 zh = "  音效"
 
 [[record]]
-id = "list_key_config"
+record_id = "list_key_config"
 address = 0x00c118
 source = "  KEY CONFIG"
 ko = "  조작설정"
 zh = "  按键设置"
 
 [[record]]
-id = "list_exit"
+record_id = "list_exit"
 address = 0x00c12d
 source = "  EXIT"
 ko = "  나가기"
 zh = "  退出"
 
 [[record]]
-id = "level_selected"
+record_id = "level_selected"
 address = 0x00c179
 cursor = true
 source = " LEVEL"
@@ -66,35 +66,35 @@ ko = " 난이도"
 zh = " 难度"
 
 [[record]]
-id = "level_deselected"
+record_id = "level_deselected"
 address = 0x00c1a6
 source = "  LEVEL"
 ko = "  난이도"
 zh = "  难度"
 
 [[record]]
-id = "level_easy"
+record_id = "level_easy"
 address = 0x00c1d6
 source = "  EASY"
 ko = "  쉬움"
 zh = "  简单"
 
 [[record]]
-id = "level_normal"
+record_id = "level_normal"
 address = 0x00c1e7
 source = "NORMAL"
 ko = "  보통"
 zh = "  普通"
 
 [[record]]
-id = "level_hard"
+record_id = "level_hard"
 address = 0x00c1f8
 source = "  HARD"
 ko = " 어려움"
 zh = "  困难"
 
 [[record]]
-id = "time_selected"
+record_id = "time_selected"
 address = 0x00c224
 cursor = true
 source = " TIME"
@@ -102,28 +102,28 @@ ko = " 시간"
 zh = " 时间"
 
 [[record]]
-id = "time_deselected"
+record_id = "time_deselected"
 address = 0x00c250
 source = "  TIME"
 ko = "  시간"
 zh = "  时间"
 
 [[record]]
-id = "time_limit"
+record_id = "time_limit"
 address = 0x00c280
 source = "   LIMIT"
 ko = "   제한"
 zh = "   限时"
 
 [[record]]
-id = "time_no_limit"
+record_id = "time_no_limit"
 address = 0x00c293
 source = "NO LIMIT"
 ko = "  무제한"
 zh = "   无限"
 
 [[record]]
-id = "sound_selected"
+record_id = "sound_selected"
 address = 0x00c2c1
 cursor = true
 source = " SOUND"
@@ -131,28 +131,28 @@ ko = " 사운드"
 zh = " 音效"
 
 [[record]]
-id = "sound_deselected"
+record_id = "sound_deselected"
 address = 0x00c2ee
 source = "  SOUND"
 ko = "  사운드"
 zh = "  音效"
 
 [[record]]
-id = "sound_stereo"
+record_id = "sound_stereo"
 address = 0x00c31c
 source = "  STEREO"
 ko = "  스테레오"
 zh = "  立体声"
 
 [[record]]
-id = "sound_monaural"
+record_id = "sound_monaural"
 address = 0x00c32f
 source = "MONAURAL"
 ko = "   모노"
 zh = "  单声道"
 
 [[record]]
-id = "key_config_selected"
+record_id = "key_config_selected"
 address = 0x00c3d3
 cursor = true
 source = " KEY CONFIG"
@@ -160,14 +160,14 @@ ko = " 조작설정"
 zh = " 按键设置"
 
 [[record]]
-id = "key_config_deselected"
+record_id = "key_config_deselected"
 address = 0x00c405
 source = "  KEY CONFIG"
 ko = "  조작설정"
 zh = "  按键设置"
 
 [[record]]
-id = "exit_selected"
+record_id = "exit_selected"
 address = 0x00c438
 cursor = true
 source = " EXIT"
@@ -175,42 +175,42 @@ ko = " 나가기"
 zh = " 退出"
 
 [[record]]
-id = "exit_deselected"
+record_id = "exit_deselected"
 address = 0x00c464
 source = "  EXIT"
 ko = "  나가기"
 zh = "  退出"
 
 [[record]]
-id = "key_header"
+record_id = "key_header"
 address = 0x00c4b2
 source = "KEY CONFIG"
 ko = "   키 설정"
 zh = "   按键设置"
 
 [[record]]
-id = "key_weak_punch"
+record_id = "key_weak_punch"
 address = 0x00c4e7
 source = "WEAK   PUNCH"
 ko = "약펀치"
 zh = "轻拳"
 
 [[record]]
-id = "key_strong_punch"
+record_id = "key_strong_punch"
 address = 0x00c500
 source = "STRONG PUNCH"
 ko = "강펀치"
 zh = "重拳"
 
 [[record]]
-id = "key_weak_weapon"
+record_id = "key_weak_weapon"
 address = 0x00c519
 source = "WEAK   WEAPON"
 ko = "약무기"
 zh = "轻武器"
 
 [[record]]
-id = "key_strong_weapon"
+record_id = "key_strong_weapon"
 address = 0x00c533
 source = "STRONG WEAPON"
 ko = "강무기"

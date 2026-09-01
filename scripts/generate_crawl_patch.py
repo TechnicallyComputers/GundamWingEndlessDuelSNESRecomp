@@ -128,6 +128,17 @@ def update_block(block: str, generated: dict[str, str]) -> str:
         replacement = f'{lang}_hex = "{hex_value}"'
         if pattern.search(out):
             out = pattern.sub(replacement, out, count=1)
+            continue
+        # A new language has no line yet. Insert it directly AFTER the last
+        # existing <lang>_hex line, never at the end of the block: the block
+        # runs to the next [[rom_patch]] and therefore swallows any trailing
+        # marker comment, so appending would drop the new key INSIDE the
+        # following generated section, where the next --write deletes it.
+        existing = list(re.finditer(
+            r'(?m)^[a-z]{2}_hex\s*=\s*"[0-9a-fA-F]*"\s*$', out))
+        if existing:
+            at = existing[-1].end()
+            out = out[:at] + "\n" + replacement + out[at:]
         else:
             out = out.rstrip() + "\n" + replacement + "\n"
     return out
@@ -164,7 +175,12 @@ def main() -> int:
     mismatches = [lang for lang, hex_value in generated.items() if current.get(lang) != hex_value]
 
     if args.write and mismatches:
-        table_path.write_text(table_text[:start] + update_block(block, generated) + table_text[end:], encoding="utf-8")
+        # newline="\n": Path.write_text defaults to universal newline
+        # translation, which would silently rewrite the whole LF table as CRLF
+        # and make every other generator's --check diff.
+        table_path.write_text(
+            table_text[:start] + update_block(block, generated) + table_text[end:],
+            encoding="utf-8", newline="\n")
         print(f"updated {table_path} for: {', '.join(mismatches)}")
         return 0
 

@@ -13,7 +13,7 @@ from pathlib import Path
 # Latin languages only. ko/zh render these screens natively through the font
 # slot injection in scripts/generate_option_cjk_patch.py, which rewrites whole
 # records; these sub-span entries must stay inert for them.
-LANGS = ("en", "es", "fr", "it", "pt")
+LANGS = ("en", "es", "fr", "it", "pt", "tl", "id")
 STALE_LANGS = ("zh", "ko")
 
 

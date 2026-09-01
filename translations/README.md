@@ -17,8 +17,17 @@ map of current assets, commands, and open surfaces.
   key-config labels, opening/fight crawl, intro caption sprite art, and all 162
   battle/ending dialogue rows (with accented glyph cells added to the dialogue
   font by `generate_dialogue_accent_patch.py`).
-- `pt`: native crawl, menus, and intro caption; 109 of the 162 dialogue rows are
-  authored, the rest fall back to English.
+- `pt`: native throughout on the same footing as `fr`/`it` — crawl, menus,
+  intro caption, and all 162 dialogue rows.
+- `tl` (Filipino/Tagalog), `id` (Bahasa Indonesia): native throughout — title
+  mode-selector labels, option-menu and key-config labels, opening/fight crawl,
+  intro caption sprite art, and all 162 battle/ending dialogue rows. Both are
+  plain ASCII and allocate **zero** accent cells, so
+  `endless_duel_dialogue_accents.toml` is untouched by them; the wording instead
+  avoids the hyphen, which the dialogue charmap does not have (see that file's
+  header). `tl`/`id` also needed four extra single-byte option fragments
+  (`0x00c0da`, `0x00c1d6`, `0x00c4eb`, `0x00c51d`) so their labels are not cut
+  by the fixed spaces the reference English left inside those records.
 - `ko`, `zh`: both exposed in the launcher, both native for the title menu,
   option menu, key config, opening/fight crawl, intro caption, and the
   battle dialogue, the post-final Treize conversation and the per-pilot
@@ -67,7 +76,8 @@ screenshot-validated, and shipping.
 
 ## Adding Native Language Data
 
-Add per-patch fields such as `fr_hex`, `it_hex`, `pt_hex`, `ko_hex`, or `zh_hex`
+Add per-patch fields such as `fr_hex`, `it_hex`, `pt_hex`, `tl_hex`, `id_hex`,
+`ko_hex`, or `zh_hex`
 to the existing `[[rom_patch]]`, `[[ram_patch]]`, or `[[vram_patch]]` entries.
 The runtime tries the selected language first and then follows the root-level
 `fallback_<lang>` mapping. A native entry therefore overrides the English
@@ -79,8 +89,8 @@ game uploads to VRAM. Do not add native overlay bytes without screenshot
 validation; arbitrary Latin letter codes can render as unrelated pixels in that
 layer.
 
-The current Latin crawl text for English, Spanish, French, Italian, and
-Portuguese lives in `endless_duel_crawl.toml`. Run the generator after editing
+The current Latin crawl text for English, Spanish, French, Italian, Portuguese,
+Tagalog, and Indonesian lives in `endless_duel_crawl.toml`. Run the generator after editing
 those lines:
 
 ```powershell
@@ -109,9 +119,9 @@ python scripts\generate_option_patch.py --check
 ```
 
 The option generator fails on non-ASCII text or any translation whose byte
-length does not match the source patch width. It covers `es`, `fr`, `it`, `pt`
-only: those entries patch sub-spans of a record and are deliberately inert for
-`ko`/`zh`, which replace whole records instead (below).
+length does not match the source patch width. It covers `es`, `fr`, `it`, `pt`,
+`tl`, `id` only: those entries patch sub-spans of a record and are deliberately
+inert for `ko`/`zh`, which replace whole records instead (below).
 
 ### Native CJK option / key-config text (font-slot injection)
 
@@ -182,7 +192,7 @@ To preview rectangle fit against a captured frame without launching the game:
 
 ```powershell
 py -3 scripts\render_title_menu_overlay_preview.py `
-  C:\path\to\title-menu-capture\en --langs es,fr,it,pt
+  C:\path\to\title-menu-capture\en --langs es,fr,it,pt,tl,id
 ```
 
 Regenerate the authored/generated title glyph asset after changing non-ASCII
@@ -201,7 +211,7 @@ are review previews only; the actual in-game path is the generated
 
 The battle and ending dialogue decoded from the English and Spanish IPS files
 lives in `endless_duel_dialogue.toml`, with a readable audit report in
-`reference_dialogue_decode.md`. The authored French, Italian, and Portuguese
+`reference_dialogue_decode.md`. The authored native-Latin
 target strings live separately in `endless_duel_dialogue_targets.toml` so the
 decoder can be regenerated without overwriting human translation work. These
 lines are tilemaps, not script text: each line is a 32-tile top row followed by
@@ -209,7 +219,7 @@ a 32-tile bottom row, and each visible 16px glyph is encoded as `top_tile` plus
 `top_tile + 0x10`.
 
 Regenerate the dialogue source and the language-gated runtime patch section
-after editing the decoder or adding `fr`, `it`, or `pt` strings:
+after editing the decoder or adding `fr`, `it`, `pt`, `tl`, or `id` strings:
 
 ```powershell
 python scripts\decode_reference_tilemaps.py `
@@ -235,6 +245,8 @@ LANGUAGE by `generate_dialogue_accent_patch.py` from
 | fr | 4 | `é è à ê` |
 | it | 5 | `è à ù ì ò` |
 | pt | 5 | `ã é ê á ç` |
+| tl | 0 | (none - plain ASCII) |
+| id | 0 | (none - plain ASCII) |
 
 The art is composed from the English base letter plus a stamped diacritic, in a
 cleared band either above the x-height or - for the cedilla - below the baseline
@@ -269,30 +281,32 @@ python scripts\audit_localization_coverage.py
 This reports runtime patch counts, patched byte counts, root fallback mappings,
 and per-language editable crawl/option entries.
 
-To inspect the English/Spanish reference patches as a worklist for expanding
-French, Italian, and Portuguese, run:
+To inspect the English/Spanish reference patches as a worklist for expanding the
+native Latin languages (French, Italian, Portuguese, Tagalog, Indonesian), run:
 
 ```powershell
 python scripts\audit_reference_patch_map.py
 ```
 
 The highest-value spans are the `reference_diff_unmapped` ranges: English and
-Spanish differ there, but the current table has no French/Italian/Portuguese
-override. Those ranges are the next places to decode into text, tilemaps, or
+Spanish differ there, but the current table has no native-Latin override. Those ranges are the next places to decode into text, tilemaps, or
 external-rendered overlays.
 
-The headline tally is an ANY-of-fr/it/pt test, so a patch carrying two of the
-three still reads as mapped. The `Per-language effective reference-diff gap`
+The headline tally is an ANY-of-`fr`/`it`/`pt`/`tl`/`id` test, so a patch
+carrying only some of them still reads as mapped. The `Per-language effective reference-diff gap`
 block at the end re-runs the byte-owner pass requiring one language at a time -
 that is the number to read when asking "does <lang> still fall back to English
-anywhere?". All three are currently 0 bytes. The residual
+anywhere?". All five are currently 0 bytes. The residual
 `reference_glyph_art_diff` bytes are font CELL art the two reference hacks each
 repurposed for their own punctuation (dialogue cell `0x069` = the Spanish `ñ`,
 and the crawl font's `ó` at `0x02eb42`/`0x02ec40`); they are not text and not
 per-language work under the current mechanisms. Giving the CRAWL font
 per-language accented cells would need a new subsystem (free-cell audit plus
 per-language crawl glyph art), which is why the Portuguese crawl lines are
-unaccented while the Portuguese dialogue is not.
+unaccented while the Portuguese dialogue is not. The same limit is why the
+Tagalog and Indonesian crawl lines only use the letters A C E G L M P S T Y as
+capitals (that is the entire uppercase set the crawl font has) and never a
+lowercase `x`.
 
 For a lower-level pass against the original fan-patch IPS files, extract the
 English and Spanish archives and run:
@@ -388,7 +402,7 @@ activation and capture TCP-driven screenshots:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate_localization_tcp.ps1 `
-  -RomPath C:\path\to\gwedj.smc -Languages en,es,fr,it,pt
+  -RomPath C:\path\to\gwedj.smc -Languages en,es,fr,it,pt,tl,id
 ```
 
 The harness writes per-language screenshots, `xlate_stats.json`, `contact.html`,
@@ -401,7 +415,7 @@ For the scrolling opening/fight crawl specifically, capture fixed-time frames:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate_localization_crawl_tcp.ps1 `
-  -RomPath C:\path\to\gwedj.smc -Languages en,es,fr,it,pt -CaptureSeconds 55,60
+  -RomPath C:\path\to\gwedj.smc -Languages en,es,fr,it,pt,tl,id -CaptureSeconds 55,60
 ```
 
 The crawl harness also emits `contact.png` when `System.Drawing` is available,
@@ -423,7 +437,7 @@ the exact PPU/VRAM/CGRAM/OAM state used to draw it:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\probe_title_menu_vram.ps1 `
-  -RomPath C:\path\to\gwedj.smc -Languages off,en,es,fr,it,pt -Visible
+  -RomPath C:\path\to\gwedj.smc -Languages off,en,es,fr,it,pt,tl,id -Visible
 ```
 
 This probe uses TCP input to advance to the mode menu, then writes
@@ -438,7 +452,7 @@ python scripts\render_oam_capture.py C:\path\to\capture\en
 The current evidence shows the Japanese ROM already draws the visible
 `STORY MODE`, `VS. MODE`, `TRIAL MODE`, and `OPTION` labels in English. A
 2026-08-30 visible probe confirmed those labels are byte-identical across
-`off`, `en`, `es`, `fr`, `it`, and `pt`; the active runtime table does not touch
+`off`, `en`, `es`, `fr`, `it`, `pt`, `tl`, and `id`; the active runtime table does not touch
 this surface. On that capture the mode-menu screen is Mode 1, BG1 map base
 `0xd000`, BG2 map base `0xe000`, BG3 map base `0xf000`, BG1/BG2 tile base
 `0xc000`, and OBJ base `0x00000`. The selectable label area lines up with BG1

@@ -53,7 +53,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-LANGS = ("en", "es", "fr", "it", "pt", "zh", "ko")
+LANGS = ("en", "es", "fr", "it", "pt", "tl", "id", "zh", "ko")
 
 BEGIN_MARK = "# BEGIN GENERATED INTRO CAPTION PATCHES"
 END_MARK = "# END GENERATED INTRO CAPTION PATCHES"

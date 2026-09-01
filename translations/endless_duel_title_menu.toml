@@ -18,7 +18,7 @@ inactive_shadow = [24, 56, 48]
 inactive_fill = [18, 48, 48]
 
 [[label]]
-id = "story_mode"
+label_id = "story_mode"
 source = "STORY MODE"
 x = 76
 y = 136
@@ -33,11 +33,13 @@ es = "HISTORIA"
 fr = "HISTOIRE"
 it = "STORIA"
 pt = "HISTORIA"
+tl = "KUWENTO"
+id = "CERITA"
 zh = "\u5267\u60c5"
 ko = "\uc2a4\ud1a0\ub9ac"
 
 [[label]]
-id = "vs_mode"
+label_id = "vs_mode"
 source = "VS. MODE"
 x = 76
 y = 149
@@ -52,11 +54,13 @@ es = "MODO VS"
 fr = "MODE VS"
 it = "MODO VS"
 pt = "MODO VS"
+tl = "LABANAN"
+id = "MODE VS"
 zh = "\u5bf9\u6218"
 ko = "\ub300\uc804"
 
 [[label]]
-id = "trial_mode"
+label_id = "trial_mode"
 source = "TRIAL MODE"
 x = 76
 y = 160
@@ -71,11 +75,13 @@ es = "PRUEBA"
 fr = "ESSAI"
 it = "PROVA"
 pt = "TREINO"
+tl = "PAGSUBOK"
+id = "LATIHAN"
 zh = "\u8bd5\u70bc"
 ko = "\uc5f0\uc2b5"
 
 [[label]]
-id = "option"
+label_id = "option"
 source = "OPTION"
 x = 76
 y = 171
@@ -90,5 +96,7 @@ es = "OPCIONES"
 fr = "OPTIONS"
 it = "OPZIONI"
 pt = "OPCOES"
+tl = "OPSYON"
+id = "OPSI"
 zh = "\u9009\u9879"
 ko = "\uc124\uc815"

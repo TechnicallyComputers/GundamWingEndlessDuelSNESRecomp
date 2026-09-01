@@ -284,6 +284,45 @@ lines = [
   "alla Sfera terrestre...",
 ]
 
+# Tagalog and Indonesian use the DEFAULT slot table (no line_slot overrides),
+# so the per-line budgets are 28,28,30,30,30,30,30,29,27,27 characters.
+#
+# The crawl glyph set above is what constrains the wording, not the language:
+# the only UPPERCASE letters that exist are A C E G L M P S T Y, there is no
+# lowercase 'x', and the only digit is '5'. Consequences recorded so they are
+# not "corrected" later:
+#   * tl/id: "bumi" / "mundo" (Earth) are lowercase - 'B' and 'M'... 'M' exists,
+#     'B' does not, so Indonesian "Bumi" must be written "bumi".
+#   * tl "Alyansa" and id "Aliansi" keep their capital A (allowed).
+#   * id sentence openers were chosen from S/M/A on purpose.
+[languages.tl]
+lines = [
+  "Tulad ng bulalakaw, limang",
+  "kabataan ay bumaba sa mundo.",
+  "Sa mga Gundam, sila ay",
+  "binigyan ng lihim na misyon",
+  "na sirain ang mga mobile",
+  "suit ng Alyansa, at patayin",
+  "ang sinumang humahadlang",
+  "sa misyon....",
+  "Sana ay maghatid sila ng",
+  "kalayaan sa mundo...",
+]
+
+[languages.id]
+lines = [
+  "Seperti bintang jatuh, lima",
+  "pemuda turun ke bumi.",
+  "Mengemudi Gundam, mereka",
+  "diberi misi sangat rahasia",
+  "menghancurkan mobile suit",
+  "Aliansi, dan membunuh",
+  "siapa pun yang mengancam",
+  "penyelesaian tugas....",
+  "Semoga mereka membawa",
+  "kebebasan ke bumi...",
+]
+
 [languages.pt]
 lines = [
   "Estrelas cadentes,cinco",

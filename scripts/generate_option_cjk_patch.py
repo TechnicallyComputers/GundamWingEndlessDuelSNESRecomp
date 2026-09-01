@@ -150,12 +150,12 @@ def encode(record: dict, lang: str, codes: dict[str, int]) -> bytes:
         value = ord(char)
         if not 0x20 <= value <= 0x5F:
             raise ValueError(
-                f"{record['id']} {lang}: {char!r} is outside the stock "
+                f"{record['record_id']} {lang}: {char!r} is outside the stock "
                 "font's ASCII range 0x20-0x5f")
         out.append(value)
     if len(out) > span:
         raise ValueError(
-            f"{record['id']} {lang}: {len(out)} bytes exceed the "
+            f"{record['record_id']} {lang}: {len(out)} bytes exceed the "
             f"{span}-byte record span")
     out.extend([PAD_BYTE] * (span - len(out)))
     return bytes(out)
@@ -180,16 +180,16 @@ def verify_against_rom(root: Path, records: list[dict]) -> bool:
         want = source_bytes(record)
         end = address + len(want)
         if end >= len(rom):
-            errors.append(f"{record['id']}: {address:#08x} past end of ROM")
+            errors.append(f"{record['record_id']}: {address:#08x} past end of ROM")
             continue
         have = rom[address:end]
         if have != want:
             errors.append(
-                f"{record['id']} at {address:#08x}: ROM has {have.hex()}, "
+                f"{record['record_id']} at {address:#08x}: ROM has {have.hex()}, "
                 f"source says {want.hex()}")
         elif rom[end] != RECORD_TERMINATOR:
             errors.append(
-                f"{record['id']} at {address:#08x}: record does not end at "
+                f"{record['record_id']} at {address:#08x}: record does not end at "
                 f"0x{RECORD_TERMINATOR:02x} (found 0x{rom[end]:02x})")
     if errors:
         raise ValueError("\n".join(errors))
@@ -263,13 +263,13 @@ def generate_section(root: Path) -> str:
         address = int(record["address"])
         span = record_span(record)
         lines.append("[[rom_patch]]")
-        lines.append(f"# option text: {record['id']}")
+        lines.append(f"# option text: {record['record_id']}")
         lines.append(f"address = 0x{address:06x}")
         lines.append(f'source_hex = "{source_bytes(record).hex()}"')
         for lang in LANGS:
             payload = encode(record, lang, allocations[lang])
             if len(payload) != span:
-                raise ValueError(f"{record['id']} {lang}: span mismatch")
+                raise ValueError(f"{record['record_id']} {lang}: span mismatch")
             lines.append(f'{lang}_hex = "{payload.hex()}"')
         lines.append("")
 

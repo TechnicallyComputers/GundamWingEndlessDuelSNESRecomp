@@ -3,7 +3,7 @@ id = "gwed.localization"
 version = "1.0.0"
 name = "Gundam Wing Endless Duel Localization"
 author = "Aeon Genesis; Max1323; runtime integration by mstan"
-description = "Runtime localization by asset interception: guarded in-memory ROM, WRAM, and VRAM patches that the game's own render path draws. Nothing is drawn over the presented frame, and the ROM file on disk is never modified. English and Spanish are reference fan-translation patch data. French and Italian are native throughout — title mode selector, option and key-config labels, opening/fight crawl, intro caption sprites, and all 162 battle/ending dialogue rows, including accented glyph cells added to the dialogue font. Portuguese is native for the crawl, menus, and caption and falls back to English for the dialogue rows it has not yet authored. Korean and Simplified Chinese are native for the title menu, option menu, key config, opening/fight crawl, intro caption, and the victory/defeat battle dialogue, the last delivered as per-quote 16x16 glyph pages injected into free VRAM tiles behind byte-exact tilemap guards; the post-final conversation and the per-pilot endings still show English under those two languages."
+description = "Runtime localization by asset interception: guarded in-memory ROM, WRAM, and VRAM patches that the game's own render path draws. Nothing is drawn over the presented frame, and the ROM file on disk is never modified. English and Spanish are reference fan-translation patch data. French, Italian, Portuguese, Filipino (Tagalog) and Bahasa Indonesia are native throughout — title mode selector, option and key-config labels, opening/fight crawl, intro caption sprites, and all 162 battle/ending dialogue rows; French, Italian and Portuguese also add accented glyph cells to the dialogue font, while Tagalog and Indonesian need none. Korean and Simplified Chinese are native for the title menu, option menu, key config, opening/fight crawl, intro caption, and the victory/defeat battle dialogue, the last delivered as per-quote 16x16 glyph pages injected into free VRAM tiles behind byte-exact tilemap guards; the post-final conversation and the per-pilot endings still show English under those two languages."
 license = "Fan translation reference material; runtime integration MIT"
 resolver = "declarative"
 save_compatibility = "shared"
@@ -47,6 +47,14 @@ label = "Italian"
 [[option.choice]]
 value = "pt"
 label = "Portuguese"
+
+[[option.choice]]
+value = "tl"
+label = "Filipino (Tagalog)"
+
+[[option.choice]]
+value = "id"
+label = "Bahasa Indonesia"
 
 [[option.choice]]
 value = "zh"

@@ -34,7 +34,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-LANGS = ("es", "fr", "it", "pt", "zh", "ko")
+LANGS = ("es", "fr", "it", "pt", "tl", "id", "zh", "ko")
 
 BEGIN_MARK = "# BEGIN GENERATED TITLE MENU VRAM PATCHES"
 END_MARK = "# END GENERATED TITLE MENU VRAM PATCHES"
@@ -256,7 +256,7 @@ def generate_section(root: Path) -> str:
     for lang in LANGS:
         labels = {}
         for label in menu["label"]:
-            label_id = str(label["id"])
+            label_id = str(label["label_id"])
             if label_id not in LABEL_LAYOUT:
                 raise ValueError(f"unknown label id {label_id!r}")
             text = label.get(lang)

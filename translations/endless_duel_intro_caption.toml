@@ -120,6 +120,23 @@ line1_left = "Após"
 line1_right = "Colônia"
 line2 = "keep"
 
+# Tagalog / Indonesian. Free-form sprite art, so there is no glyph budget -
+# only the two 48x24px boxes. "Matapos ang Kolonya" and "Setelah Koloni" are
+# the natural renderings of "After Colony"; the geometry is two boxes, so the
+# Tagalog linker "ang" is dropped (the era name reads as a two-word label in
+# every other language too).
+[language.tl]
+face = "latin"
+line1_left = "Matapos"
+line1_right = "Kolonya"
+line2 = "keep"
+
+[language.id]
+face = "latin"
+line1_left = "Setelah"
+line1_right = "Koloni"
+line2 = "keep"
+
 [language.ko]
 face = "ko"
 line1_left = "애프터"

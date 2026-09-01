@@ -433,6 +433,10 @@ real time once; none should waste it twice.
 | relaxed N-glyph tilemap signatures | captures tagged with the wrong dialogue group ("This w" is two different rows in two different groups) | partition captures by SCREEN (PPU map/char base + box row), then decode the map to read what is actually up |
 | PS `Set-Content -Encoding utf8` in the capture harness | `json.load` on a capture dies with "Expecting value: line 1 column 1" | read capture JSON with `encoding="utf-8-sig"` |
 | a 64-wide BG map is two 32-wide screens | decoding at a 64-word row stride shows an empty tilemap | row stride is 0x40 **bytes** (32 words); the right half lives at +0x800 |
+| a language code that collides with a source table's own key — `id` (Indonesian) vs `id = "story_mode"` | `tomllib`: "Cannot overwrite a value"; and every per-entry audit counts the identity string as an `id` translation | never name an entry-identity key after anything that could be an ISO 639-1 code; rename it (`label_id`, `record_id`) the moment you add such a language |
+| a generator that appends a NEW `<lang>_hex` line at the end of a `[[rom_patch]]` block | the key lands *after* a following `# BEGIN GENERATED …` marker, i.e. inside the next generator's section, and that generator's next `--write` silently deletes it | blocks run to the next `[[rom_patch]]`, so insert new keys after the LAST existing `*_hex` line, never at block end |
+| `Path.write_text(..., encoding=…)` without `newline="\n"` | one generator's `--write` rewrites the whole LF table as CRLF and every other generator's `--check` diffs | always pass `newline="\n"` when writing the runtime table |
+| assuming a font has the ASCII glyph its code implies | the option font drew `MAH.` as `MAHL` — code 0x2e's cell is not a period on these screens | render the label live before shipping punctuation; the Latin option font here is safe for A-Z and space only |
 
 ---
 

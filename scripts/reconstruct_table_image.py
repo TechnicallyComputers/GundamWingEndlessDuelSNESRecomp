@@ -24,7 +24,7 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-ALL_LANGS = ("en", "es", "fr", "it", "pt", "zh", "ko")
+ALL_LANGS = ("en", "es", "fr", "it", "pt", "tl", "id", "zh", "ko")
 
 
 def repo_root() -> Path:
@@ -102,7 +102,7 @@ def build_image(
 def main() -> int:
     table = load_table()
     rom = default_rom_path().read_bytes()
-    for lang in ("en", "es", "fr", "it", "pt"):
+    for lang in ("en", "es", "fr", "it", "pt", "tl", "id"):
         _, applied, skipped = build_image(lang, table, rom)
         print(f"{lang}: applied {applied}, guard-skipped {skipped}")
     return 0
