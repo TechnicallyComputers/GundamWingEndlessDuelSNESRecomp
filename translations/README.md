@@ -16,7 +16,8 @@ map of current assets, commands, and open surfaces.
   graphics and still-undecoded reference spans fall back to English patch data.
 - `ko`: exposed as a prototype. Korean has native title/menu, option-screen,
   key-config, and opening/fight crawl coverage through generated runtime
-  glyph/tile patches.
+  glyph/tile patches. Every surface is drawn by the game itself; nothing is
+  drawn over the presented frame.
 - `zh`: not exposed in the launcher. Chinese remains research input.
 
 English and Spanish are broader because they were imported from existing full
@@ -82,7 +83,46 @@ python scripts\generate_option_patch.py --check
 ```
 
 The option generator fails on non-ASCII text or any translation whose byte
-length does not match the source patch width.
+length does not match the source patch width. It covers `es`, `fr`, `it`, `pt`
+only: those entries patch sub-spans of a record and are deliberately inert for
+`ko`/`zh`, which replace whole records instead (below).
+
+### Native CJK option / key-config text (font-slot injection)
+
+Both option screens are drawn from a display list in ROM at
+`0x00c000-0x00c800`. Its opcodes are 16-bit: `0x000c` sets column/row, `0x0006`
+sets the attribute mask, `0x0002` prints font codes until a `0xff` terminator,
+`0x0018` prints a variable, and `0x0004` ends the list. There are 44 print
+records; the translated ones (28) live in `endless_duel_option_text.toml`, keyed
+by the address of the record's first string byte, with the exact stock `source`
+text and `cursor = true` for records whose first byte is the `0x09` selection
+cursor.
+
+The screens use a BG2 Mode 0 2bpp font at char base `0x0000`, 16 bytes per tile.
+A character code `c` in `0x20-0x9f` draws an 8x16 cell from two stacked tiles:
+
+```
+top    = 2 * (c & 0xf0) - 0x40 + (c & 0x0f)
+bottom = top + 0x10
+```
+
+Codes `0x60-0x9f` are free: their tiles `0x80-0xff` (VRAM `0x0800-0x0fff`) are
+all-zero on these screens and no record references them. Because the font is
+generated rather than stored raw in ROM, the glyph art ships as source-guarded
+`[[vram_patch]]` entries over that all-zero region -- a real guard, since the
+same VRAM is non-zero on the title screen, so the patches no-op everywhere else.
+
+`scripts/generate_option_cjk_patch.py` allocates one free code per distinct
+character per language over the sorted charset, packs the 8x8 masks from
+`endless_duel_title_glyphs.toml` vertically centred into the 8x16 cell, and
+emits both the `[[rom_patch]]` record bytes and the `[[vram_patch]]` font tiles,
+plus a code allocation table. Source bytes are verified against the ROM at the
+repo root at generation time.
+
+```powershell
+py -3 scripts\generate_option_cjk_patch.py --write
+py -3 scripts\generate_option_cjk_patch.py --check
+```
 
 The title-screen mode selector labels live in
 `endless_duel_title_menu.toml`. These are `STORY MODE`, `VS. MODE`,
@@ -120,7 +160,8 @@ py -3 scripts\render_title_menu_overlay_preview.py `
 ```
 
 Regenerate the authored/generated title glyph asset after changing non-ASCII
-title labels:
+title-menu labels or option records (it is the shared mask source for both the
+title tile art and the option font slots):
 
 ```powershell
 py -3 scripts\generate_title_glyphs.py --check

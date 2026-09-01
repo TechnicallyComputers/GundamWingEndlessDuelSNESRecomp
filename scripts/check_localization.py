@@ -19,7 +19,9 @@ SCRIPT_CHECKS = (
     "scripts/generate_crawl_patch.py",
     "scripts/generate_cjk_crawl_patch.py",
     "scripts/generate_title_glyphs.py",
+    "scripts/generate_title_menu_vram_patch.py",
     "scripts/generate_option_patch.py",
+    "scripts/generate_option_cjk_patch.py",
     "scripts/generate_dialogue_patch.py",
     "scripts/audit_localization_coverage.py",
     "scripts/render_dialogue_previews.py",
@@ -95,7 +97,9 @@ def main() -> int:
     run(root, [sys.executable, "scripts/generate_crawl_patch.py", "--check"])
     run(root, [sys.executable, "scripts/generate_cjk_crawl_patch.py", "--check"])
     run(root, [sys.executable, "scripts/generate_title_glyphs.py", "--check"])
+    run(root, [sys.executable, "scripts/generate_title_menu_vram_patch.py", "--check"])
     run(root, [sys.executable, "scripts/generate_option_patch.py", "--check"])
+    run(root, [sys.executable, "scripts/generate_option_cjk_patch.py", "--check"])
     run(root, [sys.executable, "scripts/generate_dialogue_patch.py"])
     validate_patch_widths(root)
     run(root, [sys.executable, "scripts/audit_localization_coverage.py"])

@@ -55,7 +55,6 @@ add_executable(GundamWingEndlessDuelSNESRecomp
     src/host_contract.c
     src/codegen_setup.c
     src/game_rtl.c
-    src/title_menu_overlay.c
     src/translation_mod.c
     src/gen_stubs.c
     ${GAME_GEN_SOURCES}

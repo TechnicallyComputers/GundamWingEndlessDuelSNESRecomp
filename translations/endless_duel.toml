@@ -2062,22 +2062,16 @@ source_hex = "54"
 es_hex = "43"
 it_hex = "5a"
 pt_hex = "43"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c0d9
 source_hex = "49"
 pt_hex = "41"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c0db
 source_hex = "4e"
 pt_hex = "20"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c0ea
@@ -2086,8 +2080,6 @@ es_hex = "4e4956454c20"
 fr_hex = "4e4956454155"
 it_hex = "4c4956454c20"
 pt_hex = "4e4956454c20"
-zh_hex = "202020202020"
-ko_hex = "202020202020"
 
 [[rom_patch]]
 address = 0x00c0fa
@@ -2096,8 +2088,6 @@ es_hex = "544945"
 fr_hex = "54454d"
 it_hex = "54454d"
 pt_hex = "54454d"
-zh_hex = "202020"
-ko_hex = "202020"
 
 [[rom_patch]]
 address = 0x00c0fd
@@ -2105,8 +2095,6 @@ source_hex = "4d"
 fr_hex = "50"
 it_hex = "50"
 pt_hex = "50"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c0fe
@@ -2115,8 +2103,6 @@ es_hex = "50"
 fr_hex = "53"
 it_hex = "4f"
 pt_hex = "4f"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c109
@@ -2125,8 +2111,6 @@ es_hex = "534f4e49444f"
 fr_hex = "534f4e202020"
 it_hex = "415544494f20"
 pt_hex = "534f4d202020"
-zh_hex = "202020202020"
-ko_hex = "202020202020"
 
 [[rom_patch]]
 address = 0x00c119
@@ -2135,8 +2119,6 @@ es_hex = "4d414e444f202020202020"
 fr_hex = "434f4e54524f4c45532020"
 it_hex = "434f4d414e444920202020"
 pt_hex = "434f4e54524f4c45532020"
-zh_hex = "2020202020202020202020"
-ko_hex = "2020202020202020202020"
 
 [[rom_patch]]
 address = 0x00c12e
@@ -2145,16 +2127,12 @@ es_hex = "53414c"
 fr_hex = "204649"
 it_hex = "455343"
 pt_hex = "534149"
-zh_hex = "202020"
-ko_hex = "202020"
 
 [[rom_patch]]
 address = 0x00c131
 source_hex = "49"
 fr_hex = "4e"
 pt_hex = "52"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c132
@@ -2163,8 +2141,6 @@ es_hex = "52"
 fr_hex = "20"
 it_hex = "20"
 pt_hex = "20"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c17a
@@ -2173,8 +2149,6 @@ es_hex = "4e4956454c20"
 fr_hex = "4e4956454155"
 it_hex = "4c4956454c20"
 pt_hex = "4e4956454c20"
-zh_hex = "202020202020"
-ko_hex = "202020202020"
 
 [[rom_patch]]
 address = 0x00c1a7
@@ -2183,8 +2157,6 @@ es_hex = "4e4956454c20"
 fr_hex = "4e4956454155"
 it_hex = "4c4956454c20"
 pt_hex = "4e4956454c20"
-zh_hex = "202020202020"
-ko_hex = "202020202020"
 
 [[rom_patch]]
 address = 0x00c1d7
@@ -2193,14 +2165,10 @@ es_hex = "464143494c"
 fr_hex = "464143494c"
 it_hex = "464143494c"
 pt_hex = "464143494c"
-zh_hex = "2020202020"
-ko_hex = "2020202020"
 
 [[rom_patch]]
 address = 0x00c1e7
 source_hex = "4e4f524d414c"
-zh_hex = "202020202020"
-ko_hex = "202020202020"
 
 [[rom_patch]]
 address = 0x00c1f9
@@ -2209,8 +2177,6 @@ es_hex = "4449464943"
 fr_hex = "4455522020"
 it_hex = "444946462e"
 pt_hex = "4449464943"
-zh_hex = "2020202020"
-ko_hex = "2020202020"
 
 [[rom_patch]]
 address = 0x00c225
@@ -2219,8 +2185,6 @@ es_hex = "544945"
 fr_hex = "54454d"
 it_hex = "54454d"
 pt_hex = "54454d"
-zh_hex = "202020"
-ko_hex = "202020"
 
 [[rom_patch]]
 address = 0x00c228
@@ -2228,8 +2192,6 @@ source_hex = "4d"
 fr_hex = "50"
 it_hex = "50"
 pt_hex = "50"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c229
@@ -2238,8 +2200,6 @@ es_hex = "50"
 fr_hex = "53"
 it_hex = "4f"
 pt_hex = "4f"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c251
@@ -2248,8 +2208,6 @@ es_hex = "544945"
 fr_hex = "54454d"
 it_hex = "54454d"
 pt_hex = "54454d"
-zh_hex = "202020"
-ko_hex = "202020"
 
 [[rom_patch]]
 address = 0x00c254
@@ -2257,8 +2215,6 @@ source_hex = "4d"
 fr_hex = "50"
 it_hex = "50"
 pt_hex = "50"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c255
@@ -2267,20 +2223,14 @@ es_hex = "50"
 fr_hex = "53"
 it_hex = "4f"
 pt_hex = "4f"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c283
 source_hex = "4c494d4954"
-zh_hex = "2020202020"
-ko_hex = "2020202020"
 
 [[rom_patch]]
 address = 0x00c296
 source_hex = "4c494d4954"
-zh_hex = "2020202020"
-ko_hex = "2020202020"
 
 [[rom_patch]]
 address = 0x00c2c2
@@ -2289,8 +2239,6 @@ es_hex = "534f4e49444f"
 fr_hex = "534f4e202020"
 it_hex = "415544494f20"
 pt_hex = "534f4d202020"
-zh_hex = "202020202020"
-ko_hex = "202020202020"
 
 [[rom_patch]]
 address = 0x00c2ef
@@ -2299,14 +2247,10 @@ es_hex = "534f4e49444f"
 fr_hex = "534f4e202020"
 it_hex = "415544494f20"
 pt_hex = "534f4d202020"
-zh_hex = "202020202020"
-ko_hex = "202020202020"
 
 [[rom_patch]]
 address = 0x00c31e
 source_hex = "53544552454f"
-zh_hex = "202020202020"
-ko_hex = "202020202020"
 
 [[rom_patch]]
 address = 0x00c3d4
@@ -2315,8 +2259,6 @@ es_hex = "4d414e444f202020202020"
 fr_hex = "434f4e54524f4c45532020"
 it_hex = "434f4d414e444920202020"
 pt_hex = "434f4e54524f4c45532020"
-zh_hex = "2020202020202020202020"
-ko_hex = "2020202020202020202020"
 
 [[rom_patch]]
 address = 0x00c406
@@ -2325,8 +2267,6 @@ es_hex = "4d414e444f202020202020"
 fr_hex = "434f4e54524f4c45532020"
 it_hex = "434f4d414e444920202020"
 pt_hex = "434f4e54524f4c45532020"
-zh_hex = "2020202020202020202020"
-ko_hex = "2020202020202020202020"
 
 [[rom_patch]]
 address = 0x00c439
@@ -2335,16 +2275,12 @@ es_hex = "53414c"
 fr_hex = "204649"
 it_hex = "455343"
 pt_hex = "534149"
-zh_hex = "202020"
-ko_hex = "202020"
 
 [[rom_patch]]
 address = 0x00c43c
 source_hex = "49"
 fr_hex = "4e"
 pt_hex = "52"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c43d
@@ -2353,8 +2289,6 @@ es_hex = "52"
 fr_hex = "20"
 it_hex = "20"
 pt_hex = "20"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c465
@@ -2363,16 +2297,12 @@ es_hex = "53414c"
 fr_hex = "204649"
 it_hex = "455343"
 pt_hex = "534149"
-zh_hex = "202020"
-ko_hex = "202020"
 
 [[rom_patch]]
 address = 0x00c468
 source_hex = "49"
 fr_hex = "4e"
 pt_hex = "52"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c469
@@ -2381,8 +2311,6 @@ es_hex = "52"
 fr_hex = "20"
 it_hex = "20"
 pt_hex = "20"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c4b2
@@ -2391,8 +2319,6 @@ es_hex = "20204d414e444f202020"
 fr_hex = "434f4e54524f4c455320"
 it_hex = "434f4d414e4449202020"
 pt_hex = "434f4e54524f4c455320"
-zh_hex = "20202020202020202020"
-ko_hex = "20202020202020202020"
 
 [[rom_patch]]
 address = 0x00c4e7
@@ -2401,8 +2327,6 @@ es_hex = "50554e4f"
 fr_hex = "434f5550"
 it_hex = "434f4c50"
 pt_hex = "534f434f"
-zh_hex = "20202020"
-ko_hex = "20202020"
 
 [[rom_patch]]
 address = 0x00c4ec
@@ -2411,8 +2335,6 @@ es_hex = "444542494c2020"
 fr_hex = "464149424c4520"
 it_hex = "4445424f4c4520"
 pt_hex = "465241434f2020"
-zh_hex = "20202020202020"
-ko_hex = "20202020202020"
 
 [[rom_patch]]
 address = 0x00c500
@@ -2421,16 +2343,12 @@ es_hex = "50554e"
 fr_hex = "434f55"
 it_hex = "434f4c"
 pt_hex = "534f43"
-zh_hex = "202020"
-ko_hex = "202020"
 
 [[rom_patch]]
 address = 0x00c503
 source_hex = "4f"
 fr_hex = "50"
 it_hex = "50"
-zh_hex = "20"
-ko_hex = "20"
 
 [[rom_patch]]
 address = 0x00c504
@@ -2439,8 +2357,6 @@ es_hex = "2046554552544520"
 fr_hex = "20464f5254202020"
 it_hex = "20464f5254452020"
 pt_hex = "20464f5254452020"
-zh_hex = "2020202020202020"
-ko_hex = "2020202020202020"
 
 [[rom_patch]]
 address = 0x00c519
@@ -2449,8 +2365,6 @@ es_hex = "41524d41"
 fr_hex = "41524d45"
 it_hex = "41524d41"
 pt_hex = "41524d41"
-zh_hex = "20202020"
-ko_hex = "20202020"
 
 [[rom_patch]]
 address = 0x00c51e
@@ -2459,8 +2373,6 @@ es_hex = "444542494c202020"
 fr_hex = "464149424c452020"
 it_hex = "4445424f4c452020"
 pt_hex = "4652414341202020"
-zh_hex = "2020202020202020"
-ko_hex = "2020202020202020"
 
 [[rom_patch]]
 address = 0x00c533
@@ -2469,8 +2381,6 @@ es_hex = "41524d41204655455254452020"
 fr_hex = "41524d4520464f525445202020"
 it_hex = "41524d4120464f525445202020"
 pt_hex = "41524d4120464f525445202020"
-zh_hex = "20202020202020202020202020"
-ko_hex = "20202020202020202020202020"
 
 [[rom_patch]]
 address = 0x00e000
@@ -19546,3 +19456,730 @@ zh_hex = "0000000000000000000000000000000000000000000000000000000000000000000000
 ko_hex = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 
 # END GENERATED TITLE MENU VRAM PATCHES
+
+# BEGIN GENERATED OPTION CJK PATCHES
+# Native CJK option / key-config text via font-slot injection.
+# Generated by scripts/generate_option_cjk_patch.py from
+# endless_duel_option_text.toml and the glyph masks in
+# endless_duel_title_glyphs.toml. Do not hand-edit.
+#
+# Free font codes 0x60-0x9f are allocated per language over the sorted
+# distinct characters; code c draws tiles 2*(c&0xf0)-0x40+(c&0x0f) and
+# +0x10, i.e. VRAM 0x0800-0x0fff, which is all-zero on these screens.
+#
+# ROM source bytes verified against Shin Kidou Senki Gundam W - Endless Duel (J).smc: yes
+#
+# code |   ko   |   zh
+# 0x60 | U+AC00 | U+4F53
+# 0x61 | U+AC04 | U+51FA
+# 0x62 | U+AC15 | U+5355
+# 0x63 | U+AE30 | U+5668
+# 0x64 | U+B098 | U+56F0
+# 0x65 | U+B09C | U+58F0
+# 0x66 | U+B178 | U+5EA6
+# 0x67 | U+B3C4 | U+62F3
+# 0x68 | U+B4DC | U+6309
+# 0x69 | U+B808 | U+6548
+# 0x6a | U+B824 | U+65E0
+# 0x6b | U+BAA8 | U+65F6
+# 0x6c | U+BB34 | U+666E
+# 0x6d | U+BCF4 | U+6B66
+# 0x6e | U+C0AC | U+7ACB
+# 0x6f | U+C124 | U+7B80
+# 0x70 | U+C26C | U+7F6E
+# 0x71 | U+C2A4 | U+8BBE
+# 0x72 | U+C2DC | U+8F7B
+# 0x73 | U+C57D | U+9000
+# 0x74 | U+C5B4 | U+9009
+# 0x75 | U+C624 | U+901A
+# 0x76 | U+C6B4 | U+9053
+# 0x77 | U+C6C0 | U+91CD
+# 0x78 | U+C774 | U+952E
+# 0x79 | U+C791 | U+95F4
+# 0x7a | U+C815 | U+9650
+# 0x7b | U+C81C | U+96BE
+# 0x7c | U+C870 | U+97F3
+# 0x7d | U+CE58 | U+9879
+# 0x7e | U+D0A4 |   -
+# 0x7f | U+D14C |   -
+# 0x80 | U+D1B5 |   -
+# 0x81 | U+D380 |   -
+# 0x82 | U+D55C |   -
+
+[[rom_patch]]
+# option text: header_option
+address = 0x00c0d6
+source_hex = "4f5054494f4e"
+ko_hex = "20206f7a2020"
+zh_hex = "2020747d2020"
+
+[[rom_patch]]
+# option text: list_level
+address = 0x00c0e9
+source_hex = "20204c4556454c"
+ko_hex = "20206578672020"
+zh_hex = "20207b66202020"
+
+[[rom_patch]]
+# option text: list_time
+address = 0x00c0f9
+source_hex = "202054494d45"
+ko_hex = "202072612020"
+zh_hex = "20206b792020"
+
+[[rom_patch]]
+# option text: list_sound
+address = 0x00c108
+source_hex = "2020534f554e44"
+ko_hex = "20206e76682020"
+zh_hex = "20207c69202020"
+
+[[rom_patch]]
+# option text: list_key_config
+address = 0x00c118
+source_hex = "20204b455920434f4e464947"
+ko_hex = "20207c796f7a202020202020"
+zh_hex = "202068787170202020202020"
+
+[[rom_patch]]
+# option text: list_exit
+address = 0x00c12d
+source_hex = "202045584954"
+ko_hex = "202064606320"
+zh_hex = "202073612020"
+
+[[rom_patch]]
+# option text: level_selected
+address = 0x00c179
+source_hex = "09204c4556454c"
+ko_hex = "09206578672020"
+zh_hex = "09207b66202020"
+
+[[rom_patch]]
+# option text: level_deselected
+address = 0x00c1a6
+source_hex = "20204c4556454c"
+ko_hex = "20206578672020"
+zh_hex = "20207b66202020"
+
+[[rom_patch]]
+# option text: level_easy
+address = 0x00c1d6
+source_hex = "202045415359"
+ko_hex = "202070772020"
+zh_hex = "20206f622020"
+
+[[rom_patch]]
+# option text: level_normal
+address = 0x00c1e7
+source_hex = "4e4f524d414c"
+ko_hex = "20206d802020"
+zh_hex = "20206c752020"
+
+[[rom_patch]]
+# option text: level_hard
+address = 0x00c1f8
+source_hex = "202048415244"
+ko_hex = "20746a772020"
+zh_hex = "2020647b2020"
+
+[[rom_patch]]
+# option text: time_selected
+address = 0x00c224
+source_hex = "092054494d45"
+ko_hex = "092072612020"
+zh_hex = "09206b792020"
+
+[[rom_patch]]
+# option text: time_deselected
+address = 0x00c250
+source_hex = "202054494d45"
+ko_hex = "202072612020"
+zh_hex = "20206b792020"
+
+[[rom_patch]]
+# option text: time_limit
+address = 0x00c280
+source_hex = "2020204c494d4954"
+ko_hex = "2020207b82202020"
+zh_hex = "2020207a6b202020"
+
+[[rom_patch]]
+# option text: time_no_limit
+address = 0x00c293
+source_hex = "4e4f204c494d4954"
+ko_hex = "20206c7b82202020"
+zh_hex = "2020206a7a202020"
+
+[[rom_patch]]
+# option text: sound_selected
+address = 0x00c2c1
+source_hex = "0920534f554e44"
+ko_hex = "09206e76682020"
+zh_hex = "09207c69202020"
+
+[[rom_patch]]
+# option text: sound_deselected
+address = 0x00c2ee
+source_hex = "2020534f554e44"
+ko_hex = "20206e76682020"
+zh_hex = "20207c69202020"
+
+[[rom_patch]]
+# option text: sound_stereo
+address = 0x00c31c
+source_hex = "202053544552454f"
+ko_hex = "2020717f69752020"
+zh_hex = "20206e6065202020"
+
+[[rom_patch]]
+# option text: sound_monaural
+address = 0x00c32f
+source_hex = "4d4f4e415552414c"
+ko_hex = "2020206b66202020"
+zh_hex = "2020626576202020"
+
+[[rom_patch]]
+# option text: key_config_selected
+address = 0x00c3d3
+source_hex = "09204b455920434f4e464947"
+ko_hex = "09207c796f7a202020202020"
+zh_hex = "092068787170202020202020"
+
+[[rom_patch]]
+# option text: key_config_deselected
+address = 0x00c405
+source_hex = "20204b455920434f4e464947"
+ko_hex = "20207c796f7a202020202020"
+zh_hex = "202068787170202020202020"
+
+[[rom_patch]]
+# option text: exit_selected
+address = 0x00c438
+source_hex = "092045584954"
+ko_hex = "092064606320"
+zh_hex = "092073612020"
+
+[[rom_patch]]
+# option text: exit_deselected
+address = 0x00c464
+source_hex = "202045584954"
+ko_hex = "202064606320"
+zh_hex = "202073612020"
+
+[[rom_patch]]
+# option text: key_header
+address = 0x00c4b2
+source_hex = "4b455920434f4e464947"
+ko_hex = "2020207e206f7a202020"
+zh_hex = "20202068787170202020"
+
+[[rom_patch]]
+# option text: key_weak_punch
+address = 0x00c4e7
+source_hex = "5745414b20202050554e4348"
+ko_hex = "73817d202020202020202020"
+zh_hex = "726720202020202020202020"
+
+[[rom_patch]]
+# option text: key_strong_punch
+address = 0x00c500
+source_hex = "5354524f4e472050554e4348"
+ko_hex = "62817d202020202020202020"
+zh_hex = "776720202020202020202020"
+
+[[rom_patch]]
+# option text: key_weak_weapon
+address = 0x00c519
+source_hex = "5745414b202020574541504f4e"
+ko_hex = "736c6320202020202020202020"
+zh_hex = "726d6320202020202020202020"
+
+[[rom_patch]]
+# option text: key_strong_weapon
+address = 0x00c533
+source_hex = "5354524f4e4720574541504f4e"
+ko_hex = "626c6320202020202020202020"
+zh_hex = "776d6320202020202020202020"
+
+[[vram_patch]]
+# option font tile 0x80
+address = 0x0800
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000007676fefe16163737"
+zh_hex = "00000000000000004c4c7f7fdededede"
+
+[[vram_patch]]
+# option font tile 0x81
+address = 0x0810
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000007676767637376767"
+zh_hex = "00000000000000001010d6d6fefefefe"
+
+[[vram_patch]]
+# option font tile 0x82
+address = 0x0820
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000007676767637376666"
+zh_hex = "000000000000000024247e7effffffff"
+
+[[vram_patch]]
+# option font tile 0x83
+address = 0x0830
+source_hex = "00000000000000000000000000000000"
+ko_hex = "000000000000000072727a7a12123232"
+zh_hex = "0000000000000000ffffffffffffffff"
+
+[[vram_patch]]
+# option font tile 0x84
+address = 0x0840
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000000606c6c6c6c6c7c7"
+zh_hex = "0000000000000000ffffdbdbffffdbdb"
+
+[[vram_patch]]
+# option font tile 0x85
+address = 0x0850
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000008c8c8c8c8e8efcfc"
+zh_hex = "0000000000000000ffffffff7e7e7e7e"
+
+[[vram_patch]]
+# option font tile 0x86
+address = 0x0860
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000000000606060607e7e"
+zh_hex = "00000000000000007f7ffffffffffefe"
+
+[[vram_patch]]
+# option font tile 0x87
+address = 0x0870
+source_hex = "00000000000000000000000000000000"
+ko_hex = "000000000000000000007e7e60606060"
+zh_hex = "00000000000000007e7e7e7effffffff"
+
+[[vram_patch]]
+# option font tile 0x88
+address = 0x0880
+source_hex = "00000000000000000000000000000000"
+ko_hex = "000000000000000000007e7e60606060"
+zh_hex = "00000000000000004c4cfffff9f97f7f"
+
+[[vram_patch]]
+# option font tile 0x89
+address = 0x0890
+source_hex = "00000000000000000000000000000000"
+ko_hex = "0000000000000000eeeeeeeefefefefe"
+zh_hex = "00000000000000006c6cffff7f7fdfdf"
+
+[[vram_patch]]
+# option font tile 0x8a
+address = 0x08a0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "0000000000000000f2f2fefe1e1ef2f2"
+zh_hex = "0000000000000000ffff1818ffffffff"
+
+[[vram_patch]]
+# option font tile 0x8b
+address = 0x08b0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000007e7e666666667e7e"
+zh_hex = "0000000000000000e6e6fefefefef6f6"
+
+[[vram_patch]]
+# option font tile 0x8c
+address = 0x08c0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000007e7e66667e7e7e7e"
+zh_hex = "00000000000000007e7effffffffffff"
+
+[[vram_patch]]
+# option font tile 0x8d
+address = 0x08d0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "000000000000000066667e7e7e7e7e7e"
+zh_hex = "00000000000000007e7e7f7fffffffff"
+
+[[vram_patch]]
+# option font tile 0x8e
+address = 0x08e0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000000606363636363737"
+zh_hex = "00000000000000001818ffffffff6666"
+
+[[vram_patch]]
+# option font tile 0x8f
+address = 0x08f0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "000000000000000026262e2e7e7ed2d2"
+zh_hex = "00000000000000007f7fffff7f7fffff"
+
+[[vram_patch]]
+# option font tile 0x90
+address = 0x0900
+source_hex = "00000000000000000000000000000000"
+ko_hex = "6666c6c6060606060000000000000000"
+zh_hex = "fefe7f7f7e7e4c4c0000000000000000"
+
+[[vram_patch]]
+# option font tile 0x91
+address = 0x0910
+source_hex = "00000000000000000000000000000000"
+ko_hex = "c6c6666660607e7e0000000000000000"
+zh_hex = "92929292fefefefe0000000000000000"
+
+[[vram_patch]]
+# option font tile 0x92
+address = 0x0920
+source_hex = "00000000000000000000000000000000"
+ko_hex = "dcdc7e7e66663c3c0000000000000000"
+zh_hex = "ffff7e7effff18180000000000000000"
+
+[[vram_patch]]
+# option font tile 0x93
+address = 0x0930
+source_hex = "00000000000000000000000000000000"
+ko_hex = "6666c2c2020202020000000000000000"
+zh_hex = "ffffffffffff00000000000000000000"
+
+[[vram_patch]]
+# option font tile 0x94
+address = 0x0940
+source_hex = "00000000000000000000000000000000"
+ko_hex = "c6c6fefe060606060000000000000000"
+zh_hex = "ffffdfdfffffffff0000000000000000"
+
+[[vram_patch]]
+# option font tile 0x95
+address = 0x0950
+source_hex = "00000000000000000000000000000000"
+ko_hex = "4c4c4c4c40407c7c0000000000000000"
+zh_hex = "7e7e7e7ec0c0c0c00000000000000000"
+
+[[vram_patch]]
+# option font tile 0x96
+address = 0x0960
+source_hex = "00000000000000000000000000000000"
+ko_hex = "7e7e1818ffff00000000000000000000"
+zh_hex = "dedefefededeffff0000000000000000"
+
+[[vram_patch]]
+# option font tile 0x97
+address = 0x0970
+source_hex = "00000000000000000000000000000000"
+ko_hex = "7e7e1818ffff00000000000000000000"
+zh_hex = "fefe7e7e383800000000000000000000"
+
+[[vram_patch]]
+# option font tile 0x98
+address = 0x0980
+source_hex = "00000000000000000000000000000000"
+ko_hex = "7e7e0000ffff00000000000000000000"
+zh_hex = "fafa5e5edfdfd3d30000000000000000"
+
+[[vram_patch]]
+# option font tile 0x99
+address = 0x0990
+source_hex = "00000000000000000000000000000000"
+ko_hex = "cecefefe0e0e0e0e0000000000000000"
+zh_hex = "76766666ffffdbdb0000000000000000"
+
+[[vram_patch]]
+# option font tile 0x9a
+address = 0x09a0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "cecefafafafa02020000000000000000"
+zh_hex = "383839396f6fc6c60000000000000000"
+
+[[vram_patch]]
+# option font tile 0x9b
+address = 0x09b0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "3c3c1818ffff00000000000000000000"
+zh_hex = "bebee6e6eeee8c8c0000000000000000"
+
+[[vram_patch]]
+# option font tile 0x9c
+address = 0x09c0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "ffffffff181818180000000000000000"
+zh_hex = "7e7e7e7e7e7e7e7e0000000000000000"
+
+[[vram_patch]]
+# option font tile 0x9d
+address = 0x09d0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "18181818ffff00000000000000000000"
+zh_hex = "7c7cf7f7ffffe3e30000000000000000"
+
+[[vram_patch]]
+# option font tile 0x9e
+address = 0x09e0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "7e7ecece060606060000000000000000"
+zh_hex = "66662c2cffffffff0000000000000000"
+
+[[vram_patch]]
+# option font tile 0x9f
+address = 0x09f0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "3e3e3e3e7e7e3e3e0000000000000000"
+zh_hex = "ffffffffffffc6c60000000000000000"
+
+[[vram_patch]]
+# option font tile 0xa0
+address = 0x0a00
+source_hex = "00000000000000000000000000000000"
+ko_hex = "000000000000000022223232fafacece"
+zh_hex = "0000000000000000ffffffffffff7e7e"
+
+[[vram_patch]]
+# option font tile 0xa1
+address = 0x0a10
+source_hex = "00000000000000000000000000000000"
+ko_hex = "0000000000000000000018183c3c7e7e"
+zh_hex = "0000000000000000dede5e5eb3b3fefe"
+
+[[vram_patch]]
+# option font tile 0xa2
+address = 0x0a20
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000002626262636363232"
+zh_hex = "00000000000000005e5efefeeeeefbfb"
+
+[[vram_patch]]
+# option font tile 0xa3
+address = 0x0a30
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000007676f7f7dfdf7777"
+zh_hex = "0000000000000000dede7e7ebebefefe"
+
+[[vram_patch]]
+# option font tile 0xa4
+address = 0x0a40
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000006262f2f2dede9e9e"
+zh_hex = "0000000000000000dcdc7f7f3f3fffff"
+
+[[vram_patch]]
+# option font tile 0xa5
+address = 0x0a50
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000003c3c666666667e7e"
+zh_hex = "0000000000000000ffff5e5ebfbfffff"
+
+[[vram_patch]]
+# option font tile 0xa6
+address = 0x0a60
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000003c3c66667e7e1818"
+zh_hex = "0000000000000000d6d6ffff3e3effff"
+
+[[vram_patch]]
+# option font tile 0xa7
+address = 0x0a70
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000003c3c66667e7effff"
+zh_hex = "00000000000000007e7effff7e7e7e7e"
+
+[[vram_patch]]
+# option font tile 0xa8
+address = 0x0a80
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000002626f6f6dada9a9a"
+zh_hex = "0000000000000000d6d6ffffffffffff"
+
+[[vram_patch]]
+# option font tile 0xa9
+address = 0x0a90
+source_hex = "00000000000000000000000000000000"
+ko_hex = "0000000000000000fefef6f67777fefe"
+zh_hex = "00000000000000007e7efefefefefefe"
+
+[[vram_patch]]
+# option font tile 0xaa
+address = 0x0aa0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "0000000000000000f6f6fefe3e3e7e7e"
+zh_hex = "0000000000000000ffffffffffffffff"
+
+[[vram_patch]]
+# option font tile 0xab
+address = 0x0ab0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "0000000000000000eeeefefe6e6e7e7e"
+zh_hex = "0000000000000000dedeffffffffffff"
+
+[[vram_patch]]
+# option font tile 0xac
+address = 0x0ac0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000007e7e18183c3ce7e7"
+zh_hex = "00000000000000007e7e7f7fffff7f7f"
+
+[[vram_patch]]
+# option font tile 0xad
+address = 0x0ad0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000003232fefe36363232"
+zh_hex = "0000000000000000fffffefe5f5f5f5f"
+
+[[vram_patch]]
+# option font tile 0xae
+address = 0x0ae0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "000000000000000072727a7a1212f2f2"
+
+[[vram_patch]]
+# option font tile 0xaf
+address = 0x0af0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000006e6eeeeececefefe"
+
+[[vram_patch]]
+# option font tile 0xb0
+address = 0x0b00
+source_hex = "00000000000000000000000000000000"
+ko_hex = "fefe3232323232320000000000000000"
+zh_hex = "7e7e7e7e7e7effff0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xb1
+address = 0x0b10
+source_hex = "00000000000000000000000000000000"
+ko_hex = "42420000ffff00000000000000000000"
+zh_hex = "5e5e7e7e7e7e73730000000000000000"
+
+[[vram_patch]]
+# option font tile 0xb2
+address = 0x0b20
+source_hex = "00000000000000000000000000000000"
+ko_hex = "7a7acece020206060000000000000000"
+zh_hex = "ffffeeeeffff7f7f0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xb3
+address = 0x0b30
+source_hex = "00000000000000000000000000000000"
+ko_hex = "26267e7e060606060000000000000000"
+zh_hex = "7f7f7e7effffbfbf0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xb4
+address = 0x0b40
+source_hex = "00000000000000000000000000000000"
+ko_hex = "dadaf2f2222202020000000000000000"
+zh_hex = "5f5f7777ffffbfbf0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xb5
+address = 0x0b50
+source_hex = "00000000000000000000000000000000"
+ko_hex = "18181818ffff00000000000000000000"
+zh_hex = "7f7f7f7fffffbfbf0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xb6
+address = 0x0b60
+source_hex = "00000000000000000000000000000000"
+ko_hex = "ffff787878787e7e0000000000000000"
+zh_hex = "ffff7f7fffffbfbf0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xb7
+address = 0x0b70
+source_hex = "00000000000000000000000000000000"
+ko_hex = "ffff7e7e7e7e7e7e0000000000000000"
+zh_hex = "7e7e7e7effffffff0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xb8
+address = 0x0b80
+source_hex = "00000000000000000000000000000000"
+ko_hex = "dadaf6f6262606060000000000000000"
+zh_hex = "dfdfffffffff7f7f0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xb9
+address = 0x0b90
+source_hex = "00000000000000000000000000000000"
+ko_hex = "5e5e7e7e060606060000000000000000"
+zh_hex = "fefefefeeeee8e8e0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xba
+address = 0x0ba0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "c6c63e3e26263c3c0000000000000000"
+zh_hex = "fffff7f7dfdf9b9b0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xbb
+address = 0x0bb0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "6e6efefe0e0e0e0e0000000000000000"
+zh_hex = "7e7effffffff1f1f0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xbc
+address = 0x0bc0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "18181818ffff00000000000000000000"
+zh_hex = "7e7e7e7e7e7e7e7e0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xbd
+address = 0x0bd0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "7272dede020202020000000000000000"
+zh_hex = "5f5ffefefefe33330000000000000000"
+
+[[vram_patch]]
+# option font tile 0xbe
+address = 0x0be0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "3636e2e2c2c202020000000000000000"
+
+[[vram_patch]]
+# option font tile 0xbf
+address = 0x0bf0
+source_hex = "00000000000000000000000000000000"
+ko_hex = "8e8efefe6e6e0e0e0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xc0
+address = 0x0c00
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000007e7e7e7e7e7e7e7e"
+
+[[vram_patch]]
+# option font tile 0xc1
+address = 0x0c10
+source_hex = "00000000000000000000000000000000"
+ko_hex = "0000000000000000fefef6f65e5e7e7e"
+
+[[vram_patch]]
+# option font tile 0xc2
+address = 0x0c20
+source_hex = "00000000000000000000000000000000"
+ko_hex = "00000000000000002626fefe76767f7f"
+
+[[vram_patch]]
+# option font tile 0xd0
+address = 0x0d00
+source_hex = "00000000000000000000000000000000"
+ko_hex = "ffff3c3c7e7e7e7e0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xd1
+address = 0x0d10
+source_hex = "00000000000000000000000000000000"
+ko_hex = "fefe262660603e3e0000000000000000"
+
+[[vram_patch]]
+# option font tile 0xd2
+address = 0x0d20
+source_hex = "00000000000000000000000000000000"
+ko_hex = "fefe767660607e7e0000000000000000"
+
+# END GENERATED OPTION CJK PATCHES

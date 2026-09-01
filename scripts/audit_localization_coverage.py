@@ -77,10 +77,11 @@ def dialogue_langs(source: dict) -> Counter[str]:
 
 def label_langs(source: dict) -> Counter[str]:
     counts: Counter[str] = Counter()
-    for entry in source.get("label", []):
-        for lang in LANGS:
-            if lang in entry and str(entry[lang]):
-                counts[lang] += 1
+    for key in ("label", "record"):
+        for entry in source.get(key, []):
+            for lang in LANGS:
+                if lang in entry and str(entry[lang]):
+                    counts[lang] += 1
     return counts
 
 
@@ -129,12 +130,12 @@ def main() -> int:
     parser.add_argument(
         "--title-menu",
         default=str(root / "translations" / "endless_duel_title_menu.toml"),
-        help="source-backed title-menu overlay text table",
+        help="source-backed title-menu label text table",
     )
     parser.add_argument(
-        "--option-menu",
-        default=str(root / "translations" / "endless_duel_option_menu.toml"),
-        help="source-backed option-menu overlay text table",
+        "--option-text",
+        default=str(root / "translations" / "endless_duel_option_text.toml"),
+        help="source-backed native option/key-config record text table",
     )
     parser.add_argument(
         "--cjk-candidates",
@@ -168,14 +169,14 @@ def main() -> int:
     crawl_source = load_toml(Path(args.crawl))
     dialogue_source = load_toml(Path(args.dialogue_targets))
     title_menu_source = load_toml(Path(args.title_menu))
-    option_menu_source = load_toml(Path(args.option_menu))
+    option_text_source = load_toml(Path(args.option_text))
     cjk_crawl_source = load_toml(Path(args.cjk_candidates))
     option_counts = text_patch_langs(option_source)
     crawl_counts = crawl_langs(crawl_source)
     cjk_crawl_counts = cjk_crawl_langs(cjk_crawl_source)
     dialogue_counts = dialogue_langs(dialogue_source)
     title_menu_counts = label_langs(title_menu_source)
-    option_menu_counts = label_langs(option_menu_source)
+    option_text_counts = label_langs(option_text_source)
 
     print("Endless Duel localization coverage")
     print(f"  default_lang: {table.get('default_lang', 'en')}")
@@ -202,7 +203,7 @@ def main() -> int:
             f"crawl_lines={crawl_counts.get(lang, 0)} "
             f"cjk_crawl_lines={cjk_crawl_counts.get(lang, 0)} "
             f"title_labels={title_menu_counts[lang]} "
-            f"option_overlay_labels={option_menu_counts[lang]} "
+            f"option_records={option_text_counts[lang]} "
             f"dialogue_lines={dialogue_counts[lang]}"
         )
     print()

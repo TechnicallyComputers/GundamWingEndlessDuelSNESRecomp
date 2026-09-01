@@ -44,14 +44,18 @@ files, then regenerate.
 Current Endless Duel source files:
 
 - `translations/endless_duel_crawl.toml`: opening/fight crawl strings.
-- `translations/endless_duel_options.toml`: fixed-width option and key-config
-  labels.
+- `translations/endless_duel_options.toml`: fixed-width Latin option and
+  key-config label sub-spans.
+- `translations/endless_duel_option_text.toml`: whole option/key-config display
+  list records with native Chinese/Korean text.
 - `translations/endless_duel_dialogue.toml`: decoded English/Spanish reference
   dialogue tilemap rows.
 - `translations/endless_duel_dialogue_targets.toml`: authored French, Italian,
   and Portuguese dialogue text.
-- `translations/endless_duel_title_menu.toml`: editable rectangles and strings
-  for the title-screen mode selector runtime overlay.
+- `translations/endless_duel_title_menu.toml`: strings for the title-screen
+  mode selector tile art.
+- `translations/endless_duel_title_glyphs.toml`: authored/generated glyph masks
+  shared by the title tile art and the option font slots.
 - `translations/endless_duel_cjk_candidates.toml`: inactive CJK research input.
 
 The generators are intentionally strict. They fail on unsupported glyphs, text
@@ -165,7 +169,28 @@ override format accepts single-byte `char = "H"` entries and Unicode
 `scripts/generate_title_glyphs.py --check` to verify generated Chinese/Korean
 title and option glyphs remain in sync with
 `translations/endless_duel_title_menu.toml` and
-`translations/endless_duel_option_menu.toml`.
+`translations/endless_duel_option_text.toml`.
+
+The option and key-config screens are the second worked example, and they are
+text, not tile art. Both are drawn from a display list in ROM at
+`0x00c000-0x00c800`: 16-bit opcodes `0x000c` (set column/row), `0x0006` (set
+attribute mask), `0x0002` (print font codes until a `0xff` terminator), `0x0018`
+(print variable) and `0x0004` (end). The 44 print records are plain fixed-width
+bytes, so the text itself is a `[[rom_patch]]`; only the font is missing.
+
+The font is BG2, Mode 0, 2bpp, char base `0x0000`, 16 bytes per tile. Code `c`
+in `0x20-0x9f` draws an 8x16 cell from tiles
+`2 * (c & 0xf0) - 0x40 + (c & 0x0f)` and that tile `+ 0x10`. Codes `0x60-0x9f`
+are free: their tiles `0x80-0xff` (VRAM `0x0800-0x0fff`) are all-zero on these
+screens and unreferenced by any record. The font is generated rather than stored
+raw in ROM, so glyph art is injected as source-guarded `[[vram_patch]]` entries
+over that all-zero region; the guard is genuine because the same VRAM is
+non-zero on the title screen, so the patches no-op elsewhere.
+`scripts/generate_option_cjk_patch.py` allocates the free codes per language,
+packs the shared 8x8 glyph masks into the 8x16 cells, verifies each record's
+source bytes against the ROM, and emits both patch kinds. The game then renders
+the translated labels itself, through its own selection cursor, value changes,
+and screen transitions.
 
 The attract crawl has two paths:
 

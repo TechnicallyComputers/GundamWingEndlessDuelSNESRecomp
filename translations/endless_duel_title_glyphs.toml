@@ -1,10 +1,13 @@
-# Authored/generated title-menu glyph overrides for the runtime title selector
-# overlay.
+# Authored/generated glyph masks for the translated Endless Duel UI.
 #
-# The base runtime atlas is seeded from glyph masks extracted from native
-# selected title-menu rows. Entries here override that atlas for letters or
+# The base atlas is seeded from glyph masks extracted from native selected
+# title-menu rows. Entries here override that atlas for letters or
 # codepoints needed by translations but not present in the original English
 # labels. Rows are bitmasks read left to right within `width`.
+#
+# Consumers: scripts/generate_title_menu_vram_patch.py (title label tile
+# art) and scripts/generate_option_cjk_patch.py (option/key-config font
+# slot injection).
 
 schema = 1
 source_capture = "C:\\Users\\Matthew\\AppData\\Local\\Temp\\gwed_title_menu_wram_select_20260830"
@@ -305,34 +308,6 @@ row6 = "de"
 row7 = "ff"
 
 [[glyph]]
-codepoint = "U+666E"
-origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "7e"
-row1 = "ff"
-row2 = "ff"
-row3 = "ff"
-row4 = "7e"
-row5 = "7e"
-row6 = "7e"
-row7 = "7e"
-
-[[glyph]]
-codepoint = "U+901A"
-origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "ff"
-row1 = "5e"
-row2 = "bf"
-row3 = "ff"
-row4 = "7f"
-row5 = "7f"
-row6 = "ff"
-row7 = "bf"
-
-[[glyph]]
 codepoint = "U+65F6"
 origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
 width = 8
@@ -361,20 +336,6 @@ row6 = "ee"
 row7 = "8e"
 
 [[glyph]]
-codepoint = "U+9650"
-origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "ff"
-row1 = "ff"
-row2 = "ff"
-row3 = "ff"
-row4 = "ff"
-row5 = "f7"
-row6 = "df"
-row7 = "9b"
-
-[[glyph]]
 codepoint = "U+97F3"
 origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
 width = 8
@@ -401,48 +362,6 @@ row4 = "76"
 row5 = "66"
 row6 = "ff"
 row7 = "db"
-
-[[glyph]]
-codepoint = "U+7ACB"
-origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "18"
-row1 = "ff"
-row2 = "ff"
-row3 = "66"
-row4 = "66"
-row5 = "2c"
-row6 = "ff"
-row7 = "ff"
-
-[[glyph]]
-codepoint = "U+4F53"
-origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "4c"
-row1 = "7f"
-row2 = "de"
-row3 = "de"
-row4 = "fe"
-row5 = "7f"
-row6 = "7e"
-row7 = "4c"
-
-[[glyph]]
-codepoint = "U+58F0"
-origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "ff"
-row1 = "ff"
-row2 = "7e"
-row3 = "7e"
-row4 = "7e"
-row5 = "7e"
-row6 = "c0"
-row7 = "c0"
 
 [[glyph]]
 codepoint = "U+6309"
@@ -527,6 +446,160 @@ row4 = "92"
 row5 = "92"
 row6 = "fe"
 row7 = "fe"
+
+[[glyph]]
+codepoint = "U+7B80"
+origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "7f"
+row1 = "ff"
+row2 = "7f"
+row3 = "ff"
+row4 = "ff"
+row5 = "ff"
+row6 = "ff"
+row7 = "c6"
+
+[[glyph]]
+codepoint = "U+5355"
+origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "24"
+row1 = "7e"
+row2 = "ff"
+row3 = "ff"
+row4 = "ff"
+row5 = "7e"
+row6 = "ff"
+row7 = "18"
+
+[[glyph]]
+codepoint = "U+666E"
+origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "7e"
+row1 = "ff"
+row2 = "ff"
+row3 = "ff"
+row4 = "7e"
+row5 = "7e"
+row6 = "7e"
+row7 = "7e"
+
+[[glyph]]
+codepoint = "U+901A"
+origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "ff"
+row1 = "5e"
+row2 = "bf"
+row3 = "ff"
+row4 = "7f"
+row5 = "7f"
+row6 = "ff"
+row7 = "bf"
+
+[[glyph]]
+codepoint = "U+56F0"
+origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "ff"
+row1 = "db"
+row2 = "ff"
+row3 = "db"
+row4 = "ff"
+row5 = "df"
+row6 = "ff"
+row7 = "ff"
+
+[[glyph]]
+codepoint = "U+9650"
+origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "ff"
+row1 = "ff"
+row2 = "ff"
+row3 = "ff"
+row4 = "ff"
+row5 = "f7"
+row6 = "df"
+row7 = "9b"
+
+[[glyph]]
+codepoint = "U+65E0"
+origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "ff"
+row1 = "18"
+row2 = "ff"
+row3 = "ff"
+row4 = "38"
+row5 = "39"
+row6 = "6f"
+row7 = "c6"
+
+[[glyph]]
+codepoint = "U+7ACB"
+origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "18"
+row1 = "ff"
+row2 = "ff"
+row3 = "66"
+row4 = "66"
+row5 = "2c"
+row6 = "ff"
+row7 = "ff"
+
+[[glyph]]
+codepoint = "U+4F53"
+origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "4c"
+row1 = "7f"
+row2 = "de"
+row3 = "de"
+row4 = "fe"
+row5 = "7f"
+row6 = "7e"
+row7 = "4c"
+
+[[glyph]]
+codepoint = "U+58F0"
+origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "ff"
+row1 = "ff"
+row2 = "7e"
+row3 = "7e"
+row4 = "7e"
+row5 = "7e"
+row6 = "c0"
+row7 = "c0"
+
+[[glyph]]
+codepoint = "U+9053"
+origin = "generated from Microsoft YaHei Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "d6"
+row1 = "ff"
+row2 = "3e"
+row3 = "ff"
+row4 = "ff"
+row5 = "7f"
+row6 = "ff"
+row7 = "bf"
 
 [[glyph]]
 codepoint = "U+8F7B"
@@ -641,34 +714,6 @@ row6 = "ff"
 row7 = "00"
 
 [[glyph]]
-codepoint = "U+BCF4"
-origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "66"
-row1 = "7e"
-row2 = "7e"
-row3 = "7e"
-row4 = "18"
-row5 = "18"
-row6 = "ff"
-row7 = "00"
-
-[[glyph]]
-codepoint = "U+D1B5"
-origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "7e"
-row1 = "7e"
-row2 = "7e"
-row3 = "7e"
-row4 = "ff"
-row5 = "3c"
-row6 = "7e"
-row7 = "7e"
-
-[[glyph]]
 codepoint = "U+C2DC"
 origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
 width = 8
@@ -693,34 +738,6 @@ row2 = "37"
 row3 = "67"
 row4 = "c6"
 row5 = "66"
-row6 = "60"
-row7 = "7e"
-
-[[glyph]]
-codepoint = "U+C81C"
-origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "ee"
-row1 = "fe"
-row2 = "6e"
-row3 = "7e"
-row4 = "6e"
-row5 = "fe"
-row6 = "0e"
-row7 = "0e"
-
-[[glyph]]
-codepoint = "U+D55C"
-origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "26"
-row1 = "fe"
-row2 = "76"
-row3 = "7f"
-row4 = "fe"
-row5 = "76"
 row6 = "60"
 row7 = "7e"
 
@@ -763,48 +780,6 @@ row2 = "60"
 row3 = "60"
 row4 = "7e"
 row5 = "00"
-row6 = "ff"
-row7 = "00"
-
-[[glyph]]
-codepoint = "U+D14C"
-origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "6e"
-row1 = "ee"
-row2 = "ce"
-row3 = "fe"
-row4 = "8e"
-row5 = "fe"
-row6 = "6e"
-row7 = "0e"
-
-[[glyph]]
-codepoint = "U+B808"
-origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "ee"
-row1 = "ee"
-row2 = "fe"
-row3 = "fe"
-row4 = "ce"
-row5 = "fe"
-row6 = "0e"
-row7 = "0e"
-
-[[glyph]]
-codepoint = "U+C624"
-origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "3c"
-row1 = "66"
-row2 = "66"
-row3 = "7e"
-row4 = "18"
-row5 = "18"
 row6 = "ff"
 row7 = "00"
 
@@ -879,6 +854,202 @@ row6 = "02"
 row7 = "02"
 
 [[glyph]]
+codepoint = "U+C26C"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "22"
+row1 = "32"
+row2 = "fa"
+row3 = "ce"
+row4 = "fe"
+row5 = "32"
+row6 = "32"
+row7 = "32"
+
+[[glyph]]
+codepoint = "U+C6C0"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "3c"
+row1 = "66"
+row2 = "7e"
+row3 = "ff"
+row4 = "ff"
+row5 = "7e"
+row6 = "7e"
+row7 = "7e"
+
+[[glyph]]
+codepoint = "U+BCF4"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "66"
+row1 = "7e"
+row2 = "7e"
+row3 = "7e"
+row4 = "18"
+row5 = "18"
+row6 = "ff"
+row7 = "00"
+
+[[glyph]]
+codepoint = "U+D1B5"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "7e"
+row1 = "7e"
+row2 = "7e"
+row3 = "7e"
+row4 = "ff"
+row5 = "3c"
+row6 = "7e"
+row7 = "7e"
+
+[[glyph]]
+codepoint = "U+C5B4"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "62"
+row1 = "f2"
+row2 = "de"
+row3 = "9e"
+row4 = "da"
+row5 = "f2"
+row6 = "22"
+row7 = "02"
+
+[[glyph]]
+codepoint = "U+B824"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "f2"
+row1 = "fe"
+row2 = "1e"
+row3 = "f2"
+row4 = "ce"
+row5 = "fa"
+row6 = "fa"
+row7 = "02"
+
+[[glyph]]
+codepoint = "U+C81C"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "ee"
+row1 = "fe"
+row2 = "6e"
+row3 = "7e"
+row4 = "6e"
+row5 = "fe"
+row6 = "0e"
+row7 = "0e"
+
+[[glyph]]
+codepoint = "U+D55C"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "26"
+row1 = "fe"
+row2 = "76"
+row3 = "7f"
+row4 = "fe"
+row5 = "76"
+row6 = "60"
+row7 = "7e"
+
+[[glyph]]
+codepoint = "U+BB34"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "7e"
+row1 = "66"
+row2 = "7e"
+row3 = "7e"
+row4 = "ff"
+row5 = "ff"
+row6 = "18"
+row7 = "18"
+
+[[glyph]]
+codepoint = "U+D14C"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "6e"
+row1 = "ee"
+row2 = "ce"
+row3 = "fe"
+row4 = "8e"
+row5 = "fe"
+row6 = "6e"
+row7 = "0e"
+
+[[glyph]]
+codepoint = "U+B808"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "ee"
+row1 = "ee"
+row2 = "fe"
+row3 = "fe"
+row4 = "ce"
+row5 = "fe"
+row6 = "0e"
+row7 = "0e"
+
+[[glyph]]
+codepoint = "U+C624"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "3c"
+row1 = "66"
+row2 = "66"
+row3 = "7e"
+row4 = "18"
+row5 = "18"
+row6 = "ff"
+row7 = "00"
+
+[[glyph]]
+codepoint = "U+BAA8"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "7e"
+row1 = "66"
+row2 = "66"
+row3 = "7e"
+row4 = "3c"
+row5 = "18"
+row6 = "ff"
+row7 = "00"
+
+[[glyph]]
+codepoint = "U+B178"
+origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
+width = 8
+height = 8
+row0 = "00"
+row1 = "60"
+row2 = "60"
+row3 = "7e"
+row4 = "7e"
+row5 = "18"
+row6 = "ff"
+row7 = "00"
+
+[[glyph]]
 codepoint = "U+D0A4"
 origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
 width = 8
@@ -947,17 +1118,3 @@ row4 = "dc"
 row5 = "7e"
 row6 = "66"
 row7 = "3c"
-
-[[glyph]]
-codepoint = "U+BB34"
-origin = "generated from Malgun Gothic Bold, reduced to compact 8px title-menu mask"
-width = 8
-height = 8
-row0 = "7e"
-row1 = "66"
-row2 = "7e"
-row3 = "7e"
-row4 = "ff"
-row5 = "ff"
-row6 = "18"
-row7 = "18"

@@ -40,8 +40,8 @@ BEGIN_MARK = "# BEGIN GENERATED TITLE MENU VRAM PATCHES"
 END_MARK = "# END GENERATED TITLE MENU VRAM PATCHES"
 
 # Native title letterforms, seeded from selected-row captures of the stock
-# title menu. Mirrors the tables in src/title_menu_overlay.c; the authored
-# overrides in endless_duel_title_glyphs.toml replace entries (H, C, CJK).
+# title menu. The authored overrides in endless_duel_title_glyphs.toml
+# replace entries (H, C, CJK).
 NATIVE_GLYPHS = {
     " ": (5, [0] * 8),
     ".": (2, [0, 0, 0, 0, 0, 0, 0x3, 0x3]),

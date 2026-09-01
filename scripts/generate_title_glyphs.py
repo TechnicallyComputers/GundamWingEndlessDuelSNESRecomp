@@ -44,17 +44,27 @@ def repo_root() -> Path:
     return Path(__file__.replace("\\", "/")).resolve().parents[1]
 
 
+ENTRY_KEYS = ("label", "record")
+
+
 def ordered_non_ascii_chars(sources: list[dict], langs: list[str]) -> list[tuple[str, str]]:
+    """Every non-ASCII codepoint the translated UI strings need, first use first.
+
+    Sources carry either `[[label]]` (title-menu tile art) or `[[record]]`
+    (option display-list text) entries; both are scanned so the atlas stays a
+    superset of what the two generators consume.
+    """
     chars: list[tuple[str, str]] = []
     seen: set[str] = set()
     for source in sources:
         for lang in langs:
-            for label in source.get("label", []):
-                for char in str(label.get(lang, "")):
-                    if ord(char) < 128 or char in seen:
-                        continue
-                    seen.add(char)
-                    chars.append((lang, char))
+            for key in ENTRY_KEYS:
+                for entry in source.get(key, []):
+                    for char in str(entry.get(lang, "")):
+                        if ord(char) < 128 or char in seen:
+                            continue
+                        seen.add(char)
+                        chars.append((lang, char))
     return chars
 
 
@@ -88,13 +98,16 @@ def render_mask(char: str, font_path: Path, font_size: int, target: int, thresho
 def emit_header(lines: list[str]) -> None:
     lines.extend(
         [
-            "# Authored/generated title-menu glyph overrides for the runtime title selector",
-            "# overlay.",
+            "# Authored/generated glyph masks for the translated Endless Duel UI.",
             "#",
-            "# The base runtime atlas is seeded from glyph masks extracted from native",
-            "# selected title-menu rows. Entries here override that atlas for letters or",
+            "# The base atlas is seeded from glyph masks extracted from native selected",
+            "# title-menu rows. Entries here override that atlas for letters or",
             "# codepoints needed by translations but not present in the original English",
             "# labels. Rows are bitmasks read left to right within `width`.",
+            "#",
+            "# Consumers: scripts/generate_title_menu_vram_patch.py (title label tile",
+            "# art) and scripts/generate_option_cjk_patch.py (option/key-config font",
+            "# slot injection).",
             "",
             "schema = 1",
             'source_capture = "C:\\\\Users\\\\Matthew\\\\AppData\\\\Local\\\\Temp\\\\gwed_title_menu_wram_select_20260830"',
@@ -151,9 +164,9 @@ def main() -> int:
         action="append",
         default=[
             str(root / "translations" / "endless_duel_title_menu.toml"),
-            str(root / "translations" / "endless_duel_option_menu.toml"),
+            str(root / "translations" / "endless_duel_option_text.toml"),
         ],
-        help="source TOML with translated [[label]] entries; may be passed more than once",
+        help="source TOML with translated [[label]]/[[record]] entries; may be passed more than once",
     )
     parser.add_argument("--out", default=str(root / "translations" / "endless_duel_title_glyphs.toml"))
     parser.add_argument("--langs", default="zh,ko")
