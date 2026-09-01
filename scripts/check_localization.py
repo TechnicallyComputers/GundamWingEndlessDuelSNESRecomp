@@ -22,6 +22,7 @@ SCRIPT_CHECKS = (
     "scripts/generate_title_menu_vram_patch.py",
     "scripts/generate_option_patch.py",
     "scripts/generate_option_cjk_patch.py",
+    "scripts/generate_intro_caption_patch.py",
     "scripts/generate_dialogue_patch.py",
     "scripts/audit_localization_coverage.py",
     "scripts/render_dialogue_previews.py",
@@ -100,6 +101,8 @@ def main() -> int:
     run(root, [sys.executable, "scripts/generate_title_menu_vram_patch.py", "--check"])
     run(root, [sys.executable, "scripts/generate_option_patch.py", "--check"])
     run(root, [sys.executable, "scripts/generate_option_cjk_patch.py", "--check"])
+    run(root, [sys.executable, "scripts/generate_intro_caption_patch.py",
+               "--check"])
     run(root, [sys.executable, "scripts/generate_dialogue_patch.py"])
     validate_patch_widths(root)
     run(root, [sys.executable, "scripts/audit_localization_coverage.py"])
