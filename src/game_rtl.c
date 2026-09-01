@@ -50,6 +50,18 @@ extern Ppu *g_ppu;
 
 /* 0 until the first frame has booted from the reset vector. */
 static uint32_t g_resume_pc;
+/* Last cursor that passed cpu_pc24_resumable — the recovery candidate when
+ * g_resume_pc comes back implausible from a state load. psxrecomp keeps the
+ * same thing (g_last_good_bb_pc) for the same reason. */
+static uint32_t g_last_good_resume_pc;
+
+/* Take the bridge's resume cursor, remembering it while it looks like code. */
+static void game_set_resume_pc(uint32_t pc)
+{
+    g_resume_pc = pc;
+    if (cpu_pc24_resumable(pc))
+        g_last_good_resume_pc = pc;
+}
 
 static uint32_t reset_vector(void)
 {
@@ -138,6 +150,22 @@ void GameRunOneFrame(void)
     int slices = 0;
 
     int booting = !g_booted;
+    if (!booting && !cpu_pc24_resumable(g_resume_pc)) {
+        /* The cursor cannot be code, so running it would execute whatever
+         * happens to live there. Take the first plausible candidate instead,
+         * loudest first — never synthesize one silently. */
+        if (cpu_pc24_resumable(g_last_good_resume_pc)) {
+            fprintf(stderr, "game: resume pc $%06X implausible — recovering "
+                    "to last good $%06X\n",
+                    (unsigned)g_resume_pc, (unsigned)g_last_good_resume_pc);
+            g_resume_pc = g_last_good_resume_pc;
+        } else {
+            fprintf(stderr, "game: resume pc $%06X implausible and no good "
+                    "cursor to fall back to — cold booting. Expect a reset, "
+                    "not a resume.\n", (unsigned)g_resume_pc);
+            booting = 1;
+        }
+    }
     if (booting) {
         g_resume_pc = reset_vector();
         g_booted = 1;
@@ -201,7 +229,7 @@ void GameRunOneFrame(void)
         snes_beam_hold(0);
         interp_bridge_set_master_deadline(0);
         g_snes->inNmi = false;
-        g_resume_pc = interp_bridge_lle_resume_pc();
+        game_set_resume_pc(interp_bridge_lle_resume_pc());
     }
 
     /* Latch OAM/CGRAM for this frame's render — the scanout state. Taken
@@ -284,7 +312,7 @@ void GameRunOneFrame(void)
             interp_bridge_set_master_deadline(frame_end);
             (void)interp_bridge_run_until_quiescent(&g_cpu, g_resume_pc);
             interp_bridge_set_master_deadline(0);
-            g_resume_pc = interp_bridge_lle_resume_pc();
+            game_set_resume_pc(interp_bridge_lle_resume_pc());
         }
 
         if (g_snes->inIrq) {            cpu_push_interrupt_frame_at(&g_cpu, g_resume_pc);
@@ -298,7 +326,7 @@ void GameRunOneFrame(void)
             interp_bridge_set_master_deadline(frame_end);
             (void)interp_bridge_run_interrupt(&g_cpu, irq_vector());
             interp_bridge_set_master_deadline(0);
-            snes_beam_hold(0);            g_resume_pc = interp_bridge_lle_resume_pc();
+            snes_beam_hold(0);            game_set_resume_pc(interp_bridge_lle_resume_pc());
             continue;
         }
 
@@ -414,7 +442,7 @@ void GameRunOneFrame(void)
                 snes_beam_hold(1);
                 (void)interp_bridge_run_interrupt(&g_cpu, irq_vector());
                 snes_beam_hold(0);
-                g_resume_pc = interp_bridge_lle_resume_pc();
+                game_set_resume_pc(interp_bridge_lle_resume_pc());
                 continue;
             }
             step = snes_master_clocks_until_line(g_snes, 225u);
@@ -586,6 +614,13 @@ static void GameStateLoadExtra(SaveLoadInfo *sli, uint32_t version)
                 (unsigned)c.magic);
         return;
     }
+    if (c.booted && !cpu_pc24_resumable(c.resume_pc)) {
+        /* Say so here rather than let it surface as a wedged guest three
+         * frames later with no clue where it came from. */
+        fprintf(stderr, "game: state extra carries an implausible resume pc "
+                "$%06X — ignoring it\n", (unsigned)c.resume_pc);
+        return;
+    }
     g_resume_pc = c.resume_pc;
     g_booted    = c.booted ? 1 : 0;
 }
@@ -598,6 +633,7 @@ void GameSessionReset(void)
      * re-enters the boot path twice in one process. */
     g_resume_pc = 0;
     g_booted = 0;
+    g_last_good_resume_pc = 0;
     /* Cold-boot the CPU from RESET rather than resuming stale registers or a
      * stale WAI: g_cpu survives a session teardown, so a rematch that skipped
      * this would start frame 1 mid-flight. Re-points g_cpu.ram too. */
