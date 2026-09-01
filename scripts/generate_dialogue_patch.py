@@ -13,6 +13,10 @@ sys.path.insert(0, str(Path(__file__.replace("\\", "/")).resolve().parent))
 
 from analyze_reference_ips import repo_root
 from decode_reference_tilemaps import CHAR_BY_TILE
+from generate_dialogue_accent_patch import (
+    load_source as load_accent_source,
+    per_language_charmap,
+)
 
 
 BEGIN_MARKER = "# BEGIN GENERATED DIALOGUE TILEMAP PATCHES"
@@ -32,7 +36,9 @@ def word_bytes(word: int) -> bytes:
     return bytes((word & 0xFF, (word >> 8) & 0xFF))
 
 
-def encode_line(source_hex: str, start_col: int, text: str) -> str:
+def encode_line(source_hex: str, start_col: int, text: str,
+                charmap: dict[str, int] | None = None) -> str:
+    charmap = TILE_BY_CHAR if charmap is None else charmap
     source = bytearray.fromhex(source_hex)
     if len(source) != ROW_BYTES * 2:
         raise ValueError(f"dialogue source row must be 0x80 bytes, got {len(source):#x}")
@@ -50,9 +56,9 @@ def encode_line(source_hex: str, start_col: int, text: str) -> str:
             source[bottom_off:bottom_off + 2] = word_bytes(0x0800)
             continue
         char = text[rel]
-        if char not in TILE_BY_CHAR:
+        if char not in charmap:
             raise ValueError(f"unsupported dialogue glyph {char!r} in {text!r}")
-        tile = TILE_BY_CHAR[char]
+        tile = charmap[char]
         if char == " ":
             top_word = 0x0400 | tile
             bottom_word = top_word
@@ -83,7 +89,8 @@ def load_targets(path: Path) -> dict[int, dict[str, str]]:
     return targets
 
 
-def generated_blocks(dialogue: dict, targets: dict[int, dict[str, str]]) -> list[str]:
+def generated_blocks(dialogue: dict, targets: dict[int, dict[str, str]],
+                     charmaps: dict[str, dict[str, int]]) -> list[str]:
     blocks = [BEGIN_MARKER]
     count = 0
     for index, entry in enumerate(dialogue.get("line", []), 1):
@@ -95,7 +102,8 @@ def generated_blocks(dialogue: dict, targets: dict[int, dict[str, str]]) -> list
             text = targets.get(address, {}).get(lang, entry.get(lang))
             if not text:
                 continue
-            values[lang] = encode_line(source_hex, start_col, text)
+            values[lang] = encode_line(
+                source_hex, start_col, text, charmaps.get(lang))
         if not values:
             continue
         count += 1
@@ -106,6 +114,16 @@ def generated_blocks(dialogue: dict, targets: dict[int, dict[str, str]]) -> list
             f"# generated_from = \"translations/endless_duel_dialogue.toml line {index}\"",
             f'source_hex = "{source_hex}"',
         ])
+        # The table has no fallback_es, so Spanish cannot reach the English
+        # baseline through the chain: an es-less patch restores source_hex.
+        # source_hex IS the English row, so omitting es_hex would show English
+        # in Spanish wherever the guard matched (it does whenever the Spanish
+        # row happens to equal one of the fr/it/pt payloads - three rows did).
+        # Emit the decoded Spanish row explicitly; it is a no-op when the
+        # earlier reference fragments already produced it.
+        es_hex = entry.get("es_hex")
+        if isinstance(es_hex, str) and es_hex:
+            blocks.append(f'es_hex = "{es_hex}"')
         for lang, hex_value in values.items():
             blocks.append(f'{lang}_hex = "{hex_value}"')
     blocks.extend(["", END_MARKER, ""])
@@ -152,9 +170,16 @@ def main() -> int:
         default=str(root / "translations" / "endless_duel_dialogue_targets.toml"),
         help="authored target-language dialogue text table",
     )
+    parser.add_argument(
+        "--accents",
+        default=str(root / "translations" / "endless_duel_dialogue_accents.toml"),
+        help="per-language accented glyph cell allocation table",
+    )
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args()
 
+    accents = load_accent_source(Path(args.accents))
+    charmaps = {lang: per_language_charmap(accents, lang) for lang in TARGET_LANGS}
     source_path = Path(args.source)
     table_path = Path(args.table)
     dialogue = load_toml(source_path)
@@ -164,7 +189,7 @@ def main() -> int:
     if unknown_targets:
         formatted = ", ".join(f"0x{address:06x}" for address in unknown_targets)
         raise ValueError(f"target dialogue address not present in decoded source: {formatted}")
-    generated = "\n".join(generated_blocks(dialogue, targets))
+    generated = "\n".join(generated_blocks(dialogue, targets, charmaps))
     table_text = normalize_embedded_markers(table_path.read_text(encoding="utf-8"))
     updated = replace_generated_section(table_text, generated)
 

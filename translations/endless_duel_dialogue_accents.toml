@@ -1,0 +1,187 @@
+# Per-language accented glyph cells for the 8x16 dialogue font.
+#
+# The dialogue font is RAW in the cart at 0x006f00: 2bpp, 128 tiles, 16 bytes
+# each, tile n at font_address + n*16. A glyph is an 8x16 cell: top tile t plus
+# bottom tile t+0x10.
+#
+# Five cells are unreferenced by every dialogue tilemap in both reference
+# languages (verified by scanning every tilemap word in SCRIPT_RANGES):
+#
+#   0x001  unreferenced border/filler art
+#   0x06a  ':'  (English) - never used by dialogue text
+#   0x06b  ';'  (English) - never used by dialogue text
+#   0x06e  blank in English; the Spanish hack put the inverted question mark here
+#   0x06f  blank in English; the Spanish hack put the inverted exclamation here
+#
+# Each language gets its OWN allocation of those cells: the same tile index
+# means a different character per language, exactly as Spanish already
+# repurposes 0x069 (the English apostrophe) for 'n' with a tilde. English and
+# Spanish art is preserved byte-for-byte by the baseline payloads recorded
+# below.
+#
+# Glyph art is COMPOSED, never hand-drawn: the base letter's cell is copied out
+# of the English font image and the diacritic is stamped into the empty rows
+# above the x-height (the Spanish tilde sits on top-tile row 3; these marks use
+# rows 2-3). Regenerate with:
+#
+#   py -3 scripts/generate_dialogue_accent_patch.py --write
+#
+# Do not hand-edit baseline_en_hex / baseline_es_hex: they are captured from the
+# pre-split runtime table and are what the byte-identity invariant is checked
+# against. Refresh them with --capture-baseline only when the reference import
+# itself changes.
+
+schema = 1
+font_address = 0x006f00
+tile_bytes = 16
+bottom_tile_offset = 0x10
+
+# Pixel value written for diacritic ink. The font paints letters as colour 3 on
+# a colour-1 background; colour 2 is the soft edge the reference font uses.
+ink = 3
+background = 1
+
+# Rows 0..4 of the top tile are cleared to background before stamping, which
+# also removes the tittle of 'i' so that grave/acute sit correctly on it.
+clear_top_rows = 4
+
+# Diacritic shapes: one entry per row, "row" is the top-tile row index and
+# "cols" the pixel columns (0 = leftmost) that receive ink.
+[[mark]]
+name = "acute"
+row = 2
+cols = [4, 5]
+[[mark]]
+name = "acute"
+row = 3
+cols = [3, 4]
+
+[[mark]]
+name = "grave"
+row = 2
+cols = [2, 3]
+[[mark]]
+name = "grave"
+row = 3
+cols = [3, 4]
+
+[[mark]]
+name = "circumflex"
+row = 2
+cols = [3, 4]
+[[mark]]
+name = "circumflex"
+row = 3
+cols = [2, 5]
+
+# ---------------------------------------------------------------------------
+# Allocations. `base` names the character whose cell art is copied; `mark` names
+# the diacritic stamped on it; `tile` is the free top-tile index that the
+# language repurposes.
+# ---------------------------------------------------------------------------
+
+[[cell]]
+lang = "fr"
+char = "é"
+tile = 0x06e
+base = "e"
+mark = "acute"
+
+[[cell]]
+lang = "fr"
+char = "è"
+tile = 0x06f
+base = "e"
+mark = "grave"
+
+[[cell]]
+lang = "fr"
+char = "à"
+tile = 0x06a
+base = "a"
+mark = "grave"
+
+[[cell]]
+lang = "fr"
+char = "ê"
+tile = 0x06b
+base = "e"
+mark = "circumflex"
+
+[[cell]]
+lang = "it"
+char = "è"
+tile = 0x06e
+base = "e"
+mark = "grave"
+
+[[cell]]
+lang = "it"
+char = "à"
+tile = 0x06f
+base = "a"
+mark = "grave"
+
+[[cell]]
+lang = "it"
+char = "ù"
+tile = 0x06a
+base = "u"
+mark = "grave"
+
+[[cell]]
+lang = "it"
+char = "ì"
+tile = 0x06b
+base = "i"
+mark = "grave"
+
+[[cell]]
+lang = "it"
+char = "ò"
+tile = 0x001
+base = "o"
+mark = "grave"
+
+# Captured pre-split reference art for every owned tile.
+# scripts/generate_dialogue_accent_patch.py --capture-baseline
+
+[baseline.tile_001]
+en = "fa06fa06fa06fa06fa06fa06fa06fa06"
+es = "fa06fa06fa06fa06fa06fa06fa06fa06"
+
+[baseline.tile_011]
+en = "fa0602fefcfc00000000000000000000"
+es = "fa0602fefcfc00000000000000000000"
+
+[baseline.tile_06a]
+en = "ff00ff00ff00ff00ff00ff30f738e718"
+es = "ff00ff00ff00ff00ff00ff30f738e718"
+
+[baseline.tile_06b]
+en = "ff00ff00ff00ff00ff00ff30f738e718"
+es = "ff00ff00ff00ff00ff00ff30f738e718"
+
+[baseline.tile_06e]
+en = "ff00ff00ff00ff00ff00ff00ff00ff00"
+es = "ff00e718df3cdf3cff1cff00ef18df38"
+
+[baseline.tile_06f]
+en = "ff00ff00ff00ff00ff00ff00ff00ff00"
+es = "ff00e718df3cdf3cff1cff00ef18ef18"
+
+[baseline.tile_07a]
+en = "ff00ff00ff30f738e718ff00ff00ff00"
+es = "ff00ff00ff30f738e718ff00ff00ff00"
+
+[baseline.tile_07b]
+en = "ff00ff00ff30f738f718e738ef10ff00"
+es = "ff00ff00ff30f738f718e738ef10ff00"
+
+[baseline.tile_07e]
+en = "ff00ff00ff00ff00ff00ff00ff00ff00"
+es = "b97e77ff77efff67f37fff3eff00ff00"
+
+[baseline.tile_07f]
+en = "ff00ff00ff00ff00ff00ff00ff00ff00"
+es = "cb3cdf3cdf3cdf3cdf3cff1cff00ff00"

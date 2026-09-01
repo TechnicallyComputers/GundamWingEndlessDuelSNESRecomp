@@ -11,6 +11,24 @@ graphics. Translation parity for French, Italian, and Portuguese can be
 implemented by adding target strings for these rows and regenerating
 language-specific tilemap bytes with the same tile table.
 
+## battle_dialogue_0
+
+| Address | English | Spanish |
+| --- | --- | --- |
+| `0x007700` | I will accomplish my mission | Cumplire mi mision |
+| `0x007780` | alone if I must! | solo si debo! |
+| `0x007800` | Don't even try it. | Ni lo intentes. |
+| `0x007900` | I believe in my own | &#x00a1;Creo en mi propia |
+| `0x007980` | justice! | justicia! |
+| `0x007a00` | Get back! You're | &#x00a1;Apartate!&#x00a1;Me |
+| `0x007a80` | slowing me down! | estas atrasando! |
+| `0x007b00` | Mission accomplished. | Mision cumplida. |
+| `0x007c00` | Obstacles such as yourself | &#x00a1;Los obstaculos como tu |
+| `0x007c80` | shall be terminated! | seran acabados! |
+| `0x007d00` | Aaaaahahahahahah! | &#x00a1;Aaaajajajajajah! |
+| `0x007e00` | Do you think this is a | &#x00bf;&#x00a1;Crees que esto es un |
+| `0x007e80` | game!? | juego!? |
+
 ## battle_dialogue_1
 
 | Address | English | Spanish |
@@ -71,6 +89,51 @@ language-specific tilemap bytes with the same tile table.
 | `0x027980` | your tongue? Hah. | comio la lengua? Ja. |
 | `0x027a00` | Heh, you're pretty weak, | Je, eres bastante |
 | `0x027a80` | huh? | debil,&#x00bf;huh? |
+
+## battle_dialogue_4
+
+| Address | English | Spanish |
+| --- | --- | --- |
+| `0x02c900` | On your feet! | On your feet! |
+| `0x02ca00` | You did quite well. | Lo hiciste bien. |
+| `0x02cb00` | What's wrong? | &#x00bf;Que paso? |
+| `0x02cb80` | Having a bad day? | &#x00bf;Tuviste un mal dia? |
+| `0x02cc00` | Never visit any mercy | Nunca des misericordia |
+| `0x02cc80` | upon your foes! | a tus enemigos. |
+| `0x02cd00` | I was hoping to get a bit | Esperaba tener un poco |
+| `0x02cd80` | more practice, but... | mas de practica... |
+| `0x02ce00` | I'm sorry... but this | Lo siento... esto es |
+| `0x02ce80` | is war. | la guerra. |
+| `0x02cf00` | Well fought, but in the | Bien peleado, pero al |
+| `0x02cf80` | end, I am the victor! | final,&#x00a1;Soy el vencedor! (WARNING: top/bottom glyph mismatch) |
+| `0x02d000` | Did you learn anything | &#x00bf;Aprendiste algo |
+| `0x02d080` | from the battle? | de la batalla? |
+| `0x02d100` | It seems you need more | &#x00a1;Necesitas mas |
+| `0x02d180` | practice! | practica! |
+| `0x02d200` | That was surprising! | &#x00a1;Fue sorprendente! |
+| `0x02d300` | It's been ages since I | &#x00a1;Pasaron a'os desde |
+| `0x02d380` | last fought that hard! | que luche tan duro! |
+| `0x02d400` | You're not crying for the | No estas llorando por la |
+| `0x02d480` | elite, are you? | elite,&#x00bf;verdad? |
+| `0x02d500` | Wow, that was pretty | Wow, eso fue bastante |
+| `0x02d580` | bad... | malo... |
+| `0x02d600` | This war's gone on for | Esta guerra ha durado |
+| `0x02d680` | too long... | mucho tiempo... |
+| `0x02d700` | Looks like you couldn't | Parece que no pudiste |
+| `0x02d780` | take it, huh? | soportarlo,&#x00bf;huh? |
+| `0x02d800` | Raise a white flag and | Iza una bandera blanca |
+| `0x02d880` | you won't be harmed... | y no te lastimare... |
+| `0x02d900` | I fight for Duke Treize! | I fight for Duke Treize! |
+| `0x02da00` | Hmm? Something the matter? | &#x00bf;Hmm?&#x00bf;Pasa algo? |
+| `0x02db00` | Howl like the dog you are!! | &#x00a1;&#x00a1;Aullas como un perro!! |
+| `0x02dc00` | Look, is it alright if I | Mira,&#x00bf;esta bien si |
+| `0x02dc80` | say something? | digo algo? |
+| `0x02dd00` | Duke Treize wants me to | &#x00a1;Duke Treize quiere que |
+| `0x02dd80` | fight! | pelee! |
+| `0x02de00` | Catch that pilot! | &#x00a1;Toma eso piloto! |
+| `0x02df00` | Fool... | Tonto... |
+| `0x02e000` | Perhaps you should try a | Quizas deberias intentar |
+| `0x02e080` | different approach... | un enfoque diferente... |
 
 ## battle_dialogue_3
 

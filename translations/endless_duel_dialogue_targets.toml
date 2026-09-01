@@ -2,9 +2,11 @@
 # Regenerate runtime overlays with:
 #   python scripts/generate_dialogue_patch.py --write
 #
-# The current recovered dialogue font supports only A-Z, a-z, space, . , ' ? !
-# plus Spanish inverted punctuation. Keep FR/IT/PT text unaccented until a
-# replacement glyph sheet is added.
+# The dialogue font supports A-Z, a-z, space, . , ' ? ! plus, per language, the
+# accented cells allocated in translations/endless_duel_dialogue_accents.toml
+# (fr: e-acute e-grave a-grave e-circumflex; it: e-grave a-grave u-grave
+# i-grave o-grave). Any other accented character is a hard error: rewrite the
+# line rather than dropping the accent.
 
 schema = 1
 
@@ -661,3 +663,274 @@ address = 0x05ef00
 fr = "Quelle ironie..."
 it = "Che ironia..."
 pt = "Que ironico..."
+
+# --- battle_dialogue_0 + battle_dialogue_4 (pre-fight / win-lose quotes) ---
+# Added 2026-08 with the accented glyph cells; see
+# translations/endless_duel_dialogue_accents.toml for the per-language
+# accent budget. pt is intentionally unauthored here: those rows fall back
+# to English through fallback_pt.
+
+[[line]]
+address = 0x007700
+fr = "J'accomplirai ma mission"
+it = "Compirò la mia missione"
+
+[[line]]
+address = 0x007780
+fr = "seul s'il le faut!"
+it = "anche da solo!"
+
+[[line]]
+address = 0x007800
+fr = "N'essaie même pas."
+it = "Non provarci nemmeno."
+
+[[line]]
+address = 0x007900
+fr = "Je crois en ma propre"
+it = "Credo nella mia"
+
+[[line]]
+address = 0x007980
+fr = "justice!"
+it = "giustizia!"
+
+[[line]]
+address = 0x007a00
+fr = "Recule! Tu me"
+it = "Indietro! Mi stai"
+
+[[line]]
+address = 0x007a80
+fr = "ralentis!"
+it = "rallentando!"
+
+[[line]]
+address = 0x007b00
+fr = "Mission accomplie."
+it = "Missione compiuta."
+
+[[line]]
+address = 0x007c00
+fr = "Les obstacles comme toi"
+it = "Gli ostacoli come te"
+
+[[line]]
+address = 0x007c80
+fr = "seront éliminés!"
+it = "saranno eliminati!"
+
+[[line]]
+address = 0x007d00
+fr = "Aaaaahahahahahah!"
+it = "Aaaaahahahahahah!"
+
+[[line]]
+address = 0x007e00
+fr = "Tu crois que c'est un"
+it = "Credi che sia un"
+
+[[line]]
+address = 0x007e80
+fr = "jeu!?"
+it = "gioco!?"
+
+[[line]]
+address = 0x02c900
+fr = "Debout!"
+it = "In piedi!"
+
+[[line]]
+address = 0x02ca00
+fr = "Tu t'es bien battu."
+it = "Ti sei battuto bene."
+
+[[line]]
+address = 0x02cb00
+fr = "Un problème?"
+it = "Qualcosa non va?"
+
+[[line]]
+address = 0x02cb80
+fr = "Mauvaise journée?"
+it = "Giornata storta?"
+
+[[line]]
+address = 0x02cc00
+fr = "N'aie jamais pitié de"
+it = "Non avere mai pietà"
+
+[[line]]
+address = 0x02cc80
+fr = "tes ennemis!"
+it = "dei tuoi nemici!"
+
+[[line]]
+address = 0x02cd00
+fr = "J'espérais un peu plus"
+it = "Speravo di allenarmi"
+
+[[line]]
+address = 0x02cd80
+fr = "d'exercice, mais..."
+it = "un po' di più, ma..."
+
+[[line]]
+address = 0x02ce00
+fr = "Désolé... mais c'est"
+it = "Mi dispiace... ma"
+
+[[line]]
+address = 0x02ce80
+fr = "la guerre."
+it = "questa è la guerra."
+
+[[line]]
+address = 0x02cf00
+fr = "Bien battu, mais à la"
+it = "Hai lottato bene, ma"
+
+[[line]]
+address = 0x02cf80
+fr = "fin, c'est moi le vainqueur!"
+it = "alla fine vinco io!"
+
+[[line]]
+address = 0x02d000
+fr = "Tu as appris quelque"
+it = "Hai imparato qualcosa"
+
+[[line]]
+address = 0x02d080
+fr = "chose du combat?"
+it = "da questa battaglia?"
+
+[[line]]
+address = 0x02d100
+fr = "Il te faut encore de"
+it = "Ti serve ancora"
+
+[[line]]
+address = 0x02d180
+fr = "la pratique!"
+it = "allenamento!"
+
+[[line]]
+address = 0x02d200
+fr = "C'était surprenant!"
+it = "Che sorpresa!"
+
+[[line]]
+address = 0x02d300
+fr = "Il y a longtemps que"
+it = "Era tanto che non"
+
+[[line]]
+address = 0x02d380
+fr = "je n'avais lutté ainsi!"
+it = "combattevo così!"
+
+[[line]]
+address = 0x02d400
+fr = "Tu ne pleures pas pour"
+it = "Non piangi mica per"
+
+[[line]]
+address = 0x02d480
+fr = "l'élite, si?"
+it = "l'elite, vero?"
+
+[[line]]
+address = 0x02d500
+fr = "Ouah, c'était vraiment"
+it = "Wow, è stato proprio"
+
+[[line]]
+address = 0x02d580
+fr = "mauvais..."
+it = "brutto..."
+
+[[line]]
+address = 0x02d600
+fr = "Cette guerre dure"
+it = "Questa guerra dura"
+
+[[line]]
+address = 0x02d680
+fr = "depuis trop longtemps..."
+it = "da troppo tempo..."
+
+[[line]]
+address = 0x02d700
+fr = "On dirait que tu n'as"
+it = "Sembra che tu non"
+
+[[line]]
+address = 0x02d780
+fr = "pas tenu le coup, hein?"
+it = "abbia retto, eh?"
+
+[[line]]
+address = 0x02d800
+fr = "Hisse un drapeau blanc"
+it = "Alza bandiera bianca"
+
+[[line]]
+address = 0x02d880
+fr = "et tu seras épargné..."
+it = "e non ti farò nulla..."
+
+[[line]]
+address = 0x02d900
+fr = "Je me bats pour Treize!"
+it = "Combatto per Treize!"
+
+[[line]]
+address = 0x02da00
+fr = "Hmm? Quelque chose ne va pas?"
+it = "Hmm? Qualche problema?"
+
+[[line]]
+address = 0x02db00
+fr = "Hurle, chien que tu es!!"
+it = "Ulula, cane che sei!!"
+
+[[line]]
+address = 0x02dc00
+fr = "Dis, je peux te dire"
+it = "Senti, posso dirti"
+
+[[line]]
+address = 0x02dc80
+fr = "quelque chose?"
+it = "una cosa?"
+
+[[line]]
+address = 0x02dd00
+fr = "Le duc Treize veut que"
+it = "Il duca Treize vuole"
+
+[[line]]
+address = 0x02dd80
+fr = "je me batte!"
+it = "che io combatta!"
+
+[[line]]
+address = 0x02de00
+fr = "Attrapez ce pilote!"
+it = "Prendete quel pilota!"
+
+[[line]]
+address = 0x02df00
+fr = "Imbécile..."
+it = "Sciocco..."
+
+[[line]]
+address = 0x02e000
+fr = "Tu devrais essayer une"
+it = "Forse dovresti provare"
+
+[[line]]
+address = 0x02e080
+fr = "autre approche..."
+it = "un altro approccio..."

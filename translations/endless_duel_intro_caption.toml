@@ -153,7 +153,15 @@ en_line2_hex = [
 
 [baseline.rom_sha256]
 en = "121c97ce7ea47dbc999c4d37f7cef30ad2d4dd76ee9f4bfe5adcd1b0b8c7e3d2"
-es = "8b76355310eff55c00ff68da85ef3f22a203f5d2f1bb3678d27334c3b66df1aa"
+# 2026-08: the es digest moved once, deliberately. The generated dialogue
+# overlays used to carry no es_hex; the table has no fallback_es, so an
+# es-less rom_patch restores source_hex - which for those patches IS the
+# English row. At three rows (0x03fa00, 0x05e080, 0x05ef00) the Spanish text
+# happened to equal one of the fr/it/pt payloads, so the guard matched and
+# Spanish rendered English. generate_dialogue_patch.py now emits an explicit
+# es_hex; those three rows are the only bytes that changed, and they now
+# match the decoded Spanish reference exactly. en is unchanged.
+es = "600b7eec097a7e25eb5452c9a5fe57df99fef8bc02293bde7d1245f53847f6bd"
 
 # --- preview -------------------------------------------------------------
 # OBJ palette 7 as captured live at the caption moment, used only by

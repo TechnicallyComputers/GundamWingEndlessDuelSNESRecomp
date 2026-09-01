@@ -11,11 +11,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__.replace("\\", "/")).resolve().parent))
 
 from analyze_reference_ips import apply_records, parse_ips, repo_root
+from reconstruct_table_image import build_image, load_table
 
 
 SCRIPT_RANGES = (
+    # 0x007f00 is tile art, not a dialogue row - stop the page there.
+    (0x007700, 0x007F00, "battle_dialogue_0"),
     (0x017000, 0x018000, "battle_dialogue_1"),
     (0x026B00, 0x027B00, "battle_dialogue_2"),
+    (0x02C900, 0x02E100, "battle_dialogue_4"),
     (0x03EB00, 0x03FB00, "battle_dialogue_3"),
     (0x05E000, 0x05F000, "ending_dialogue"),
 )
@@ -237,7 +241,7 @@ def write_toml(path: Path, decoded: dict[str, list[DecodedLine]]) -> None:
                 "es_ids = [" + ", ".join(f"0x{tile:03x}" for tile in entry.es_ids) + "]"
             )
             lines.append("")
-    path.write_text("\n".join(lines), encoding="utf-8")
+    path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
 
 
 def write_md(path: Path, decoded: dict[str, list[DecodedLine]]) -> None:
@@ -267,15 +271,25 @@ def write_md(path: Path, decoded: dict[str, list[DecodedLine]]) -> None:
                 es += " (WARNING: top/bottom glyph mismatch)"
             lines.append(f"| `0x{entry.address:06x}` | {en} | {es} |")
         lines.append("")
-    path.write_text("\n".join(lines), encoding="utf-8")
+    path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
 
 
 def main() -> int:
     root = repo_root()
     parser = argparse.ArgumentParser()
     parser.add_argument("--rom", default=str(root / "Shin Kidou Senki Gundam W - Endless Duel (J).smc"))
-    parser.add_argument("--en-ips", required=True)
-    parser.add_argument("--es-ips", required=True)
+    parser.add_argument("--en-ips")
+    parser.add_argument("--es-ips")
+    parser.add_argument(
+        "--from-table",
+        action="store_true",
+        help="reconstruct the en/es images by replaying translations/endless_duel.toml "
+             "instead of applying the reference IPS files",
+    )
+    parser.add_argument(
+        "--table",
+        default=str(root / "translations" / "endless_duel.toml"),
+    )
     parser.add_argument("--write", action="store_true")
     parser.add_argument("--allow-mismatch", action="store_true")
     parser.add_argument("--toml", default=str(root / "translations" / "endless_duel_dialogue.toml"))
@@ -283,8 +297,20 @@ def main() -> int:
     args = parser.parse_args()
 
     source = Path(args.rom).read_bytes()
-    en_image = apply_records(source, parse_ips(Path(args.en_ips), -0x200), "en")
-    es_image = apply_records(source, parse_ips(Path(args.es_ips), 0), "es")
+    if args.from_table:
+        table = load_table(Path(args.table))
+        en_image, en_applied, en_skipped = build_image("en", table, source)
+        es_image, es_applied, es_skipped = build_image("es", table, source)
+        print(f"table replay: en applied={en_applied} guard-skipped={en_skipped}")
+        print(f"table replay: es applied={es_applied} guard-skipped={es_skipped}")
+        if en_skipped:
+            print("WARNING: English replay guard-skipped patches; the table baseline moved")
+            return 1
+    else:
+        if not args.en_ips or not args.es_ips:
+            parser.error("--en-ips/--es-ips are required unless --from-table is given")
+        en_image = apply_records(source, parse_ips(Path(args.en_ips), -0x200), "en")
+        es_image = apply_records(source, parse_ips(Path(args.es_ips), 0), "es")
     decoded = {
         name: decode_range(en_image, es_image, start, end)
         for start, end, name in SCRIPT_RANGES

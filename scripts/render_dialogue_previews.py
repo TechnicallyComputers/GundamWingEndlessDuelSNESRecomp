@@ -13,6 +13,10 @@ sys.path.insert(0, str(Path(__file__.replace("\\", "/")).resolve().parent))
 
 from analyze_reference_ips import repo_root
 from decode_reference_tilemaps import CHAR_BY_TILE, bottom_matches, tile_words
+from generate_dialogue_accent_patch import (
+    load_source as load_accent_source,
+    per_language_charmap,
+)
 from generate_dialogue_patch import TARGET_LANGS, encode_line, load_targets
 
 
@@ -25,7 +29,8 @@ def load_toml(path: Path) -> dict:
         return tomllib.load(f)
 
 
-def row_text(row_hex: str) -> str:
+def row_text(row_hex: str, char_by_tile: dict[int, str] | None = None) -> str:
+    char_by_tile = CHAR_BY_TILE if char_by_tile is None else char_by_tile
     data = bytes.fromhex(row_hex)
     words = [data[i] | (data[i + 1] << 8) for i in range(0, ROW_BYTES, 2)]
     chars: list[str] = []
@@ -34,15 +39,16 @@ def row_text(row_hex: str) -> str:
         if tile in (0, 0x060):
             chars.append(" ")
         else:
-            chars.append(CHAR_BY_TILE.get(tile, "?"))
+            chars.append(char_by_tile.get(tile, "?"))
     return "".join(chars)
 
 
-def validate_encoded(address: int, start_col: int, text: str, encoded_hex: str) -> None:
+def validate_encoded(address: int, start_col: int, text: str, encoded_hex: str,
+                     char_by_tile: dict[int, str]) -> None:
     data = bytes.fromhex(encoded_hex)
     if len(data) != ROW_BYTES * 2:
         raise ValueError(f"0x{address:06x}: generated row width is {len(data):#x}")
-    decoded = row_text(encoded_hex)
+    decoded = row_text(encoded_hex, char_by_tile)
     slot = decoded[start_col:start_col + len(text)]
     if slot != text:
         raise ValueError(
@@ -72,7 +78,9 @@ def cell_svg(x: int, y: int, char: str, index: int, start_col: int, text_len: in
     )
 
 
-def render_lang(lang: str, entries: list[dict], targets: dict[int, dict[str, str]], out_path: Path) -> int:
+def render_lang(lang: str, entries: list[dict], targets: dict[int, dict[str, str]],
+                charmap: dict[str, int], out_path: Path) -> int:
+    char_by_tile = {tile: char for char, tile in charmap.items()}
     row_height = 34
     width = 1010
     height = 72 + len(entries) * row_height
@@ -91,9 +99,9 @@ def render_lang(lang: str, entries: list[dict], targets: dict[int, dict[str, str
         if not text:
             continue
         start_col = int(entry["start_col"])
-        encoded = encode_line(entry["en_hex"], start_col, text)
-        validate_encoded(address, start_col, text, encoded)
-        decoded = row_text(encoded)
+        encoded = encode_line(entry["en_hex"], start_col, text, charmap)
+        validate_encoded(address, start_col, text, encoded, char_by_tile)
+        decoded = row_text(encoded, char_by_tile)
         y = 88 + row * row_height
         shade = "#ffffff" if row % 2 == 0 else "#f1f4f8"
         lines.append(f'<rect x="12" y="{y - 17}" width="{width - 24}" height="{row_height}" fill="{shade}"/>')
@@ -134,9 +142,15 @@ def main() -> int:
         default=str(root / "translations" / "dialogue_previews"),
         help="directory for generated SVG contact sheets",
     )
+    parser.add_argument(
+        "--accents",
+        default=str(root / "translations" / "endless_duel_dialogue_accents.toml"),
+        help="per-language accented glyph cell allocation table",
+    )
     parser.add_argument("--langs", default=",".join(TARGET_LANGS))
     args = parser.parse_args()
 
+    accents = load_accent_source(Path(args.accents))
     source = load_toml(Path(args.source))
     entries = source.get("line", [])
     targets = load_targets(Path(args.targets))
@@ -148,7 +162,9 @@ def main() -> int:
         raise ValueError(f"unsupported preview language(s): {', '.join(bad)}")
 
     for lang in requested:
-        count = render_lang(lang, entries, targets, out_dir / f"dialogue_{lang}.svg")
+        count = render_lang(lang, entries, targets,
+                            per_language_charmap(accents, lang),
+                            out_dir / f"dialogue_{lang}.svg")
         print(f"{lang}: rendered {count} dialogue rows")
     print(f"wrote {out_dir}")
     return 0
