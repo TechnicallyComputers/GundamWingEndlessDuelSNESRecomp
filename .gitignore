@@ -48,6 +48,7 @@ mesen.log
 # change to the SNES state layout. tools/validation_states/README.md (committed)
 # documents each one and how to regenerate it.
 tools/validation_states/*.state
+tools/validation_states/stagehunt_log.json
 
 # Captures written by scripts/validate_from_state.ps1.
 /analysis/state_validation/

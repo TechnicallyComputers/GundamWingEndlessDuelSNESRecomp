@@ -42,6 +42,67 @@ Default build dir is `build-agent`; default port 6650.
 * `xlate_stats` reports `"effective_language"` as the **last** entry of the
   fallback chain (`ko` → `en`), not the selected language. `"language"` is
   the selected one. An `effective_language` of `en` under `ko` is normal.
+* `load_state` does **not** restore the cart ROM. `cart_saveload` streams only
+  `cart->ram` (battery SRAM) plus coprocessor state, so the loading process
+  keeps its own language-patched in-memory cart image. Worth knowing, because
+  "load_state undoes my ROM patches" is the first theory anyone reaches for
+  when a loaded state renders the wrong language — and it is wrong.
+
+## "Before the draw" is not early enough for a STAGED surface
+
+`battle_dialogue_3` and `ending_dialogue` copy their whole script out of the
+cart into WRAM when the **scene** loads, and the draw routine then feeds off
+WRAM, never re-reading the cart:
+
+| group | staged to | rows |
+|---|---|---|
+| `battle_dialogue_3` | `$7f:0100` + row*0x100 | 30 |
+| `ending_dialogue` | `$7e:6000` + row*0x100 | 28 |
+
+A state banked between that copy and the first character typed is already too
+late: the loading process patched its cart, but nothing re-reads it, so the text
+comes out in the **saving** language forever. `pre_final_convo` and `pre_ending`
+are both such states — verified 2026-08-31 by loading `pre_final_convo` in `it`
+(a language whose dialogue payload has been shipping for days) and finding the
+**English** tilemap words at WRAM `0x10104`, `0x10204`, ... So a capture from
+either of those states says nothing about the loading language, in any language.
+
+Diagnose it with a search, not a stare: after the load, `dump_ram 0 131072` and
+look for the surface's source-language tilemap words (`en_hex[4:16]` of each row
+in `endless_duel_dialogue.toml` is a good 12-byte needle). Finding them is proof
+of staging and tells you the staging address.
+
+Then key the state hunter on the **staging**, not on the draw. `statehunt.py`
+polls VRAM for the drawn tilemap, which is structurally late for a staged
+surface. `stagehunt.py` (same ring-buffer discipline, earlier trigger) polls
+WRAM for the row block and promotes the older rolling state the moment >=5 rows
+of a group appear:
+
+```powershell
+py -3 tools\validation_states\stagehunt.py <port> <seconds>
+```
+
+The states it banks are named `pre_stage_<group>.state`. `pre_quote` is not
+affected: it is mid-fight, so the quote block is staged *after* the load.
+
+## Don't guess -Advance on a typewriter scene — poll
+
+`validate_from_state.ps1 -Advance N` takes one capture at a guessed offset. On a
+dialogue sequence the box is blank between pages, cleared during transitions,
+and BG3 is not even enabled for part of it: a sweep of `-Advance 3..7` on
+`pre_stage_ending_dialogue` landed on an empty box five times out of five, while
+`-Advance 10` hit for `zh` and missed for `ko`. Poll the assertion instead:
+
+```powershell
+py -3 scripts\catch_dialogue_page.py <port> ko pre_stage_ending_dialogue endko
+```
+
+It walks the scene forward, dumps VRAM each step, stops the moment a generated
+page guard matches the live BG3 map, and asserts the page bytes equal the
+generated payload byte-for-byte. `scripts\validate_from_state.ps1` now also
+dumps VRAM *before* the screenshot for the same reason — the dumps are hundreds
+of milliseconds apart on a running game, so the thing you assert on should be
+the freshest.
 
 ## Banked states
 

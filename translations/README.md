@@ -21,17 +21,26 @@ map of current assets, commands, and open surfaces.
   authored, the rest fall back to English.
 - `ko`, `zh`: both exposed in the launcher, both native for the title menu,
   option menu, key config, opening/fight crawl, intro caption, and the
-  victory/defeat battle dialogue. Dialogue is delivered as per-quote 16x16
-  glyph pages written into free VRAM tiles (ids 0x300-0x3ff) behind byte-exact
-  BG3 tilemap guards — see `endless_duel_dialogue_cjk.toml` and
-  `generate_dialogue_cjk_patch.py`. 63 quotes / 103 rows per language, covering
-  four of the six dialogue groups. The other two (`battle_dialogue_3`, the
-  post-final Treize conversation, and `ending_dialogue`, the per-pilot
-  epilogues) still render English under ko/zh: their text is authored and their
-  screens are now captured, but they draw from a different BG3 map base, char
-  base and palette, which the single-surface generator cannot yet express. The
-  captured geometry and the work left to do are recorded at the bottom of
-  `endless_duel_dialogue_cjk.toml`.
+  battle dialogue, the post-final Treize conversation and the per-pilot
+  epilogues — all six dialogue groups. Dialogue is delivered as per-quote 16x16
+  glyph pages written into free VRAM tiles behind byte-exact BG3 tilemap
+  guards — see `endless_duel_dialogue_cjk.toml` and
+  `generate_dialogue_cjk_patch.py`. 95 quotes / 161 rows per language across
+  three surfaces:
+
+  | surface | groups | map base | 1st text row | guard | char base | word OR | page window |
+  |---|---|---|---|---|---|---|---|
+  | `battle_quote` | `battle_dialogue_0/1/2/4` | 0xc000 | 22 | 0xc584 | 0x4000 | 0x2000 | 0x300-0x3ff |
+  | `final_conversation` | `battle_dialogue_3` | 0xf000 | 22 | 0xf584 | 0xc000 | 0x2000 | 0x07a-0x0ff |
+  | `ending` | `ending_dialogue` | 0xf000 | 21 | 0xf544 | 0xc000 | 0x2400 | 0x07a-0x0ff |
+
+  The two 0xc000-based screens are tile-starved by construction: their BG1/BG2/
+  BG3 maps fill 0xd000-0xffff, so only ids 0x000-0x0ff have tile data at all and
+  0x000-0x07f is the Latin font. The free-tile survey (unreferenced by the BG3
+  map on that screen across every capture of it, and byte-stable across them)
+  found 178 free ids on `final_conversation` and 213 on `ending`; both take the
+  common contiguous run 0x07a-0x0ff, 134 tiles. Peak page use is 0x0c5 (ko
+  `ending`), leaving 58 tiles of headroom on the tightest surface.
 
 Every surface is drawn by the game itself; nothing is drawn over the presented
 frame.
@@ -334,9 +343,11 @@ python scripts\audit_cjk_feasibility.py
 
 The audit reports both pending drafts and any runtime text still missing a
 native payload. Korean uses authored Hangul tiles and Chinese authored Han
-tiles; both ship through the compact CJK crawl generator, and the dialogue
-surface uses the separate per-quote glyph pager
-(`scripts/generate_dialogue_cjk_patch.py`).
+tiles; both ship through the compact CJK crawl generator, and the three
+dialogue surfaces use the separate per-quote glyph pager
+(`scripts/generate_dialogue_cjk_patch.py`; `--stats` prints the per-surface
+page and guard budget, `--previews` renders each quote through that surface's
+own CGRAM palette row).
 
 ## Visual QA Harness
 

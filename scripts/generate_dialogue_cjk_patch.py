@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Generate the CJK dialogue glyph pages for the victory/defeat quote screen.
+"""Generate the CJK dialogue glyph pages for every dialogue text surface.
 
-The quote screen is encoded BG tilemap text (playbook section 3a), but unlike
-the Latin languages it cannot be translated by rewriting tilemap words alone:
-the font installed at BG3 char base 0x4000 holds 128 Latin cells and nothing
-else, and Korean/Chinese need thousands of glyphs.
+The dialogue screens are encoded BG tilemap text (playbook section 3a), but
+unlike the Latin languages they cannot be translated by rewriting tilemap words
+alone: the font the reference translation installs holds 128 Latin cells and
+nothing else, and Korean/Chinese need thousands of glyphs.
 
 Mechanism: per-quote glyph paging.
 
-  * The 256 tile ids 0x300-0x3ff (VRAM 0x7000-0x7fff) are unreferenced by every
-    layer on this screen and byte-stable across every recorded capture, so they
-    are a free 4 KiB scratch page.
+  * Each surface owns a window of tile ids that is unreferenced by every layer
+    on that screen and byte-stable across every recorded capture, so it is a
+    free scratch page.
   * Each quote (its one or two ROM rows) gets its OWN page laid out from a
     per-quote base tile id.  Pages deliberately OVERLAP in address space --
     only one quote is ever on screen, so only one page needs to be resident.
@@ -21,10 +21,23 @@ Mechanism: per-quote glyph paging.
   * The page art ships as a guarded vram_patch whose guard sits on the BG3 MAP
     words the draw routine writes for that quote's first row.  The guard is the
     interception point: the page lands the instant the game starts revealing
-    this specific quote, and can never land on any other screen.
+    this specific quote, and can never land on any other screen.  The engine
+    treats an explicit guard as REPLACING the content check at the payload
+    address, which is what lets overlapping pages work at all.
 
-Guards are proved unique, per language, against every row the language will
-actually render (CJK rows here plus the Latin rows every other surface keeps).
+Three surfaces, all captured live (see the geometry evidence banner in
+translations/endless_duel_dialogue_cjk.toml):
+
+  | surface            | map base | 1st text row | guard  | char base | word OR |
+  |--------------------|----------|--------------|--------|-----------|---------|
+  | battle_quote       | 0xc000   | 22           | 0xc584 | 0x4000    | 0x2000  |
+  | final_conversation | 0xf000   | 22           | 0xf584 | 0xc000    | 0x2000  |
+  | ending             | 0xf000   | 21           | 0xf544 | 0xc000    | 0x2400  |
+
+Guards are proved unique, per language, against every dialogue row any surface
+will actually render -- the CJK rows of every surface plus the Latin rows every
+surface keeps -- so a guard can never match a row it does not own, whichever
+screen that row draws on.
 """
 
 from __future__ import annotations
@@ -33,7 +46,6 @@ import argparse
 import re
 import sys
 import tomllib
-import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__.replace("\\", "/")).resolve().parent))
@@ -47,11 +59,18 @@ TILE_BY_CHAR = {char: tile for tile, char in CHAR_BY_TILE.items()}
 ROW_WORDS = 32
 ROW_BYTES = ROW_WORDS * 2
 FONT_DIR = Path("C:/Windows/Fonts")
-# Palette 0 on this surface is 0 transparent, 1 black (box fill), 2 grey,
-# 3 white.  The stock Latin cells draw white bodies with grey shading on the
-# black field, so CJK cells use the same three indices.
+# Every surface's palette row is the same three-step ramp: value 1 black (box
+# fill), 2 grey (shading), 3 white (glyph body); value 0 is transparent.  The
+# stock Latin cells draw white bodies with grey shading on the black field, so
+# CJK cells use the same three indices.
 PIX_BG, PIX_EDGE, PIX_BODY = 1, 2, 3
 MAX_GLYPH_W, MAX_GLYPH_H = 16, 14
+MIN_GUARD_WORDS = 2
+# The reference translation's Latin dialogue font is 128 cells at tile id 0 of
+# every surface's char base (byte-identical on all three, and equal to the
+# English post-patch cart image at ROM 0x006f00).  No page window may start
+# inside it.
+LATIN_FONT_TILES = 0x80
 
 
 def repo_root() -> Path:
@@ -152,12 +171,98 @@ def quad_tiles(char: str, lang: str, spec: dict) -> tuple[bytes, ...]:
 
 
 # --------------------------------------------------------------------------
-# quote model
+# surface model
 # --------------------------------------------------------------------------
 
+class Surface:
+    """One dialogue screen: its map geometry, char base and free page window."""
+
+    def __init__(self, index: int, spec: dict):
+        self.index = index
+        self.name = str(spec["name"])
+        self.groups = tuple(spec["groups"])
+        if not self.groups:
+            raise ValueError(f"surface {self.name!r}: no groups")
+        self.map_base = int(spec["map_base"])
+        self.map_row_stride = int(spec["map_row_stride"])
+        self.map_first_row = int(spec["map_first_row"])
+        self.text_start_col = int(spec["text_start_col"])
+        self.text_cells = int(spec["text_cells"])
+        self.char_base = int(spec["char_base"])
+        # What the draw routine ORs into the map word: 0x2000 is priority with
+        # palette 0, 0x2400 is priority with palette 1 (the ending screen).
+        self.word_or = int(spec["word_or"])
+        self.palette_row = int(spec["palette_row"])
+        self.palette = self._palette(str(spec["palette_hex"]))
+        self.page_tile_first = int(spec["page_tile_first"])
+        self.page_tile_last = int(spec["page_tile_last"])
+        # First VRAM byte that is NOT tile data under this char base -- the
+        # 0xc000 screens hit their BG1 map at 0xd000, so a page window one tile
+        # too long would stamp glyph art over a tilemap.
+        self.char_region_end = int(spec["char_region_end"])
+        if self.page_tile_last < self.page_tile_first:
+            raise ValueError(f"surface {self.name!r}: empty page window")
+        if self.page_tile_first < LATIN_FONT_TILES:
+            raise ValueError(
+                f"surface {self.name!r}: page window starts at "
+                f"0x{self.page_tile_first:03x}, inside the Latin dialogue font "
+                f"(tile ids 0x000-0x{LATIN_FONT_TILES - 1:03x})")
+        end = self.char_base + (self.page_tile_last + 1) * 16
+        if end > self.char_region_end:
+            raise ValueError(
+                f"surface {self.name!r}: page window ends at VRAM 0x{end:04x}, "
+                f"past the char region end 0x{self.char_region_end:04x}")
+        self.page_blob = bytes.fromhex(str(spec["page_source_hex"]))
+        want = (self.page_tile_last - self.page_tile_first + 1) * 16
+        if len(self.page_blob) != want:
+            raise ValueError(
+                f"surface {self.name!r}: page_source_hex is "
+                f"{len(self.page_blob)} bytes, the page window needs {want}")
+        if (self.word_or >> 10) & 7 != self.palette_row:
+            raise ValueError(
+                f"surface {self.name!r}: word_or {self.word_or:#06x} selects "
+                f"palette {(self.word_or >> 10) & 7}, palette_row says "
+                f"{self.palette_row}")
+
+    @staticmethod
+    def _palette(hex_value: str) -> tuple[tuple[int, int, int], ...]:
+        """The four 15-bit BGR CGRAM words of this surface's palette row."""
+        raw = bytes.fromhex(hex_value)
+        if len(raw) != 8:
+            raise ValueError("palette_hex must be 4 CGRAM words (8 bytes)")
+        out = []
+        for i in range(4):
+            word = raw[i * 2] | (raw[i * 2 + 1] << 8)
+            out.append((((word) & 31) * 255 // 31,
+                        ((word >> 5) & 31) * 255 // 31,
+                        ((word >> 10) & 31) * 255 // 31))
+        # Value 0 is transparent on BG3, so its CGRAM colour is never shown;
+        # what the player sees through it is the box's own black fill, which is
+        # value 1.  Previews paint it that way so they match the screenshots.
+        out[0] = out[PIX_BG]
+        return tuple(out)
+
+    @property
+    def page_tiles(self) -> int:
+        return self.page_tile_last - self.page_tile_first + 1
+
+    def vram_word(self, rom_word: int) -> int:
+        """What the draw routine writes into the BG3 map for a ROM word."""
+        return (rom_word & 0x03FF) | self.word_or
+
+    @property
+    def guard_address(self) -> int:
+        return (self.map_base + self.map_first_row * self.map_row_stride
+                + self.text_start_col * 2)
+
+    def tile_address(self, tile: int) -> int:
+        return self.char_base + tile * 16
+
+
 class Quote:
-    def __init__(self, index: int, addresses: list[int], texts: list[str],
-                 lang: str):
+    def __init__(self, surface: Surface, index: int, addresses: list[int],
+                 texts: list[str], lang: str):
+        self.surface = surface
         self.index = index
         self.addresses = addresses
         self.texts = texts
@@ -208,11 +313,6 @@ def encode_row(source_hex: str, start_col: int,
     return source.hex()
 
 
-def vram_word(rom_word: int) -> int:
-    """What the draw routine writes into the BG3 map for a ROM word."""
-    return (rom_word & 0x03FF) | 0x2000
-
-
 # --------------------------------------------------------------------------
 # build
 # --------------------------------------------------------------------------
@@ -224,22 +324,40 @@ class Build:
             source_path or root / "translations" / "endless_duel_dialogue_cjk.toml")
         self.dialogue = load_toml(
             root / "translations" / "endless_duel_dialogue.toml")
-        self.surface = self.source["surface"]
         self.by_address = {int(l["address"]): l
                            for l in self.dialogue.get("line", [])}
-        self.groups = tuple(self.surface["groups"])
-        self.page_blob = bytes.fromhex(self.surface["page_source_hex"])
-        first = int(self.surface["page_tile_first"])
-        last = int(self.surface["page_tile_last"])
-        if len(self.page_blob) != (last - first + 1) * 16:
-            raise ValueError("page_source_hex does not cover the page region")
+        self.surfaces = [Surface(i, spec)
+                         for i, spec in enumerate(self.source["surface"])]
+        self._verify_surfaces()
         self.rows: dict[int, dict[str, str]] = {}
-        self.quotes: dict[str, list[Quote]] = {}
+        # {surface index: {lang: [Quote]}}
+        self.quotes: dict[int, dict[str, list[Quote]]] = {}
         self._build()
 
+    # -- surface sanity --------------------------------------------------
+    def _verify_surfaces(self) -> None:
+        self.surface_by_group: dict[str, Surface] = {}
+        for surface in self.surfaces:
+            for group in surface.groups:
+                if group in self.surface_by_group:
+                    raise ValueError(
+                        f"group {group!r} is claimed by both "
+                        f"{self.surface_by_group[group].name!r} and "
+                        f"{surface.name!r}")
+                self.surface_by_group[group] = surface
+        seen: dict[int, Surface] = {}
+        for surface in self.surfaces:
+            other = seen.get(surface.guard_address)
+            if other is not None:
+                raise ValueError(
+                    f"surfaces {other.name!r} and {surface.name!r} derive the "
+                    f"same guard address 0x{surface.guard_address:04x}; guard "
+                    "uniqueness cannot be proved per surface")
+            seen[surface.guard_address] = surface
+
     # -- helpers ---------------------------------------------------------
-    def _authored(self) -> dict[int, dict]:
-        out: dict[int, dict] = {}
+    def _authored(self) -> dict[int, tuple[Surface, dict]]:
+        out: dict[int, tuple[Surface, dict]] = {}
         for index, entry in enumerate(self.source.get("line", []), 1):
             address = int(entry["address"])
             if address in out:
@@ -247,169 +365,190 @@ class Build:
             if address not in self.by_address:
                 raise ValueError(
                     f"line {index}: 0x{address:06x} is not a decoded dialogue row")
-            if self.by_address[address]["group"] not in self.groups:
+            group = self.by_address[address]["group"]
+            surface = self.surface_by_group.get(group)
+            if surface is None:
                 raise ValueError(
-                    f"line {index}: 0x{address:06x} is in group "
-                    f"{self.by_address[address]['group']!r}, which this surface "
-                    "does not cover")
-            out[address] = entry
+                    f"line {index}: 0x{address:06x} is in group {group!r}, "
+                    "which no surface covers")
+            out[address] = (surface, entry)
         return out
 
     def _build(self) -> None:
         authored = self._authored()
-        first_tile = int(self.surface["page_tile_first"])
-        last_tile = int(self.surface["page_tile_last"])
-        cells_budget = int(self.surface["text_cells"])
-        start_col = int(self.surface["text_start_col"])
-
-        # Quote boundaries: a ROM row whose address low bit 0x80 is clear starts
-        # a quote; the row 0x80 above it, when the source authors one, is its
-        # continuation line.  Both render from the same page.
-        starts = [a for a in sorted(authored) if not (a & 0x80)]
-        for lang in LANGS:
-            quotes: list[Quote] = []
-            for start in starts:
-                addresses, texts = [], []
-                for address in (start, start + 0x80):
-                    entry = authored.get(address)
-                    if entry is None or not entry.get(lang):
+        for surface in self.surfaces:
+            self.quotes[surface.index] = {}
+            mine = sorted(a for a, (s, _) in authored.items()
+                          if s is surface)
+            # Quote boundaries: a ROM row whose address bit 0x80 is clear starts
+            # a quote; the row 0x80 above it, when the source authors one, is its
+            # continuation line.  Both render from the same page.
+            starts = [a for a in mine if not (a & 0x80)]
+            for lang in LANGS:
+                quotes: list[Quote] = []
+                for start in starts:
+                    addresses, texts = [], []
+                    for address in (start, start + 0x80):
+                        entry = authored.get(address)
+                        if entry is None or entry[0] is not surface:
+                            continue
+                        if not entry[1].get(lang):
+                            continue
+                        if address != start and not addresses:
+                            raise ValueError(
+                                f"{lang}: 0x{address:06x} is a continuation line "
+                                f"but 0x{start:06x} has no {lang} text")
+                        addresses.append(address)
+                        texts.append(str(entry[1][lang]))
+                    if not addresses:
                         continue
-                    if address != start and not addresses:
+                    quote = Quote(surface, len(quotes), addresses, texts, lang)
+                    if not quote.chars:
+                        # Pure-ASCII translation (e.g. "......") needs no page
+                        # and no rewritten row: the Latin cells render it.
+                        continue
+                    quotes.append(quote)
+                # Allocate one distinct base tile per quote.  Distinct bases are
+                # what makes the map guards distinguishable (two quotes can share
+                # the same English text -- battle_dialogue_3 repeats four rows
+                # verbatim); the pages themselves overlap.
+                for quote in quotes:
+                    quote.base = surface.page_tile_first + quote.index
+                    need = 4 * len(quote.chars)
+                    if quote.base + need - 1 > surface.page_tile_last:
                         raise ValueError(
-                            f"{lang}: 0x{address:06x} is a continuation line but "
-                            f"0x{start:06x} has no {lang} text")
-                    addresses.append(address)
-                    texts.append(str(entry[lang]))
-                if not addresses:
-                    continue
-                quote = Quote(len(quotes), addresses, texts, lang)
-                if not quote.chars:
-                    # Pure-ASCII translation (e.g. "......") needs no page and no
-                    # rewritten row: the Latin cells already render it.
-                    continue
-                quotes.append(quote)
-            # Allocate one distinct base tile per quote.  Distinct bases are what
-            # makes the map guards distinguishable; the pages themselves overlap.
-            for quote in quotes:
-                quote.base = first_tile + quote.index
-                need = 4 * len(quote.chars)
-                if quote.base + need - 1 > last_tile:
-                    raise ValueError(
-                        f"{lang} 0x{quote.addresses[0]:06x}: page needs {need} "
-                        f"tiles from 0x{quote.base:03x}, past 0x{last_tile:03x}")
-                for slot, char in enumerate(quote.chars):
-                    quote.tiles[char] = quote.base + 4 * slot
-            # ROM row payloads.
-            for quote in quotes:
-                for address, text in zip(quote.addresses, quote.texts):
-                    if text_cells(text) > cells_budget:
-                        raise ValueError(
-                            f"{lang} 0x{address:06x}: {text!r} is "
-                            f"{text_cells(text)} cells, budget is {cells_budget}")
-                    row = self.by_address[address]
-                    if int(row["start_col"]) != start_col:
-                        raise ValueError(
-                            f"0x{address:06x}: start_col {row['start_col']} "
-                            f"differs from the surface's {start_col}")
-                    payload = encode_row(row["en_hex"], start_col,
-                                         row_cells(text, quote))
-                    self.rows.setdefault(address, {})[lang] = payload
-            self.quotes[lang] = quotes
+                            f"{surface.name} {lang} 0x{quote.addresses[0]:06x}: "
+                            f"page needs {need} tiles from 0x{quote.base:03x}, "
+                            f"past the window end 0x{surface.page_tile_last:03x} "
+                            f"(window is {surface.page_tiles} tiles)")
+                    for slot, char in enumerate(quote.chars):
+                        quote.tiles[char] = quote.base + 4 * slot
+                # ROM row payloads.
+                for quote in quotes:
+                    for address, text in zip(quote.addresses, quote.texts):
+                        if text_cells(text) > surface.text_cells:
+                            raise ValueError(
+                                f"{surface.name} {lang} 0x{address:06x}: "
+                                f"{text!r} is {text_cells(text)} cells, budget "
+                                f"is {surface.text_cells}")
+                        row = self.by_address[address]
+                        if int(row["start_col"]) != surface.text_start_col:
+                            raise ValueError(
+                                f"0x{address:06x}: start_col {row['start_col']} "
+                                f"differs from {surface.name}'s "
+                                f"{surface.text_start_col}")
+                        payload = encode_row(row["en_hex"], surface.text_start_col,
+                                             row_cells(text, quote))
+                        self.rows.setdefault(address, {})[lang] = payload
+                self.quotes[surface.index][lang] = quotes
         self._verify_guards()
 
-    # -- guards ----------------------------------------------------------
-    def guard_prefix_words(self, quote: Quote) -> list[int]:
-        row = self.by_address[quote.addresses[0]]
-        payload = bytes.fromhex(self.rows[quote.addresses[0]][quote.lang])
-        start_col = int(row["start_col"])
-        words = []
-        for col in range(start_col, ROW_WORDS):
-            words.append(vram_word(payload[col * 2] | (payload[col * 2 + 1] << 8)))
-        return words
-
-    def _latin_prefixes(self, lang: str) -> list[list[int]]:
-        """Post-transform map words for every row this language renders in Latin.
-
-        A guard must not match one of those, or a page would land on an
-        untranslated quote and swap its font out from under it.
-        """
+    def all_quotes(self, lang: str) -> list[Quote]:
         out = []
+        for surface in self.surfaces:
+            out.extend(self.quotes[surface.index][lang])
+        return out
+
+    # -- guards ----------------------------------------------------------
+    def row_words(self, surface: Surface, address: int, payload_hex: str
+                  ) -> list[int]:
+        """Post-transform map words this row puts on its first text row."""
+        payload = bytes.fromhex(payload_hex)
+        start_col = int(self.by_address[address]["start_col"])
+        return [surface.vram_word(payload[c * 2] | (payload[c * 2 + 1] << 8))
+                for c in range(start_col, ROW_WORDS)]
+
+    def _prefix_pool(self, lang: str) -> list[tuple[int, list[int]]]:
+        """(row address, post-transform words) for every row that can land on a
+        surface's FIRST text row -- i.e. everything a guard could ever see.
+
+        A guard must not match one of those, or a page would land on a quote it
+        does not own and swap that quote's font out from under it.  The pool
+        spans all surfaces even though their guard addresses differ: that is
+        strictly stronger than a per-surface check and costs nothing.
+
+        Continuation rows (address bit 0x80 set) are excluded: they render two
+        map rows below the guard and can never appear at the guard address.
+        Every 0x80 row in the decoded table has its 0x00 partner, so the bit is
+        a sound first-line test.  Including them is not merely wasted work, it
+        is wrong -- two zh quotes legitimately produce the identical 30-word row
+        (battle_dialogue_0 0x007c80's second line and battle_dialogue_4
+        0x027500's first line), and treating that as a clash rejects a guard
+        that is in fact unambiguous.
+        """
+        pool: list[tuple[int, list[int]]] = []
         for line in self.dialogue.get("line", []):
             address = int(line["address"])
-            if address in self.rows and lang in self.rows[address]:
+            if address & 0x80:
                 continue
-            payload = bytes.fromhex(line["en_hex"])
-            start_col = int(line["start_col"])
-            out.append([vram_word(payload[c * 2] | (payload[c * 2 + 1] << 8))
-                        for c in range(start_col, ROW_WORDS)])
-        return out
+            surface = self.surface_by_group.get(line["group"])
+            if surface is None:
+                continue
+            payload = self.rows.get(address, {}).get(lang) or line["en_hex"]
+            pool.append((address, self.row_words(surface, address, payload)))
+        return pool
 
     def _verify_guards(self) -> None:
         self.guards: dict[str, dict[int, list[int]]] = {}
         for lang in LANGS:
-            quotes = self.quotes[lang]
-            cjk = {q.addresses[0]: self.guard_prefix_words(q) for q in quotes}
-            latin = self._latin_prefixes(lang)
+            pool = self._prefix_pool(lang)
             chosen: dict[int, list[int]] = {}
-            for quote in quotes:
-                mine = cjk[quote.addresses[0]]
-                for length in range(2, len(mine) + 1):
+            for quote in self.all_quotes(lang):
+                own = quote.addresses[0]
+                mine = self.row_words(quote.surface, own,
+                                      self.rows[own][quote.lang])
+                for length in range(MIN_GUARD_WORDS, len(mine) + 1):
                     prefix = mine[:length]
-                    clash = any(other[:length] == prefix
-                                for address, other in cjk.items()
-                                if address != quote.addresses[0])
-                    clash = clash or any(row[:length] == prefix for row in latin)
-                    if not clash:
-                        chosen[quote.addresses[0]] = prefix
+                    if not any(words[:length] == prefix
+                               for address, words in pool if address != own):
+                        chosen[own] = prefix
                         break
                 else:
                     raise ValueError(
-                        f"{lang} 0x{quote.addresses[0]:06x}: no unique map guard "
-                        "prefix exists for this quote")
+                        f"{quote.surface.name} {lang} 0x{own:06x}: no unique map "
+                        "guard prefix exists for this quote")
             self.guards[lang] = chosen
 
     # -- emission --------------------------------------------------------
-    def guard_address(self) -> int:
-        return (int(self.surface["map_base"])
-                + int(self.surface["map_first_row"]) * int(self.surface["map_row_stride"])
-                + int(self.surface["text_start_col"]) * 2)
-
     def page_payload(self, quote: Quote) -> tuple[int, str, str]:
+        surface = quote.surface
         spec = self.source["font"][quote.lang]
         payload = bytearray()
         for char in quote.chars:
             payload += b"".join(quad_tiles(char, quote.lang, spec))
-        first_tile = int(self.surface["page_tile_first"])
-        offset = (quote.base - first_tile) * 16
-        source = self.page_blob[offset:offset + len(payload)]
+        offset = (quote.base - surface.page_tile_first) * 16
+        source = surface.page_blob[offset:offset + len(payload)]
         if len(source) != len(payload):
-            raise ValueError("page slice runs past the captured free region")
-        address = int(self.surface["char_base"]) + quote.base * 16
-        return address, source.hex(), payload.hex()
+            raise ValueError(
+                f"{surface.name} {quote.lang} 0x{quote.addresses[0]:06x}: page "
+                "slice runs past the captured free region")
+        return surface.tile_address(quote.base), source.hex(), payload.hex()
 
     def generated_blocks(self) -> list[str]:
         blocks = [BEGIN_MARKER]
-        guard_address = self.guard_address()
-        for lang in LANGS:
-            for quote in self.quotes[lang]:
-                address, source_hex, payload_hex = self.page_payload(quote)
-                guard = self.guards[lang][quote.addresses[0]]
-                guard_hex = b"".join(word_bytes(w) for w in guard).hex()
-                blocks.extend([
-                    "",
-                    "[[vram_patch]]",
-                    f"# {lang} quote 0x{quote.addresses[0]:06x} "
-                    f"({' / '.join(self.by_address[a]['en'] for a in quote.addresses)})",
-                    f"# page base tile 0x{quote.base:03x}, "
-                    f"{len(quote.chars)} glyphs, {4 * len(quote.chars)} tiles",
-                    f"address = 0x{address:04x}",
-                    f'source_hex = "{source_hex}"',
-                    f'{lang}_hex = "{payload_hex}"',
-                    f"guard_address = 0x{guard_address:04x}",
-                    f'guard_hex = "{guard_hex}"',
-                ])
+        for surface in self.surfaces:
+            for lang in LANGS:
+                for quote in self.quotes[surface.index][lang]:
+                    address, source_hex, payload_hex = self.page_payload(quote)
+                    guard = self.guards[lang][quote.addresses[0]]
+                    guard_hex = b"".join(word_bytes(w) for w in guard).hex()
+                    en = " / ".join(self.by_address[a]["en"]
+                                    for a in quote.addresses)
+                    blocks.extend([
+                        "",
+                        "[[vram_patch]]",
+                        f"# {surface.name} {lang} quote "
+                        f"0x{quote.addresses[0]:06x} ({en})",
+                        f"# page base tile 0x{quote.base:03x}, "
+                        f"{len(quote.chars)} glyphs, {4 * len(quote.chars)} tiles",
+                        f"address = 0x{address:04x}",
+                        f'source_hex = "{source_hex}"',
+                        f'{lang}_hex = "{payload_hex}"',
+                        f"guard_address = 0x{surface.guard_address:04x}",
+                        f'guard_hex = "{guard_hex}"',
+                    ])
         blocks.extend(["", END_MARKER, ""])
-        if not any(self.quotes[lang] for lang in LANGS):
+        if not any(self.all_quotes(lang) for lang in LANGS):
             blocks.insert(1, "# No CJK dialogue pages are authored yet.")
         return blocks
 
@@ -444,10 +583,10 @@ def row_payloads(root: Path | None = None) -> dict[int, dict[str, str]]:
 # previews
 # --------------------------------------------------------------------------
 
-PALETTE = ((0, 0, 0), (0, 0, 0), (160, 160, 160), (248, 248, 248))
-# The 128 Latin dialogue cells the reference translation installs; VRAM
-# 0x4000-0x47ff is a byte-exact copy of this span of the English post-patch
-# cart image, so previews can replay ASCII cells from the same source.
+# The 128 Latin dialogue cells the reference translation installs.  Every
+# surface's char base holds a byte-exact copy of this span of the English
+# post-patch cart image (verified against the live VRAM of all three screens),
+# so previews can replay ASCII cells from the same source.
 LATIN_FONT_ROM = 0x006F00
 _LATIN_CACHE: dict[str, bytes] = {}
 
@@ -466,49 +605,54 @@ def write_previews(build: Build, out_dir: Path, count: int = 6) -> list[Path]:
     from PIL import Image
     out_dir.mkdir(parents=True, exist_ok=True)
     written = []
-    for lang in LANGS:
-        quotes = build.quotes[lang]
-        if count <= 0:
-            selected = quotes
-        else:
-            step = max(1, len(quotes) // count)
-            selected = quotes[::step][:count]
-        for quote in selected:
-            # Replay the real path: page tiles into a tile bank, then the rows'
-            # map words through (rom & 0x3ff) | 0x2000 into pixels.
-            spec = build.source["font"][lang]
-            bank: dict[int, bytes] = {}
-            for char in quote.chars:
-                for offset, tile in enumerate(quad_tiles(char, lang, spec)):
-                    bank[quote.tiles[char] + offset] = tile
-            for tile in range(0x80):
-                bank.setdefault(tile, latin_font(build.root)[tile * 16:tile * 16 + 16])
-            rows = []
-            for address in quote.addresses:
-                payload = bytes.fromhex(build.rows[address][lang])
-                rows.append(payload)
-            width, height = 30 * 8, len(rows) * 16
-            img = Image.new("RGB", (width, height), PALETTE[1])
-            px = img.load()
-            for row_index, payload in enumerate(rows):
-                for half in (0, 1):
-                    for col in range(2, 32):
-                        word = payload[half * ROW_BYTES + col * 2] | (
-                            payload[half * ROW_BYTES + col * 2 + 1] << 8)
-                        tile = vram_word(word) & 0x03FF
-                        data = bank.get(tile)
-                        if data is None:
-                            continue
-                        for y in range(8):
-                            plane0, plane1 = data[y * 2], data[y * 2 + 1]
-                            for x in range(8):
-                                value = ((plane0 >> (7 - x)) & 1) | (
-                                    ((plane1 >> (7 - x)) & 1) << 1)
-                                px[(col - 2) * 8 + x,
-                                   row_index * 16 + half * 8 + y] = PALETTE[value]
-            path = out_dir / f"{lang}_{quote.addresses[0]:06x}.png"
-            img.resize((width * 3, height * 3), Image.NEAREST).save(path)
-            written.append(path)
+    for surface in build.surfaces:
+        palette = surface.palette
+        for lang in LANGS:
+            quotes = build.quotes[surface.index][lang]
+            if not quotes:
+                continue
+            if count <= 0:
+                selected = quotes
+            else:
+                step = max(1, len(quotes) // count)
+                selected = quotes[::step][:count]
+            for quote in selected:
+                # Replay the real path: page tiles into a tile bank, then the
+                # rows' map words through the surface's own word transform into
+                # pixels, painted with the surface's own CGRAM palette row.
+                spec = build.source["font"][lang]
+                bank: dict[int, bytes] = {}
+                for char in quote.chars:
+                    for offset, tile in enumerate(quad_tiles(char, lang, spec)):
+                        bank[quote.tiles[char] + offset] = tile
+                font = latin_font(build.root)
+                for tile in range(0x80):
+                    bank.setdefault(tile, font[tile * 16:tile * 16 + 16])
+                rows = [bytes.fromhex(build.rows[a][lang])
+                        for a in quote.addresses]
+                width, height = 30 * 8, len(rows) * 16
+                img = Image.new("RGB", (width, height), palette[PIX_BG])
+                px = img.load()
+                for row_index, payload in enumerate(rows):
+                    for half in (0, 1):
+                        for col in range(2, 32):
+                            word = payload[half * ROW_BYTES + col * 2] | (
+                                payload[half * ROW_BYTES + col * 2 + 1] << 8)
+                            tile = surface.vram_word(word) & 0x03FF
+                            data = bank.get(tile)
+                            if data is None:
+                                continue
+                            for y in range(8):
+                                plane0, plane1 = data[y * 2], data[y * 2 + 1]
+                                for x in range(8):
+                                    value = ((plane0 >> (7 - x)) & 1) | (
+                                        ((plane1 >> (7 - x)) & 1) << 1)
+                                    px[(col - 2) * 8 + x,
+                                       row_index * 16 + half * 8 + y] = \
+                                        palette[value]
+                path = out_dir / f"{lang}_{quote.addresses[0]:06x}.png"
+                img.resize((width * 3, height * 3), Image.NEAREST).save(path)
+                written.append(path)
     return written
 
 
@@ -528,7 +672,7 @@ def main() -> int:
         default=str(root / "translations" / "dialogue_cjk_previews"))
     parser.add_argument(
         "--preview-count", type=int, default=6,
-        help="how many quotes per language to render (0 = every quote)")
+        help="how many quotes per language per surface to render (0 = every one)")
     parser.add_argument("--stats", action="store_true")
     args = parser.parse_args()
 
@@ -539,14 +683,26 @@ def main() -> int:
     updated = replace_generated_section(table_text, generated)
 
     if args.stats:
-        for lang in LANGS:
-            quotes = build.quotes[lang]
-            print(f"{lang}: {len(quotes)} quotes, "
-                  f"{sum(len(q.addresses) for q in quotes)} rows, "
-                  f"pages {min(4 * len(q.chars) for q in quotes)}-"
-                  f"{max(4 * len(q.chars) for q in quotes)} tiles, "
-                  f"guards {min(len(g) for g in build.guards[lang].values())}-"
-                  f"{max(len(g) for g in build.guards[lang].values())} words")
+        for surface in build.surfaces:
+            print(f"{surface.name}: guard 0x{surface.guard_address:04x}, "
+                  f"char base 0x{surface.char_base:04x}, word OR "
+                  f"0x{surface.word_or:04x} (palette {surface.palette_row}), "
+                  f"page window 0x{surface.page_tile_first:03x}-"
+                  f"0x{surface.page_tile_last:03x} ({surface.page_tiles} tiles)")
+            for lang in LANGS:
+                quotes = build.quotes[surface.index][lang]
+                if not quotes:
+                    print(f"  {lang}: no pages")
+                    continue
+                tiles = [4 * len(q.chars) for q in quotes]
+                highest = max(q.base + 4 * len(q.chars) - 1 for q in quotes)
+                guards = [len(build.guards[lang][q.addresses[0]]) for q in quotes]
+                print(f"  {lang}: {len(quotes)} pages, "
+                      f"{sum(len(q.addresses) for q in quotes)} rows, "
+                      f"pages {min(tiles)}-{max(tiles)} tiles, highest tile "
+                      f"0x{highest:03x}, headroom "
+                      f"{surface.page_tile_last - highest} tiles, "
+                      f"guards {min(guards)}-{max(guards)} words")
 
     if args.previews:
         for path in write_previews(build, Path(args.preview_dir),

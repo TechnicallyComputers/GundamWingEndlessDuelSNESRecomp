@@ -30,6 +30,7 @@ SCRIPT_CHECKS = (
     "scripts/render_title_menu_overlay_preview.py",
     "scripts/render_vram_bg_capture.py",
     "scripts/render_oam_capture.py",
+    "scripts/catch_dialogue_page.py",
 )
 
 

@@ -135,13 +135,18 @@ try {
     }
     Start-Sleep -Seconds $WaitSeconds
 
-    $shot = (Join-Path $OutDir "shot.bmp").Replace("\", "/")
-    Write-Host (Invoke-Dbg $writer $reader "screenshot $shot")
-    Invoke-Dbg $writer $reader "get_ppu_state" | Set-Content -Encoding utf8 (Join-Path $OutDir "ppu.json")
-    Invoke-Dbg $writer $reader "dump_cgram"    | Set-Content -Encoding utf8 (Join-Path $OutDir "cgram.json")
+    # VRAM FIRST. The regression assertions are on VRAM/OAM state (screenshots
+    # of a typewriter reveal are useless), and these dumps are hundreds of
+    # milliseconds apart on a running game -- long enough for a page to finish
+    # typing or be cleared. Capture the thing you assert on while it is
+    # freshest, and treat the screenshot as the human-readable companion.
     if ($DumpVram) {
         Invoke-Dbg $writer $reader "dump_vram 0 65536" | Set-Content -Encoding utf8 (Join-Path $OutDir "vram.json")
     }
+    Invoke-Dbg $writer $reader "get_ppu_state" | Set-Content -Encoding utf8 (Join-Path $OutDir "ppu.json")
+    Invoke-Dbg $writer $reader "dump_cgram"    | Set-Content -Encoding utf8 (Join-Path $OutDir "cgram.json")
+    $shot = (Join-Path $OutDir "shot.bmp").Replace("\", "/")
+    Write-Host (Invoke-Dbg $writer $reader "screenshot $shot")
     Write-Host "captured to $OutDir"
 }
 finally {
