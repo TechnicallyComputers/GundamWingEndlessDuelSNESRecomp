@@ -1,5 +1,8 @@
 # SNES Runtime Translation And Tilemap Workflow
 
+See LOCALIZATION_PLAYBOOK.md for the end-to-end reproducible process
+(doctrine, engine semantics, surface taxonomy, recon workflow, pitfalls).
+
 Endless Duel is the first reference implementation for runtime localization in
 this SNES recomp tree. The model is deliberately close to the Tsumu Light
 PlayStation project: translators edit source data, generators produce

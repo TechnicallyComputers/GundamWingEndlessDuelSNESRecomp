@@ -3,6 +3,8 @@
 `endless_duel.toml` is a runtime patch table. It patches the in-memory cartridge
 image after boot and does not alter the user's ROM file.
 
+The reproducible end-to-end process for porting this to other games is
+docs/LOCALIZATION_PLAYBOOK.md.
 The broader implementation pattern is documented in
 `docs/TRANSLATION_TILEMAP_REFERENCE.md`; this file is the Endless Duel-specific
 map of current assets, commands, and open surfaces.
