@@ -70,7 +70,7 @@ label = "Korean"
 # label stays ASCII -- "ไทย (Thai)" would render as tofu.  Same reason the
 # Korean and Chinese choices are labelled in English.
 value = "th"
-label = "Thai"
+label = "Thai (partial)"
 
 [[option.choice]]
 value = "off"
