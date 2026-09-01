@@ -164,6 +164,27 @@ changed, all reusable:
   Measure the band boundaries from the font's own rendering of probe
   strings; never hardcode pixel rows, and never centre per line (the
   baseline has to be constant or the text bounces line to line).
+- **A "free" font cell is only free if the LIVE map says so.** Latin
+  diacritics are shipped by repurposing font cells the game does not
+  use, so the whole scheme rests on a free-cell survey. Surveying the
+  cart's dialogue tilemap pages is not enough and is not conservative —
+  it is simply blind to everything the scene composes at draw time. Here
+  the dialogue box FRAME is exactly that: it never appears in a cart
+  tilemap, the draw routine writes it into the BG3 map at `0xf000`, and
+  it is built out of cell 0x001 (tile 0x001 = vertical side rail, 0x011 =
+  corner, 0x010 = horizontal rail). A cart-only survey called that cell
+  free, it/pt allocated it, and both shipped a garbled border on every
+  dialogue screen. The correct survey scans the live BG3 map of every
+  drawn text screen, and has two gates: only captures in a language that
+  allocates nothing (en/es) count, and only captures where the dialogue
+  font is the art actually resident at the BG3 character base count (the
+  title screen reuses that base for different art). Record the result
+  next to the allocation and make the generator's `--check` enforce it:
+  `scripts/generate_dialogue_accent_patch.py --survey` writes
+  `[live_reference]`, and `--check` refuses any allocation landing on a
+  referenced tile. Cells the survey shows the frame uses get declared as
+  `[[frame_cell]]` and pinned to the reference art for *every* language,
+  so the border can never drift again.
 - **The all-background tile is not the blank cell.** In these boxes an
   empty tile is colour index 1 (the box's black fill), not 0, so it can
   NOT be replaced by the game's own blank map word — that word is tile 0
@@ -478,6 +499,9 @@ real time once; none should waste it twice.
 | a glyph atlas keyed by single codepoint | a cluster script (Thai) cannot be expressed at all — combining marks each take their own advance | either allocate per CLUSTER (option screens here) or per rendered tile (dialogue here); check for a zero-advance path before assuming an atlas can carry a script |
 | the launcher font is Latin + Japanese only | a non-Latin `[[option.choice]] label` renders as tofu | keep the language label ASCII (`label = "Thai"`), as ko/zh already do, unless you extend recomp-ui's font ranges |
 | assuming a font has the ASCII glyph its code implies | the option font drew `MAH.` as `MAHL` — code 0x2e's cell is not a period on these screens | render the label live before shipping punctuation; the Latin option font here is safe for A-Z and space only |
+| surveying "free" font cells against the cart's tilemap pages | an accent glyph lands on the BOX FRAME (cell 0x001 here: tile 0x001 is the side rail, 0x011 the corner) and every dialogue screen in that language shows a garbled border | survey the LIVE BG3 map of each drawn screen, not the cart pages — frame art is composed at draw time and appears in no cart tilemap |
+| surveying live maps in the language that owns the cells | every allocated cell looks occupied, because you are reading your own glyphs back | survey only in the languages that allocate nothing (en/es here) |
+| surveying live maps without checking which font is resident | the title screen renders BG3 from the SAME character base with different art loaded, so its glyph indices condemn cells no dialogue screen touches | gate each capture on the dialogue font actually being resident at that char base (compare a few known letter cells against the patched ROM font) |
 
 ---
 

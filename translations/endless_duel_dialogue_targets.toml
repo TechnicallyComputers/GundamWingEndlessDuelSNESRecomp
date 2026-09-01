@@ -3,13 +3,39 @@
 #   python scripts/generate_dialogue_patch.py --write
 #
 # The dialogue font supports A-Z, a-z, space, . , ' ? ! plus, per language, the
-# accented cells allocated in translations/endless_duel_dialogue_accents.toml
-# (fr: e-acute e-grave a-grave e-circumflex; it: e-grave a-grave u-grave
-# i-grave o-grave; pt: a-tilde e-acute e-circumflex a-acute c-cedilla). Any
-# other accented character is a hard error: rewrite the line rather than
+# accented cells allocated in translations/endless_duel_dialogue_accents.toml.
+# There are exactly FOUR allocable cells - see that file's header for the
+# survey that proves it - so each language gets four:
+#   fr: e-acute e-grave a-grave e-circumflex
+#   it: e-grave a-grave u-grave o-grave
+#   pt: a-tilde e-acute e-circumflex a-acute
+# Any other accented character is a hard error: rewrite the line rather than
 # dropping the accent.
 #
-# Portuguese consequences of that five-cell budget, so the wording is not
+# The budget was five until 2026-09-01. The fifth cell was 0x001, which turned
+# out to be the dialogue BOX FRAME (beads-8wg.9.11) - allocating it garbled the
+# border on every it/pt dialogue screen - so it was withdrawn and one accent
+# per language went with it. The accent cut was the least frequent in the
+# actual corpus, counted not guessed: it lost i-grave (4 occurrences of 162
+# rows), pt lost c-cedilla (10 of 162).
+#
+# Italian consequences of losing i-grave:
+#   * no i-grave -> "Ecco! Molto bene!" not "Si! Va bene!" (with the grave),
+#     "Non e vero, Nataku..." not "Non e cosi, Nataku...", "Percio smisi di
+#     mostrare" not "Cosi smisi di mostrare", "combattevo a tal punto!" not
+#     "combattevo cosi!" - i.e. "cosi" is unspellable; reach for "percio",
+#     "in tal modo" or "a tal punto" instead.
+#
+# Portuguese consequences of losing c-cedilla:
+#   * no c-cedilla -> "Eu ja sabia desde antes" not "desde o comeco",
+#     "Veja com a alma, e" not "Veja com seu coracao, e", "Por todo o meu
+#     empenho, a paz" not "Gracas aos meus esforcos, a paz", "Obtivemos a paz"
+#     not "Alcancamos a paz", "Acredito naquilo que / e justo!" not "Acredito
+#     na minha / justica!", "com tanta garra assim!" not "com tanta forca
+#     assim!" (all the right-hand spellings written here without the cedilla,
+#     since this comment is ASCII).
+#
+# Portuguese consequences of the cell budget generally, so the wording is not
 # "re-fixed" later by someone who assumes the accent was forgotten:
 #   * no i-acute -> "devemos" not "deveríamos", "grandes tolos" not
 #     "tolos incríveis", "bem claro" not "bem visível", "grave" not "terrível",
@@ -21,6 +47,26 @@
 #     "  Um duelo sem fim..." not "  É um duelo sem fim..."
 # The accented intro caption ("Após Colônia") is free-form sprite art and has
 # no cell budget, so it keeps its real spelling.
+#
+# French consequences of its four-cell budget (no c-cedilla, no a-circumflex,
+# no u-circumflex, no i/o-circumflex, no dieresis, and no UPPERCASE accent):
+#   * no c-cedilla -> "que cela arriverait" not "que ça arriverait",
+#     "de temps pour cela." not "pour ça.", "Tout cela parce que..." not
+#     "Tout ça...", "Mis à part cela" not "A part ça"
+#   * no u-circumflex -> "Il fallait te rendre..." not "Tu aurais dû te rendre"
+#   * no a-circumflex -> "Par mes efforts, la paix" not "Grâce à mes efforts"
+#   * no UPPERCASE accent -> "Mis à part cela" not "À part cela"
+#   * "coeur" keeps the oe digraph: the font has no oe ligature cell.
+#
+# Italian consequences of its cell budget generally (grave accents only - there
+# is NO e-acute cell for it, and no UPPERCASE accented letter):
+#   * no e-acute -> "Come mai continui!?" not "Perché continui!?",
+#     "Tutto a causa di..." not "Tutto perché..."
+#   * no UPPERCASE E-grave -> "Che disastro! Chiamo i soccorsi!" not
+#     "È terribile!", "Uff! Quello era proprio duro" not "Uff! È stato davvero
+#     duro", "  Un duello senza fine..." not "  È un duello senza fine..."
+# Do not "restore" any of the spellings on the right: they are unrenderable,
+# not forgotten.
 #
 # Tagalog (tl) and Bahasa Indonesia (id) allocate ZERO accent cells: both are
 # written here in plain ASCII, which is their standard orthography for this
@@ -48,7 +94,7 @@ id = "Kau lemah!"
 [[line]]
 address = 0x017100
 fr = "Pourquoi insister ainsi!?"
-it = "Perche continui!?"
+it = "Come mai continui!?"
 pt = "Por que insiste assim!?"
 tl = "Bakit pa nagpupumilit!?"
 id = "Kenapa masih memaksa!?"
@@ -71,8 +117,8 @@ id = "kuat bersama!"
 
 [[line]]
 address = 0x017300
-fr = "Qui hesite est perdu!"
-it = "Chi esita e perduto!"
+fr = "Qui hésite est perdu!"
+it = "Chi esita è perduto!"
 pt = "Quem hesita se perde!"
 tl = "Ang mahina ang loob ay talo!"
 id = "Yang ragu pasti kalah!"
@@ -87,7 +133,7 @@ id = "Yang lemah pasti akan"
 
 [[line]]
 address = 0x017480
-fr = "forcement au combat!"
+fr = "forcément au combat!"
 it = "sempre in battaglia!"
 pt = "cairão em batalha!"
 tl = "babagsak sa labanan!"
@@ -95,15 +141,15 @@ id = "gugur di medan perang!"
 
 [[line]]
 address = 0x017500
-fr = "Je savais depuis le debut"
+fr = "Je savais depuis le début"
 it = "Lo sapevo fin dall'inizio"
-pt = "Eu sabia desde o começo"
+pt = "Eu já sabia desde antes"
 tl = "Alam ko na ito mula pa sa"
 id = "Aku sudah tahu sejak awal"
 
 [[line]]
 address = 0x017580
-fr = "que ca arriverait!"
+fr = "que cela arriverait!"
 it = "che sarebbe successo!"
 pt = "que isso aconteceria!"
 tl = "simula pa lamang!"
@@ -159,7 +205,7 @@ id = "saling bertarung!"
 
 [[line]]
 address = 0x017900
-fr = "Desole..."
+fr = "Désolé..."
 it = "Scusa..."
 pt = "Desculpe..."
 tl = "Patawad..."
@@ -167,7 +213,7 @@ id = "Maaf..."
 
 [[line]]
 address = 0x017a00
-fr = "Protegeons la colonie"
+fr = "Protégeons la colonie"
 it = "Proteggiamo la colonia"
 pt = "Vamos proteger nosso lar"
 tl = "Ipagtanggol natin ang"
@@ -184,7 +230,7 @@ id = "bersama!"
 [[line]]
 address = 0x017b00
 fr = "C'est terrible! J'appelle"
-it = "E terribile! Chiamo"
+it = "Che disastro! Chiamo"
 pt = "Isto é grave! Chamarei"
 tl = "Grabe ito! Tatawag ako"
 id = "Ini buruk! Aku akan"
@@ -199,7 +245,7 @@ id = "panggil medis!"
 
 [[line]]
 address = 0x017c00
-fr = "Tu aurais du"
+fr = "Il fallait"
 it = "Avresti dovuto"
 pt = "Você deveria ter"
 tl = "Dapat ay sumuko"
@@ -216,7 +262,7 @@ id = "menyerah saja..."
 [[line]]
 address = 0x017d00
 fr = "Je ne ferai plus d'erreur!"
-it = "Non faro piu errori!"
+it = "Non farò più errori!"
 pt = "Não cometerei erros!"
 tl = "Hindi ako magkakamali!"
 id = "Aku takkan membuat salah!"
@@ -239,8 +285,8 @@ id = "tak akan berakhir..."
 
 [[line]]
 address = 0x017f00
-fr = "Bien! C'etait plus facile"
-it = "Bene! Era piu facile"
+fr = "Bien! C'était plus facile"
+it = "Bene! Era più facile"
 pt = "Certo! Foi mais fácil"
 tl = "Ayos! Mas madali pala"
 id = "Bagus! Lebih mudah"
@@ -288,14 +334,14 @@ id = "sungguh bodoh..."
 [[line]]
 address = 0x026e00
 fr = "Ton impatience est un"
-it = "La tua impazienza e un"
+it = "La tua impazienza è un"
 pt = "Sua impaciência é um"
 tl = "Ang pagkainip mo ay"
 id = "Ketidaksabaranmu itu"
 
 [[line]]
 address = 0x026e80
-fr = "defaut trop visible..."
+fr = "défaut trop visible..."
 it = "difetto molto evidente..."
 pt = "defeito bem claro..."
 tl = "isang malaking kahinaan..."
@@ -303,7 +349,7 @@ id = "cacat yang jelas..."
 
 [[line]]
 address = 0x026f00
-fr = "Il ne faut pas ceder."
+fr = "Il ne faut pas céder."
 it = "Non devi arrenderti."
 pt = "Não se deve desistir."
 tl = "Hindi dapat sumuko."
@@ -327,7 +373,7 @@ id = "terbaik darimu."
 
 [[line]]
 address = 0x027100
-fr = "Desole, mais je n'ai pas"
+fr = "Désolé, mais je n'ai pas"
 it = "Scusa, ma non ho"
 pt = "Desculpe, mas não tenho"
 tl = "Patawad, wala akong"
@@ -335,7 +381,7 @@ id = "Maaf, aku tak punya"
 
 [[line]]
 address = 0x027180
-fr = "de temps pour ca."
+fr = "de temps pour cela."
 it = "tempo per questo."
 pt = "tempo para isso."
 tl = "oras para dito."
@@ -352,7 +398,7 @@ id = "Lagi dan lagi,"
 [[line]]
 address = 0x027280
 fr = "c'est toujours pareil."
-it = "e sempre lo stesso."
+it = "è sempre lo stesso."
 pt = "é sempre igual."
 tl = "ganito pa rin ang lahat."
 id = "selalu sama saja."
@@ -360,14 +406,14 @@ id = "selalu sama saja."
 [[line]]
 address = 0x027300
 fr = "Ouais! Bien!"
-it = "Si! Va bene!"
+it = "Ecco! Molto bene!"
 pt = "Isso! Muito bem!"
 tl = "Ayos! Magaling!"
 id = "Ya! Bagus!"
 
 [[line]]
 address = 0x027400
-fr = "He! Je n'ai pas fini!"
+fr = "Hé! Je n'ai pas fini!"
 it = "Ehi, non ho finito!"
 pt = "Ei, ainda não acabei!"
 tl = "Hoy, hindi pa ako tapos!"
@@ -375,8 +421,8 @@ id = "Hei, aku belum selesai!"
 
 [[line]]
 address = 0x027500
-fr = "He, c'etait amusant!"
-it = "Ehi, e stato divertente!"
+fr = "Hé, c'était amusant!"
+it = "Ehi, è stato divertente!"
 pt = "Ei, isso foi divertido!"
 tl = "Hoy, masaya iyon!"
 id = "Hei, itu menyenangkan!"
@@ -416,7 +462,7 @@ id = "Yang melihatku harus mati!"
 [[line]]
 address = 0x027900
 fr = "Alors? Le chat a"
-it = "Che c'e? Il gatto ti"
+it = "Che c'è? Il gatto ti"
 pt = "O que foi? Perdeu a"
 tl = "Ano? Napipi ka ba"
 id = "Kenapa? Hilang"
@@ -431,7 +477,7 @@ id = "suaramu? Hah."
 
 [[line]]
 address = 0x027a00
-fr = "He, tu es bien faible,"
+fr = "Hé, tu es bien faible,"
 it = "Eh, sei piuttosto debole,"
 pt = "Há, você é bem fraco,"
 tl = "Heh, mahina ka pala,"
@@ -449,14 +495,14 @@ id = "ya?"
 address = 0x03eb00
 fr = "Regarde avec ton coeur,"
 it = "Guarda col cuore, e"
-pt = "Veja com seu coração, e"
+pt = "Veja com a alma, e"
 tl = "Tumingin ka sa puso mo, at"
 id = "Lihatlah dengan hatimu,"
 
 [[line]]
 address = 0x03eb80
 fr = "tout deviendra clair."
-it = "tutto sara chiaro."
+it = "tutto sarà chiaro."
 pt = "tudo ficará claro."
 tl = "lilinaw ang lahat."
 id = "semua akan menjadi jelas."
@@ -465,14 +511,14 @@ id = "semua akan menjadi jelas."
 address = 0x03ec00
 fr = "Regarde avec ton coeur,"
 it = "Guarda col cuore, e"
-pt = "Veja com seu coração, e"
+pt = "Veja com a alma, e"
 tl = "Tumingin ka sa puso mo, at"
 id = "Lihatlah dengan hatimu,"
 
 [[line]]
 address = 0x03ec80
 fr = "tout deviendra clair."
-it = "tutto sara chiaro."
+it = "tutto sarà chiaro."
 pt = "tudo ficará claro."
 tl = "lilinaw ang lahat."
 id = "semua akan menjadi jelas."
@@ -481,14 +527,14 @@ id = "semua akan menjadi jelas."
 address = 0x03ed00
 fr = "Regarde avec ton coeur,"
 it = "Guarda col cuore, e"
-pt = "Veja com seu coração, e"
+pt = "Veja com a alma, e"
 tl = "Tumingin ka sa puso mo, at"
 id = "Lihatlah dengan hatimu,"
 
 [[line]]
 address = 0x03ed80
 fr = "tout deviendra clair."
-it = "tutto sara chiaro."
+it = "tutto sarà chiaro."
 pt = "tudo ficará claro."
 tl = "lilinaw ang lahat."
 id = "semua akan menjadi jelas."
@@ -497,14 +543,14 @@ id = "semua akan menjadi jelas."
 address = 0x03ee00
 fr = "Regarde avec ton coeur,"
 it = "Guarda col cuore, e"
-pt = "Veja com seu coração, e"
+pt = "Veja com a alma, e"
 tl = "Tumingin ka sa puso mo, at"
 id = "Lihatlah dengan hatimu,"
 
 [[line]]
 address = 0x03ee80
 fr = "tout deviendra clair."
-it = "tutto sara chiaro."
+it = "tutto sarà chiaro."
 pt = "tudo ficará claro."
 tl = "lilinaw ang lahat."
 id = "semua akan menjadi jelas."
@@ -512,7 +558,7 @@ id = "semua akan menjadi jelas."
 [[line]]
 address = 0x03ef00
 fr = "Je ne chercherai plus"
-it = "Non inventero piu"
+it = "Non inventerò più"
 pt = "Não vou mais inventar"
 tl = "Wala na akong ibang"
 id = "Aku takkan mencari"
@@ -528,7 +574,7 @@ id = "alasan lagi!"
 [[line]]
 address = 0x03f000
 fr = "Je ne chercherai plus"
-it = "Non inventero piu"
+it = "Non inventerò più"
 pt = "Não vou mais inventar"
 tl = "Wala na akong ibang"
 id = "Aku takkan mencari"
@@ -544,7 +590,7 @@ id = "alasan lagi!"
 [[line]]
 address = 0x03f100
 fr = "Je ne chercherai plus"
-it = "Non inventero piu"
+it = "Non inventerò più"
 pt = "Não vou mais inventar"
 tl = "Wala na akong ibang"
 id = "Aku takkan mencari"
@@ -560,7 +606,7 @@ id = "alasan lagi!"
 [[line]]
 address = 0x03f200
 fr = "Je ne chercherai plus"
-it = "Non inventero piu"
+it = "Non inventerò più"
 pt = "Não vou mais inventar"
 tl = "Wala na akong ibang"
 id = "Aku takkan mencari"
@@ -575,8 +621,8 @@ id = "alasan lagi!"
 
 [[line]]
 address = 0x03f300
-fr = "Alors, mon Epyon a ete"
-it = "Dunque, il mio Epyon e"
+fr = "Alors, mon Epyon a été"
+it = "Dunque, il mio Epyon è"
 pt = "Então, meu Epyon foi"
 tl = "Kaya, natalo rin ang"
 id = "Jadi, Epyonku telah"
@@ -599,7 +645,7 @@ id = "Kurasa tiap orang punya"
 
 [[line]]
 address = 0x03f480
-fr = "un style different..."
+fr = "un style différent..."
 it = "uno stile diverso..."
 pt = "um estilo diferente..."
 tl = "ng bawat lumalaban..."
@@ -607,15 +653,15 @@ id = "gaya bertarung sendiri..."
 
 [[line]]
 address = 0x03f500
-fr = "A part ca, tu as"
-it = "A parte cio, hai"
+fr = "Mis à part cela, tu as"
+it = "A parte ciò, hai"
 pt = "Fora isso, você"
 tl = "Kahit paano, nalampasan"
 id = "Terlepas dari itu, kau"
 
 [[line]]
 address = 0x03f580
-fr = "depasse mes attentes."
+fr = "dépassé mes attentes."
 it = "superato le mie attese."
 pt = "superou minhas expectativas."
 tl = "mo ang inaasahan ko."
@@ -624,7 +670,7 @@ id = "melampaui harapanku."
 [[line]]
 address = 0x03f600
 fr = "La guerre... est finie, tu"
-it = "La guerra... e finita,"
+it = "La guerra... è finita,"
 pt = "A guerra... acabou,"
 tl = "Tapos na ba ang digmaan,"
 id = "Perang... apa sudah"
@@ -639,8 +685,8 @@ id = "berakhir, tanyamu?"
 
 [[line]]
 address = 0x03f700
-fr = "Non. L'humanite survit."
-it = "No. L'umanita prospera."
+fr = "Non. L'humanité survit."
+it = "No. L'umanità prospera."
 pt = "Não. A humanidade prospera."
 tl = "Hindi. Buhay pa ang tao."
 id = "Tidak. Manusia masih ada."
@@ -655,7 +701,7 @@ id = "Kau mungkin masih harus"
 
 [[line]]
 address = 0x03f880
-fr = "continuer a combattre..."
+fr = "continuer à combattre..."
 it = "continuare a lottare..."
 pt = "que continuar lutando..."
 tl = "pang lumaban muli..."
@@ -663,8 +709,8 @@ id = "terus bertarung juga..."
 
 [[line]]
 address = 0x03f900
-fr = "Tout ca parce que..."
-it = "Tutto perche..."
+fr = "Tout cela parce que..."
+it = "Tutto a causa di..."
 pt = "Tudo porque..."
 tl = "Dahil ang lahat nito..."
 id = "Semua ini karena..."
@@ -680,7 +726,7 @@ id = "Perang ini..."
 [[line]]
 address = 0x03fa80
 fr = "  C'est un duel sans fin..."
-it = "  E un duello senza fine..."
+it = "  Un duello senza fine..."
 pt = "  Um duelo sem fim..."
 tl = "  Duelong walang hanggan..."
 id = "  Duel tanpa akhir..."
@@ -688,14 +734,14 @@ id = "  Duel tanpa akhir..."
 [[line]]
 address = 0x05e000
 fr = "Toute la mission est"
-it = "L'intera missione e"
+it = "L'intera missione è"
 pt = "Toda a missão está"
 tl = "Ang buong misyon ay"
 id = "Seluruh misi akhirnya"
 
 [[line]]
 address = 0x05e080
-fr = "enfin terminee..."
+fr = "enfin terminée..."
 it = "finalmente completa..."
 pt = "finalmente completa..."
 tl = "tapos na sa wakas..."
@@ -703,8 +749,8 @@ id = "selesai juga..."
 
 [[line]]
 address = 0x05e100
-fr = "Apres tout ca, pourrai je"
-it = "Dopo tutto, potro ancora"
+fr = "Après tout cela, pourrai je"
+it = "Dopo tutto, potrò ancora"
 pt = "Depois de tudo, ainda vou"
 tl = "Pagkatapos nito, kaya pa"
 id = "Setelah semua itu, masih"
@@ -719,8 +765,8 @@ id = "bisakah aku bertarung...?"
 
 [[line]]
 address = 0x05e200
-fr = "Ouf! C'etait vraiment"
-it = "Uff! E stato davvero"
+fr = "Ouf! C'était vraiment"
+it = "Uff! Quello era proprio"
 pt = "Ufa! Isso foi bem"
 tl = "Aba! Napakahirap niyon,"
 id = "Fiuh! Itu cukup berat,"
@@ -735,7 +781,7 @@ id = "ya, Deathscythe?"
 
 [[line]]
 address = 0x05e300
-fr = "Tu les as bien demolis!"
+fr = "Tu les as bien démolis!"
 it = "Li hai proprio distrutti!"
 pt = "Você acabou com eles!"
 tl = "Talagang binugbog mo sila!"
@@ -743,7 +789,7 @@ id = "Kau menghajar mereka!"
 
 [[line]]
 address = 0x05e400
-fr = "Le combat etait triste, mais"
+fr = "Le combat était triste, mais"
 it = "La battaglia era triste, ma"
 pt = "A batalha foi triste, mas"
 tl = "Malungkot ang labanan,"
@@ -751,7 +797,7 @@ id = "Duel itu menyedihkan,"
 
 [[line]]
 address = 0x05e480
-fr = "j'ai des gens a proteger."
+fr = "j'ai des gens à protéger."
 it = "ho gente da proteggere."
 pt = "tenho gente a proteger."
 tl = "ngunit may ipagtatanggol ako."
@@ -767,7 +813,7 @@ id = "Sebagian akan terus"
 
 [[line]]
 address = 0x05e580
-fr = "a combattre..."
+fr = "à combattre..."
 it = "a lottare..."
 pt = "a lutar..."
 tl = "ring lalaban..."
@@ -775,7 +821,7 @@ id = "bertarung..."
 
 [[line]]
 address = 0x05e600
-fr = "Pere... J'ai reussi!"
+fr = "Père... J'ai réussi!"
 it = "Padre... Ce l'ho fatta!"
 pt = "Pai... Eu consegui!"
 tl = "Ama... Nagawa ko!"
@@ -783,9 +829,9 @@ id = "Ayah... Aku berhasil!"
 
 [[line]]
 address = 0x05e700
-fr = "Grace a mes efforts, la paix"
+fr = "Par mes efforts, la paix"
 it = "Grazie ai miei sforzi,"
-pt = "Graças aos meus esforços, a"
+pt = "Por todo o meu empenho, a"
 tl = "Dahil sa akin, bumalik ang"
 id = "Berkat usahaku, damai"
 
@@ -816,7 +862,7 @@ id = "berakhir. Aku benar."
 [[line]]
 address = 0x05e900
 fr = "N'est ce pas, Nataku..."
-it = "Non e cosi, Nataku..."
+it = "Non è vero, Nataku..."
 pt = "Não é assim, Nataku..."
 tl = "Hindi ba, Nataku..."
 id = "Bukan begitu, Nataku..."
@@ -831,7 +877,7 @@ id = "Aku sungguh kesulitan"
 
 [[line]]
 address = 0x05ea80
-fr = "a gerer certaines choses..."
+fr = "à gérer certaines choses..."
 it = "a gestire alcune cose..."
 pt = "para lidar com coisas..."
 tl = "ilang mga bagay..."
@@ -839,15 +885,15 @@ id = "menangani beberapa hal..."
 
 [[line]]
 address = 0x05eb00
-fr = "Alors j'ai cesse de montrer"
-it = "Cosi smisi di mostrare"
+fr = "Alors j'ai cessé de montrer"
+it = "Perciò smisi di mostrare"
 pt = "Então parei de mostrar"
 tl = "Kaya tumigil akong magdamdam"
 id = "Jadi kuhentikan emosiku"
 
 [[line]]
 address = 0x05eb80
-fr = "mes emotions a Relena."
+fr = "mes émotions à Relena."
 it = "emozioni con Relena."
 pt = "quando Relena zangou."
 tl = "nang magalit si Relena."
@@ -863,7 +909,7 @@ id = "Duke Treize! Mobile suit"
 
 [[line]]
 address = 0x05ec80
-fr = "neutralise!"
+fr = "neutralisé!"
 it = "neutralizzato!"
 pt = "neutralizado!"
 tl = "suit ay neutralisado!"
@@ -871,7 +917,7 @@ id = "musuh dilumpuhkan!"
 
 [[line]]
 address = 0x05ed00
-fr = "Hein? Ce suit a ete fait"
+fr = "Hein? Ce suit a été fait"
 it = "Eh? Quel suit fu fatto"
 pt = "Huh? Esse suit foi feito"
 tl = "Ha? Gawa ni Duke Treize"
@@ -887,9 +933,9 @@ id = "oleh Duke Treize...."
 
 [[line]]
 address = 0x05ee00
-fr = "Nous avons gagne la paix"
+fr = "Nous avons gagné la paix"
 it = "Abbiamo ottenuto la pace"
-pt = "Alcançamos a paz"
+pt = "Obtivemos a paz"
 tl = "Nakamit natin ang kapayapaan"
 id = "Kita raih damai dengan"
 
@@ -943,7 +989,7 @@ id = "Jangan buang waktumu."
 address = 0x007900
 fr = "Je crois en ma propre"
 it = "Credo nella mia"
-pt = "Acredito na minha"
+pt = "Acredito naquilo que"
 tl = "Nananalig ako sa sarili"
 id = "Aku percaya pada"
 
@@ -951,7 +997,7 @@ id = "Aku percaya pada"
 address = 0x007980
 fr = "justice!"
 it = "giustizia!"
-pt = "justiça!"
+pt = "é justo!"
 tl = "kong katarungan!"
 id = "keadilanku sendiri!"
 
@@ -1166,8 +1212,8 @@ id = "Sudah lama aku tak"
 [[line]]
 address = 0x02d380
 fr = "je n'avais lutté ainsi!"
-it = "combattevo così!"
-pt = "com tanta força assim!"
+it = "combattevo a tal punto!"
+pt = "com tanta garra assim!"
 tl = "lumabang ganito kalakas!"
 id = "bertarung sekeras ini!"
 

@@ -282,18 +282,37 @@ The dialogue generator currently supports the recovered Latin tile set:
 inverted exclamation mark. It intentionally fails on unsupported glyphs rather
 than emitting bytes that would draw unrelated tiles.
 
-Accented letters come from the five dialogue-font cells that no tilemap
-references (`0x001`, `0x06a`, `0x06b`, `0x06e`, `0x06f`), repurposed PER
+Accented letters come from the four dialogue-font cells that nothing on a drawn
+dialogue screen references (`0x06a`, `0x06b`, `0x06e`, `0x06f`), repurposed PER
 LANGUAGE by `generate_dialogue_accent_patch.py` from
 `endless_duel_dialogue_accents.toml`:
 
 | language | cells used | characters |
 |---|---|---|
 | fr | 4 | `é è à ê` |
-| it | 5 | `è à ù ì ò` |
-| pt | 5 | `ã é ê á ç` |
+| it | 4 | `è à ù ò` |
+| pt | 4 | `ã é ê á` |
 | tl | 0 | (none - plain ASCII) |
 | id | 0 | (none - plain ASCII) |
+
+A fifth cell, `0x001`, was allocated until 2026-09-01 on the strength of a
+survey that only scanned the cart's dialogue tilemap pages. It is the dialogue
+BOX FRAME - the scene composes tile `0x001` (side rail) and `0x011` (corner)
+into the live BG3 map at draw time, so no cart tilemap mentions them - and
+allocating it garbled the border in every it/pt dialogue screen
+(beads-8wg.9.11). The free-cell survey is now run against LIVE BG3 captures:
+
+```powershell
+py -3 scripts\generate_dialogue_accent_patch.py --survey   # writes [live_reference]
+py -3 scripts\generate_dialogue_accent_patch.py --check    # enforces it
+```
+
+`--survey` counts only captures in a language that allocates nothing (`en`/`es`
+- otherwise the survey reads its own glyphs back) and only where the dialogue
+font is the art actually resident at the BG3 character base (the title screen
+reuses that base). `0x000` and `0x001` are declared `[[frame_cell]]` and pinned
+to the reference art for every language, so `--check` also proves the box border
+is pixel-identical to English in all ten.
 
 The art is composed from the English base letter plus a stamped diacritic, in a
 cleared band either above the x-height or - for the cedilla - below the baseline
