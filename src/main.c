@@ -806,6 +806,7 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     char assets_dir[1024];
     int lr;
     int fb_seed;
+    int vs_seed;
 
     /* recomp-ui resolves its staged assets (assets/fonts, assets/img) relative
      * to the executable; the argument exists for hosts with other layouts. */
@@ -819,10 +820,15 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     ls.audio_freq    = 32000;
     ls.volume        = 100;
     ls.player_src[0] = 1;      /* keyboard */
-    /* Seed the Display "Frame blending" checkbox from its persisted home so
-     * the box shows the current state rather than resetting every boot. */
+    /* Seed the Display checkboxes from their persisted home so the boxes
+     * show the current state rather than resetting every boot. VSync uses
+     * the ABI's 1-based encoding (0 would mean "unset" and be reseeded On,
+     * silently flipping this title's ships-off default). */
     fb_seed = game_config_int("[Video]", "FrameBlend", 0) ? 1 : 0;
     ls.frame_blend   = fb_seed;
+    vs_seed = game_config_int("[Video]", "Vsync", 0) ? 1 : 0;
+    ls.vsync         = vs_seed ? RECOMP_LAUNCHER_VSYNC_ON
+                               : RECOMP_LAUNCHER_VSYNC_OFF;
 
     memset(&gi, 0, sizeof(gi));
     /* One profile call sets the whole SNES identity — theme, pad art, platform
@@ -835,6 +841,9 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
      * on alternate-frame flicker for its transparency effects (thrusters,
      * beam flashes), which is what the blend exists to steady. */
     gi.has_frame_blend = 1;
+    /* Display → VSync checkbox (the legacy surface draws it as On/Off; this
+     * host's renderer flag is boolean, so Adaptive is never offered). */
+    gi.has_vsync = 1;
     /* `sha` outlives the run_window call below, which is the only consumer. */
     if (expected_rom_sha256(sha)) {
         gi.known_sha256     = (const uint8_t (*)[32])&sha;
@@ -873,13 +882,19 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
                 ls.netplay_launch.peer_hostport, ls.netplay_launch.input_delay);
     }
 #endif
-    /* Persist a toggled Frame blending box before the game reads config.ini
-     * below (same surgical writer the launcher uses for [GamepadMap], so
-     * comments and unrelated keys survive). Only on change: an untouched
-     * launcher run must not invent a [Video] section in a fresh install. */
+    /* Persist toggled Display boxes before the game reads config.ini below
+     * (same surgical writer the launcher uses for [GamepadMap], so comments
+     * and unrelated keys survive). Only on change: an untouched launcher
+     * run must not invent a [Video] section in a fresh install. */
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && ls.frame_blend != fb_seed)
         launcher_ini_kv_write("config.ini", "Video", "FrameBlend",
                               ls.frame_blend ? "1" : "0");
+    if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH) {
+        int vs_new = (ls.vsync != RECOMP_LAUNCHER_VSYNC_OFF) ? 1 : 0;
+        if (vs_new != vs_seed)
+            launcher_ini_kv_write("config.ini", "Video", "Vsync",
+                                  vs_new ? "1" : "0");
+    }
     if (lr == RECOMP_LAUNCHER_RESULT_QUIT)
         return -1;
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && out[0])
