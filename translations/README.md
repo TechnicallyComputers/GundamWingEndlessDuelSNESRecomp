@@ -13,14 +13,28 @@ map of current assets, commands, and open surfaces.
 
 - `en`: English reference patch data from Aeon Genesis.
 - `es`: Spanish reference patch data from Max1323.
-- `fr`, `it`, `pt`: native opening/fight crawl tilemap overlays, option-menu
-  labels, and decoded battle/ending dialogue tilemap rows. Remaining title/menu
-  graphics and still-undecoded reference spans fall back to English patch data.
-- `ko`: exposed as a prototype. Korean has native title/menu, option-screen,
-  key-config, and opening/fight crawl coverage through generated runtime
-  glyph/tile patches. Every surface is drawn by the game itself; nothing is
-  drawn over the presented frame.
-- `zh`: not exposed in the launcher. Chinese remains research input.
+- `fr`, `it`: native throughout — title mode-selector labels, option-menu and
+  key-config labels, opening/fight crawl, intro caption sprite art, and all 162
+  battle/ending dialogue rows (with accented glyph cells added to the dialogue
+  font by `generate_dialogue_accent_patch.py`).
+- `pt`: native crawl, menus, and intro caption; 109 of the 162 dialogue rows are
+  authored, the rest fall back to English.
+- `ko`, `zh`: both exposed in the launcher, both native for the title menu,
+  option menu, key config, opening/fight crawl, intro caption, and the
+  victory/defeat battle dialogue. Dialogue is delivered as per-quote 16x16
+  glyph pages written into free VRAM tiles (ids 0x300-0x3ff) behind byte-exact
+  BG3 tilemap guards — see `endless_duel_dialogue_cjk.toml` and
+  `generate_dialogue_cjk_patch.py`. 63 quotes / 103 rows per language, covering
+  four of the six dialogue groups. The other two (`battle_dialogue_3`, the
+  post-final Treize conversation, and `ending_dialogue`, the per-pilot
+  epilogues) still render English under ko/zh: their text is authored and their
+  screens are now captured, but they draw from a different BG3 map base, char
+  base and palette, which the single-surface generator cannot yet express. The
+  captured geometry and the work left to do are recorded at the bottom of
+  `endless_duel_dialogue_cjk.toml`.
+
+Every surface is drawn by the game itself; nothing is drawn over the presented
+frame.
 
 English and Spanish are broader because they were imported from existing full
 fan-translation ROM hacks as binary reference diffs. The runtime table applies
@@ -38,8 +52,9 @@ added.
 `scripts/generate_cjk_glyph_tiles.ps1` and
 `scripts/generate_cjk_crawl_patch.py` produce language-gated CJK crawl tile
 patches from authored candidate text. Korean uses authored 16x16 Hangul cells
-encoded as BG3 2bpp tiles and validated with TCP screenshots. Chinese remains a
-prototype input until its glyph set and screenshots are validated.
+encoded as BG3 2bpp tiles and validated with TCP screenshots. Chinese uses the
+same compact CJK crawl path with authored Han cells; both are generated,
+screenshot-validated, and shipping.
 
 ## Adding Native Language Data
 
@@ -133,10 +148,10 @@ is seeded from glyph masks extracted from native selected-row captures, and
 `endless_duel_title_glyphs.toml` contains authored overrides for translation
 letters that do not appear in the original English labels, starting with `H`
 and `C`. It also supports `codepoint = "U+...."` entries for UTF-8 labels.
-The checked-in Chinese and Korean title-menu strings are prototype data for
-validating this external glyph path. Korean is exposed in the launcher now that
-the title/options/crawl path has screenshot validation; Chinese remains hidden
-until the broader CJK experience has been visually validated.
+The checked-in Chinese and Korean title-menu strings drive this external glyph
+path. Both languages are exposed in the launcher; the title, options,
+key-config, crawl, caption, and dialogue surfaces all have screenshot
+validation.
 
 The live replacement is SNES-level asset interception, not host drawing: the
 labels are unique, consecutive, pre-rendered 4bpp BG1 tiles (map rows 17-22,
@@ -317,11 +332,11 @@ identified in the original Japanese crawl, run:
 python scripts\audit_cjk_feasibility.py
 ```
 
-The audit reports both pending drafts and any runtime prototype text. Korean
-uses authored Hangul tiles for the current crawl prototype; the full Chinese
-draft needs additional Chinese glyph tiles beyond the original Japanese crawl
-set, and the compact Chinese prototype still needs a visually acceptable
-tile-art pass before it can ship.
+The audit reports both pending drafts and any runtime text still missing a
+native payload. Korean uses authored Hangul tiles and Chinese authored Han
+tiles; both ship through the compact CJK crawl generator, and the dialogue
+surface uses the separate per-quote glyph pager
+(`scripts/generate_dialogue_cjk_patch.py`).
 
 ## Visual QA Harness
 

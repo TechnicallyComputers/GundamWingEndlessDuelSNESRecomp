@@ -666,3 +666,397 @@ address = 0x02e080
 # en = 'different approach...'
 ko = "써보는 게 어떨까..."  # 19 cells
 zh = "个方法..."  # 9 cells
+
+# ===========================================================================
+# battle_dialogue_3 + ending_dialogue: AUTHORED, CAPTURED, NOT YET ENABLED
+# ===========================================================================
+# The ko/zh text for these two groups is authored below but COMMENTED OUT,
+# and neither group is listed in [surface].groups.  They do NOT render in
+# ko/zh; they keep their Latin payloads and show English.
+#
+# WHY: on 2026-08-31 both screens were finally captured live (story mode
+# cleared by freezing the PAR HP words from the debug TCP poll loop -- see
+# docs/LOCALIZATION_PLAYBOOK.md section 4a).  The captures DISPROVE the
+# assumption that these groups share the victory-quote screen.  Enabling them
+# on the quote screen's geometry would guarantee garbage, not risk it: the
+# guard at 0xc584 can never match, so the glyph page would never land while
+# the ROM rows would still be rewritten to reference it.
+#
+# CAPTURED GEOMETRY (sh1 run, dlg008-dlg023; states banked in
+# tools/validation_states/):
+#
+#   quote screen (the four groups this file DOES cover)
+#     BG3SC 0x63 -> map base 0xc000   BG34NBA 0x22 -> char base 0x4000
+#     first map row 22, cols 2..29, VRAM word = (rom & 0x3ff) | 0x2000
+#     free page: tile ids 0x300-0x3ff (VRAM 0x7000-0x7fff)
+#
+#   battle_dialogue_3 screen (post-final Treize conversation)
+#     BG3SC 0x79 -> map base 0xf000   BG34NBA 0x66 -> char base 0xc000
+#     first map row 22 (guard VRAM 0xf584), VRAM word = (rom & 0x3ff) | 0x2000
+#     BG1 map 0xd000, BG2 map 0xe000, BG3 map 0xf000 -- so 0xd000-0xffff is
+#     all tilemap and the only tile data under this char base is
+#     0xc000-0xcfff, i.e. tile ids 0x000-0x0ff.
+#
+#   ending_dialogue screen (per-pilot epilogue)
+#     BG3SC 0x79 -> map base 0xf000   BG34NBA 0x66 -> char base 0xc000
+#     first map row 21 (guard VRAM 0xf544), VRAM word = (rom & 0x3ff) | 0x2400
+#     (palette 1, not palette 0 -- this differs from every other group)
+#
+# TO ENABLE: generate_dialogue_cjk_patch.py currently models ONE [surface].
+# It needs an array of surfaces, each with its own map_base / map_first_row /
+# char_base / page window / word-OR value (vram_word() hardcodes 0x2000), and
+# a free-tile survey of 0xc000-0xcfff on those screens to pick the page window
+# (0x080-0x0ff is the candidate: the dialogue font itself occupies the low
+# tiles).  Guard uniqueness is per-surface because the guard addresses differ.
+# Then add the groups to that surface and uncomment the rows below.
+# ===========================================================================
+
+# --- battle_dialogue_3 (assumed geometry) ---
+#[[line]]
+#address = 0x03eb00
+# en = 'Look with your heart, and'
+#ko = "마음으로 보면"  # 13 cells
+#zh = "用心去看,"  # 9 cells
+
+#[[line]]
+#address = 0x03eb80
+# en = 'all shall become clear.'
+#ko = "모든 것이 명확해진다."  # 21 cells
+#zh = "一切终将明了."  # 13 cells
+
+#[[line]]
+#address = 0x03ec00
+# en = 'Look with your heart, and'
+#ko = "마음으로 보면"  # 13 cells
+#zh = "用心去看,"  # 9 cells
+
+#[[line]]
+#address = 0x03ec80
+# en = 'all shall become clear.'
+#ko = "모든 것이 명확해진다."  # 21 cells
+#zh = "一切终将明了."  # 13 cells
+
+#[[line]]
+#address = 0x03ed00
+# en = 'Look with your heart, and'
+#ko = "마음으로 보면"  # 13 cells
+#zh = "用心去看,"  # 9 cells
+
+#[[line]]
+#address = 0x03ed80
+# en = 'all shall become clear.'
+#ko = "모든 것이 명확해진다."  # 21 cells
+#zh = "一切终将明了."  # 13 cells
+
+#[[line]]
+#address = 0x03ee00
+# en = 'Look with your heart, and'
+#ko = "마음으로 보면"  # 13 cells
+#zh = "用心去看,"  # 9 cells
+
+#[[line]]
+#address = 0x03ee80
+# en = 'all shall become clear.'
+#ko = "모든 것이 명확해진다."  # 21 cells
+#zh = "一切终将明了."  # 13 cells
+
+#[[line]]
+#address = 0x03ef00
+# en = "I'm not going to make any"
+#ko = "더 이상 변명하지"  # 16 cells
+#zh = "我不会再找"  # 10 cells
+
+#[[line]]
+#address = 0x03ef80
+# en = 'more excuses!'
+#ko = "않겠다!"  # 7 cells
+#zh = "任何借口了!"  # 11 cells
+
+#[[line]]
+#address = 0x03f000
+# en = "I'm not going to make any"
+#ko = "더 이상 변명하지"  # 16 cells
+#zh = "我不会再找"  # 10 cells
+
+#[[line]]
+#address = 0x03f080
+# en = 'more excuses!'
+#ko = "않겠다!"  # 7 cells
+#zh = "任何借口了!"  # 11 cells
+
+#[[line]]
+#address = 0x03f100
+# en = "I'm not going to make any"
+#ko = "더 이상 변명하지"  # 16 cells
+#zh = "我不会再找"  # 10 cells
+
+#[[line]]
+#address = 0x03f180
+# en = 'more excuses!'
+#ko = "않겠다!"  # 7 cells
+#zh = "任何借口了!"  # 11 cells
+
+#[[line]]
+#address = 0x03f200
+# en = "I'm not going to make any"
+#ko = "더 이상 변명하지"  # 16 cells
+#zh = "我不会再找"  # 10 cells
+
+#[[line]]
+#address = 0x03f280
+# en = 'more excuses!'
+#ko = "않겠다!"  # 7 cells
+#zh = "任何借口了!"  # 11 cells
+
+#[[line]]
+#address = 0x03f300
+# en = 'So, my Epyon has been'
+#ko = "그래, 내 에피온이"  # 17 cells
+#zh = "原来, 我的艾比安"  # 16 cells
+
+#[[line]]
+#address = 0x03f380
+# en = 'beaten.'
+#ko = "패배했다."  # 9 cells
+#zh = "也被击败了."  # 11 cells
+
+#[[line]]
+#address = 0x03f400
+# en = 'I suppose everyone has a'
+#ko = "다들 자기만의"  # 13 cells
+#zh = "看来每个人都有"  # 14 cells
+
+#[[line]]
+#address = 0x03f480
+# en = 'different combat style...'
+#ko = "방식이 있나 보군..."  # 19 cells
+#zh = "自己的战斗风格..."  # 17 cells
+
+#[[line]]
+#address = 0x03f500
+# en = 'All that aside, you'
+#ko = "그건 그렇고,"  # 12 cells
+#zh = "撇开这些不谈,"  # 13 cells
+
+#[[line]]
+#address = 0x03f580
+# en = 'exceeded my expectations.'
+#ko = "내 예상을 뛰어넘었다."  # 21 cells
+#zh = "你超出了我的预期."  # 17 cells
+
+#[[line]]
+#address = 0x03f600
+# en = 'The war... is it over, you'
+#ko = "전쟁이... 끝났냐고"  # 18 cells
+#zh = "你问战争..."  # 11 cells
+
+#[[line]]
+#address = 0x03f680
+# en = 'ask?'
+#ko = "묻는 건가?"  # 10 cells
+#zh = "是否已经结束?"  # 13 cells
+
+#[[line]]
+#address = 0x03f700
+# en = 'No. Humanity still thrives.'
+#ko = "아니, 인류는 살아있다."  # 22 cells
+#zh = "不. 人类依然繁盛."  # 17 cells
+
+#[[line]]
+#address = 0x03f800
+# en = 'You will probably have to'
+#ko = "너도 계속 싸워야"  # 16 cells
+#zh = "你恐怕也要"  # 10 cells
+
+#[[line]]
+#address = 0x03f880
+# en = 'continue to fight, too...'
+#ko = "할 거다..."  # 10 cells
+#zh = "继续战斗下去..."  # 15 cells
+
+#[[line]]
+#address = 0x03f900
+# en = "It's all because..."
+#ko = "이유가 있어서다..."  # 18 cells
+#zh = "这一切都是因为..."  # 17 cells
+
+#[[line]]
+#address = 0x03fa00
+# en = 'This war...'
+#ko = "이 전쟁은..."  # 12 cells
+#zh = "这场战争..."  # 11 cells
+
+#[[line]]
+#address = 0x03fa80
+# en = "  'Tis an endless duel..."
+#ko = "끝없는 결투다..."  # 16 cells
+#zh = "是一场无尽的决斗..."  # 19 cells
+
+# --- ending_dialogue (assumed geometry) ---
+#[[line]]
+#address = 0x05e000
+# en = 'The entire mission is'
+#ko = "드디어 임무를"  # 13 cells
+#zh = "整个任务"  # 8 cells
+
+#[[line]]
+#address = 0x05e080
+# en = 'finally complete...'
+#ko = "모두 완수했다..."  # 16 cells
+#zh = "终于完成了..."  # 13 cells
+
+#[[line]]
+#address = 0x05e100
+# en = 'After all that, will I be'
+#ko = "이제 내가 더"  # 12 cells
+#zh = "经历这一切之后,"  # 15 cells
+
+#[[line]]
+#address = 0x05e180
+# en = 'able to fight anymore...?'
+#ko = "싸울 수 있을까...?"  # 18 cells
+#zh = "我还能再战斗吗...?"  # 18 cells
+
+#[[line]]
+#address = 0x05e200
+# en = 'Whew! That was pretty'
+#ko = "휴! 꽤 힘들었어,"  # 16 cells
+#zh = "呼! 真是够呛,"  # 13 cells
+
+#[[line]]
+#address = 0x05e280
+# en = 'tough, huh Deathscythe?'
+#ko = "데스사이즈?"  # 11 cells
+#zh = "对吧, 死神高达?"  # 15 cells
+
+#[[line]]
+#address = 0x05e300
+# en = 'You really kicked some ass!'
+#ko = "정말 제대로 해냈군!"  # 19 cells
+#zh = "你真是大显身手!"  # 15 cells
+
+#[[line]]
+#address = 0x05e400
+# en = 'The battle was sad, but'
+#ko = "슬픈 싸움이었지만"  # 17 cells
+#zh = "战斗虽然悲伤,"  # 13 cells
+
+#[[line]]
+#address = 0x05e480
+# en = 'I have people to protect.'
+#ko = "지킬 사람이 있다."  # 17 cells
+#zh = "但我有要守护的人."  # 17 cells
+
+#[[line]]
+#address = 0x05e500
+# en = 'Some will just continue'
+#ko = "누군가는 계속"  # 13 cells
+#zh = "有些人只会"  # 10 cells
+
+#[[line]]
+#address = 0x05e580
+# en = 'to fight...'
+#ko = "싸우겠지..."  # 11 cells
+#zh = "继续战斗下去..."  # 15 cells
+
+#[[line]]
+#address = 0x05e600
+# en = 'Father... I did it!'
+#ko = "아버지... 해냈어요!"  # 19 cells
+#zh = "父亲... 我做到了!"  # 17 cells
+
+#[[line]]
+#address = 0x05e700
+# en = 'Thanks to my efforts, peace'
+#ko = "내 노력 덕분에"  # 14 cells
+#zh = "多亏了我的努力,"  # 15 cells
+
+#[[line]]
+#address = 0x05e780
+# en = 'returned to the colonies!'
+#ko = "콜로니에 평화가 왔다!"  # 21 cells
+#zh = "殖民地重获和平!"  # 15 cells
+
+#[[line]]
+#address = 0x05e800
+# en = 'This means the end of the'
+#ko = "이걸로 전쟁은 끝났다."  # 21 cells
+#zh = "这意味着战争结束."  # 17 cells
+
+#[[line]]
+#address = 0x05e880
+# en = 'war. It seems I was right.'
+#ko = "내가 옳았던 모양이다."  # 21 cells
+#zh = "看来我是对的."  # 13 cells
+
+#[[line]]
+#address = 0x05e900
+# en = "Isn't that so, Nataku..."
+#ko = "그렇지, 나타쿠..."  # 17 cells
+#zh = "不是吗, 娜塔库..."  # 17 cells
+
+#[[line]]
+#address = 0x05ea00
+# en = 'I really had some trouble'
+#ko = "몇 가지 일 때문에"  # 17 cells
+#zh = "有些事情处理起来"  # 16 cells
+
+#[[line]]
+#address = 0x05ea80
+# en = 'handling some things...'
+#ko = "정말 애먹었다..."  # 16 cells
+#zh = "确实让我头疼..."  # 15 cells
+
+#[[line]]
+#address = 0x05eb00
+# en = 'So I ceased showing emotion'
+#ko = "그래서 릴레나가"  # 15 cells
+#zh = "所以莉莉娜生气时,"  # 17 cells
+
+#[[line]]
+#address = 0x05eb80
+# en = 'when Relena got angry.'
+#ko = "화낼 땐 감정을 숨겼다."  # 22 cells
+#zh = "我不再流露情绪."  # 15 cells
+
+#[[line]]
+#address = 0x05ec00
+# en = 'Duke Treize! Enemy mobile'
+#ko = "트레이즈 공! 적"  # 15 cells
+#zh = "特列斯阁下! 敌方"  # 16 cells
+
+#[[line]]
+#address = 0x05ec80
+# en = 'suit neutralized!'
+#ko = "모빌슈트 무력화했습니다!"  # 24 cells
+#zh = "机动战士已瘫痪!"  # 15 cells
+
+#[[line]]
+#address = 0x05ed00
+# en = 'Huh? That suit was made'
+#ko = "어? 저 기체는"  # 13 cells
+#zh = "咦? 那台机体"  # 12 cells
+
+#[[line]]
+#address = 0x05ed80
+# en = 'by Duke Treize....'
+#ko = "트레이즈 공이 만든 거다..."  # 26 cells
+#zh = "是特列斯阁下造的..."  # 19 cells
+
+#[[line]]
+#address = 0x05ee00
+# en = 'We achieved peace by'
+#ko = "전쟁을 치러서"  # 13 cells
+#zh = "我们通过战争"  # 12 cells
+
+#[[line]]
+#address = 0x05ee80
+# en = 'fighting a war...'
+#ko = "평화를 얻었다..."  # 16 cells
+#zh = "换来了和平..."  # 13 cells
+
+#[[line]]
+#address = 0x05ef00
+# en = 'How ironic...'
+#ko = "참 아이러니하군..."  # 18 cells
+#zh = "真是讽刺..."  # 11 cells

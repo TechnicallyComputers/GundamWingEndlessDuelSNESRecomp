@@ -468,8 +468,12 @@ def write_previews(build: Build, out_dir: Path, count: int = 6) -> list[Path]:
     written = []
     for lang in LANGS:
         quotes = build.quotes[lang]
-        step = max(1, len(quotes) // count)
-        for quote in quotes[::step][:count]:
+        if count <= 0:
+            selected = quotes
+        else:
+            step = max(1, len(quotes) // count)
+            selected = quotes[::step][:count]
+        for quote in selected:
             # Replay the real path: page tiles into a tile bank, then the rows'
             # map words through (rom & 0x3ff) | 0x2000 into pixels.
             spec = build.source["font"][lang]
@@ -522,6 +526,9 @@ def main() -> int:
     parser.add_argument(
         "--preview-dir",
         default=str(root / "translations" / "dialogue_cjk_previews"))
+    parser.add_argument(
+        "--preview-count", type=int, default=6,
+        help="how many quotes per language to render (0 = every quote)")
     parser.add_argument("--stats", action="store_true")
     args = parser.parse_args()
 
@@ -542,7 +549,8 @@ def main() -> int:
                   f"{max(len(g) for g in build.guards[lang].values())} words")
 
     if args.previews:
-        for path in write_previews(build, Path(args.preview_dir)):
+        for path in write_previews(build, Path(args.preview_dir),
+                                   args.preview_count):
             print(f"preview {path}")
 
     if args.write:

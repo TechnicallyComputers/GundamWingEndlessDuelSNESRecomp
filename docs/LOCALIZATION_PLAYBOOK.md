@@ -249,6 +249,69 @@ The debug-TCP trace build is the instrument. Never guess; capture.
    disproved theories. The expensive part of multi-session work is
    re-deriving what was already established.
 
+### 4a. Reaching late-game text: poke, don't play
+
+Some surfaces only draw after content the harness cannot reliably win —
+Endless Duel's `battle_dialogue_3` (final-boss quotes and the post-final
+conversation) and `ending_dialogue` (per-pilot epilogues) are behind a
+full story-mode clear, and random-input brawling loses. Do not grind
+inputs; **the debug TCP server can write WRAM**, so make the game hand
+you the state:
+
+```
+write_ram <addr_hex> <hex_bytes>     # writes g_ram (WRAM, 0..0x1ffff)
+zero_ram                             # clears all of WRAM
+set_cpu a=.. x=.. pc=..              # registers, hex
+save_state / load_state / savestate  # snapshots
+dump_ram <addr_hex> <len_decimal>    # note: address hex, length DECIMAL
+```
+
+Locating the value to poke is a three-step search that needs no symbols:
+
+1. Reach the scene and read a number the HUD shows you (here both HP
+   counters read `300`). Scan all of WRAM for that 16-bit value.
+2. Re-sample WRAM while the value changes on screen; keep only the
+   candidates that moved the same way. (This alone leaves mirrors and
+   max-value copies in the list — the game keeps several.)
+3. Disambiguate by *writing*: poke one candidate at a time to a
+   distinctive value and screenshot. The candidate whose number appears
+   under the right-hand portrait is the opponent's.
+
+**Then check for published cheat codes — they are the same thing, already
+done.** A Pro Action Replay code *is* a per-frame WRAM freeze, so a PAR
+list for the game is a ready-made map of exactly the addresses this
+search is looking for, and `write_ram` in a poll loop reproduces one
+exactly. (Game Genie codes are ROM patches instead — only worth mapping
+if no PAR list exists.) Always verify against a live scene: code lists
+are usually for the US release and this may be a different region.
+
+For Endless Duel the search and the published list agree, and together
+they show why the search alone was not enough. Two *separate* pairs of
+words back the two HP readouts:
+
+| address | effect |
+|---|---|
+| `$7E:1B70` / `$7E:1B74` | P1 / P2 health (the bar) |
+| `$7E:1B80` / `$7E:1B84` | P1 / P2 energy (the numeric counter) |
+| `$7E:060C` | round timer |
+
+The HUD-number search finds only the second pair. Freezing just that
+pair produces the memorable failure: the player loses the round with
+`300` still painted on screen, because the *health* words reached zero
+untouched. Freeze all four (P1 to full, P2 to 1) and every round ends
+instantly in the player's favour — a single unattended run clears story
+mode in about seven minutes while polling VRAM for the dialogue tilemap
+signatures. Record the working codes and their source in the project's
+state README so the next session does not re-derive them.
+
+Two traps: mirrors of the value are written back from the master every
+frame, so a poke that "doesn't stick" means you found a copy, not that
+writing failed; and the attract demo is also a playable-looking fight —
+if your boot delay is long enough for attract to start, you will capture
+the demo and think you are in story mode. Check the screenshot for the
+mode's own furniture (the timer, the crawl overlay) before trusting a
+capture.
+
 ---
 
 ## 5. Generator requirements
@@ -300,6 +363,33 @@ all exercised by the six generators in `scripts/`:
 - **Verify the tested exe is the built exe** (stale-build trap: compare
   mtimes) and that the build dir's `translations/` copy is current
   (toml changes need the copy step, not a compile).
+- **Bank savestates in front of every surface, and validate from those.**
+  Replaying to a late-game surface costs minutes per language and is
+  flaky; a `save_state` taken *just before* the text draws costs seconds
+  and is deterministic. The debug server has synchronous
+  `save_state <path>` / `load_state <path>` (full CPU/PPU/DMA/APU/cart/
+  WRAM), and loading into a *freshly launched* process works on the
+  current fiber-free engine — verified, because it was broken under the
+  old fiber implementation and that trap is worth re-testing on any
+  engine you port this to.
+
+  The semantics that make this a *localization* tool: a state carries the
+  VRAM of the process that saved it, but the loading process patched its
+  own in-memory cart image at boot. So immediately after a load the
+  screen still shows the *saving* language, and only the next **redraw**
+  comes out in the *loading* language. One `en` state therefore validates
+  every language — as long as it is banked *before* the draw and the
+  harness waits for the redraw. Endless Duel's harness is
+  `scripts/validate_from_state.ps1` (load → optionally drive → screenshot
+  + PPU/CGRAM/VRAM), with the state inventory and regeneration recipe in
+  `tools/validation_states/README.md`. Keep the states out of git: they
+  are engine-version-fragile binaries, and only the README is durable.
+
+  Bank them the ring-buffer way, never by arming at the moment of
+  interest: drive the game while keeping a **rolling pair** of states a
+  few seconds apart, and when the surface detector fires, promote the
+  *older* one. You cannot save a state for an event you have already
+  seen, so always be holding one from before it.
 
 ---
 

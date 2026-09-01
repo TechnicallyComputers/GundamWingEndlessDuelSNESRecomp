@@ -128,6 +128,11 @@ def main() -> int:
         help="source-backed dialogue target-language text table",
     )
     parser.add_argument(
+        "--dialogue-cjk",
+        default=str(root / "translations" / "endless_duel_dialogue_cjk.toml"),
+        help="source-backed Korean/Chinese dialogue text table",
+    )
+    parser.add_argument(
         "--title-menu",
         default=str(root / "translations" / "endless_duel_title_menu.toml"),
         help="source-backed title-menu label text table",
@@ -168,6 +173,7 @@ def main() -> int:
     option_source = load_toml(Path(args.options))
     crawl_source = load_toml(Path(args.crawl))
     dialogue_source = load_toml(Path(args.dialogue_targets))
+    dialogue_cjk_source = load_toml(Path(args.dialogue_cjk))
     title_menu_source = load_toml(Path(args.title_menu))
     option_text_source = load_toml(Path(args.option_text))
     cjk_crawl_source = load_toml(Path(args.cjk_candidates))
@@ -175,6 +181,10 @@ def main() -> int:
     crawl_counts = crawl_langs(crawl_source)
     cjk_crawl_counts = cjk_crawl_langs(cjk_crawl_source)
     dialogue_counts = dialogue_langs(dialogue_source)
+    # The CJK dialogue rows live in their own source table (they carry glyph
+    # pages, not fixed-width Latin payloads), so count them too -- otherwise
+    # ko/zh read as dialogue_lines=0 while shipping 161 authored rows each.
+    dialogue_counts.update(dialogue_langs(dialogue_cjk_source))
     title_menu_counts = label_langs(title_menu_source)
     option_text_counts = label_langs(option_text_source)
 

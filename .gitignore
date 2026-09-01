@@ -43,3 +43,12 @@ analysis/oracle/scene.csv
 snes-diag.log
 snes-run.log
 mesen.log
+
+# Validation savestates: raw snes_saveload dumps, invalidated by any engine
+# change to the SNES state layout. tools/validation_states/README.md (committed)
+# documents each one and how to regenerate it.
+tools/validation_states/*.state
+
+# Captures written by scripts/validate_from_state.ps1.
+/analysis/state_validation/
+translations/dialogue_cjk_previews/
