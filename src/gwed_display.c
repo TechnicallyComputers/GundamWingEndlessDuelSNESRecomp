@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "common_rtl.h"   /* g_ram: the WRAM the screen gate is read from */
 #include "snes/ppu.h"
 #include "widescreen.h"
 
@@ -44,6 +45,130 @@ static bool GwedWsBgEnabled(void)
                             "policy disabled\n");
     }
     return s_state != 0;
+}
+
+/* Per-policy kill switches (P14). Same contract as SNESRECOMP_WS_BG: read
+ * once, cached, logged, and never able to make the guest diverge. */
+static bool GwedWsSwitch(const char *name, const char *what, int *cache)
+{
+    if (*cache < 0) {
+        const char *env = getenv(name);
+        *cache = (env && env[0] && atoi(env) == 0) ? 0 : 1;
+        if (!*cache)
+            fprintf(stderr, "[ws] %s=0 - %s disabled\n", name, what);
+    }
+    return *cache != 0;
+}
+
+static bool GwedWsBg1MirrorEnabled(void)
+{
+    static int s_state = -1;
+    return GwedWsSwitch("SNESRECOMP_WS_BG1_MIRROR",
+                        "BG1 world-mirror margins", &s_state);
+}
+
+static bool GwedWsBg3Enabled(void)
+{
+    static int s_state = -1;
+    return GwedWsSwitch("SNESRECOMP_WS_BG3", "BG3 clamp policy", &s_state);
+}
+
+/* SNESRECOMP_WS_BG2_MODE=wrap|mirror|clamp. wrap (default) leaves BG2 with no
+ * policy at all: its map is 256 px wide and its scroll is pinned to 0, so the
+ * hardware's own map wrap tiles the skyline into the margins seamlessly.
+ * mirror reflects it about the map instead; clamp keeps it native. Exposed so
+ * the owner can A/B the skyline without a rebuild. */
+enum { kGwedBg2Wrap = 0, kGwedBg2Mirror = 1, kGwedBg2Clamp = 2 };
+
+static int GwedWsBg2Mode(void)
+{
+    static int s_mode = -1;
+    if (s_mode < 0) {
+        const char *env = getenv("SNESRECOMP_WS_BG2_MODE");
+        s_mode = kGwedBg2Wrap;
+        if (env && env[0]) {
+            if (strcmp(env, "mirror") == 0)
+                s_mode = kGwedBg2Mirror;
+            else if (strcmp(env, "clamp") == 0)
+                s_mode = kGwedBg2Clamp;
+            else if (strcmp(env, "wrap") != 0)
+                fprintf(stderr, "[ws] SNESRECOMP_WS_BG2_MODE=%s not "
+                                "recognised - using wrap\n", env);
+        }
+        if (s_mode != kGwedBg2Wrap)
+            fprintf(stderr, "[ws] BG2 margin mode = %s\n",
+                    s_mode == kGwedBg2Mirror ? "mirror" : "clamp");
+    }
+    return s_mode;
+}
+
+/* -- The fight-screen gate (recon A, Beads beads-8wg.9.13.2) --------------
+ *
+ * $7E:1000 is the coarse mode word: 0x0010 for the whole battle family.
+ * $7E:1004 is the sub-mode: 0x0012 live fight / round intro, 0x0014 victory
+ * quote, 0x001E round end + inter-stage dialogue + ending. 0x000A/0x000C are
+ * the attract crawl and the title menu, 0x0000 the cinematic and the logo.
+ *
+ * Read as raw WRAM bytes, never from framebuffer pixels (standing rule), and
+ * never from the PPU scroll: this is a mode discriminator, not pixel phase. */
+#define GWED_WRAM_MODE      0x1000u
+#define GWED_WRAM_SUBMODE   0x1004u
+#define GWED_MODE_BATTLE    0x0010u
+#define GWED_SUB_FIGHT      0x0012u
+#define GWED_SUB_QUOTE      0x0014u
+#define GWED_SUB_ROUND_END  0x001Eu
+
+static uint16_t GwedWram16(uint32_t addr)
+{
+    return (uint16_t)(g_ram[addr] | ((uint16_t)g_ram[addr + 1] << 8));
+}
+
+/* -- The arena geometry the world-mirror policy depends on ---------------
+ *
+ * BG1's tilemap is authored only over map px [64,448) - 64x64 tiles, columns
+ * 8..55, tile 0 either side (recon B). The camera X clamp is [64,192], so the
+ * authentic 256 columns span exactly the authored region at the walls and
+ * only the widescreen margins can ever leave it.
+ *
+ * $2107 == 0x6B (map at word 0x6800 = byte $D000, 64x64) with BG1's character
+ * base at word 0x0000 is unique to the arena screens: every non-arena screen
+ * recon captured - title, logo, menu, crawl, cinematic, inter-stage dialogue,
+ * ending, black transition - reads 0x69 there and points BG1 somewhere else.
+ * That check is what makes the sub-mode families below safe: 0x001E is shared
+ * by the KO/round-end screen (which IS the arena) and by the dialogue and
+ * ending screens (which are not), so the sub-mode alone cannot decide. This
+ * is emulated PPU configuration, not a rendered pixel, and it is a
+ * PRECONDITION on the world bounds rather than a screen classifier: if BG1 is
+ * not the arena map then reflecting about the arena's edges is meaningless,
+ * so the policy fails closed to a pillarbox. */
+#define GWED_BG1_ARENA_BGXSC   0x6Bu
+#define GWED_ARENA_WORLD_LEFT  64u
+#define GWED_ARENA_WORLD_RIGHT 448u
+/* BG2's 32x64 skyline map at word 0x7800 (byte $F000). The victory quote
+ * re-points BG2 at a 64x32 portrait panel (0x79) whose off-screen columns are
+ * not known to be authored, so "let the map wrap" is only claimed for 0x7A. */
+#define GWED_BG2_SKYLINE_BGXSC 0x7Au
+
+/* HUD band: the raster IRQ pins BG1 to hScroll 0 / vScroll 440 for lines
+ * 22..71 and restores vScroll on line 73, so line 72 still renders a HUD tile
+ * row, at the arena's scroll. World bounds are meaningless on any of those
+ * lines (their hScroll is not the camera), so BG1 is clamped across [22,73)
+ * and the arena band gets the world policy everywhere else.
+ * TODO(beads-8wg.9.13.3): recon B is to deliver these as measured constants
+ * together with the HUD anchor split; until then they come from the
+ * attract-fight per-line PPU journal (analysis/widescreen/recon/screens/
+ * attract_fight/attract_fight_lines.json). */
+#define GWED_HUD_BAND_Y0 22u
+#define GWED_HUD_BAND_Y1 73u
+/* The full visible picture. ppu_runLine() is called with 1..224 and the band
+ * test is a half-open [y0,y1), so the end has to be 225. */
+#define GWED_PICTURE_Y0  0u
+#define GWED_PICTURE_Y1  225u
+
+static bool GwedBg1IsArenaMap(void)
+{
+    return g_ppu && g_ppu->bgXsc[0] == GWED_BG1_ARENA_BGXSC &&
+           (g_ppu->bgTileAdr & 0xF) == 0;
 }
 
 static int ClampEven(int64_t value)
@@ -115,12 +240,33 @@ void GwedDisplay_BeginSession(uint8_t *render_pixels, size_t render_pixels_bytes
 
 GwedWsScreen GwedDisplay_ResolveScreen(void)
 {
-    /* TODO(beads-8wg.9.13.5): replace with the WRAM-gate-driven table from R1
-     * (mode byte + liveness conjunction). Until that gate is PROVEN, every
-     * screen is Bounded: a pillarbox can never stretch or slice text, so the
-     * failure mode of guessing wrong here is "less widescreen", not "broken
-     * widescreen". Classification must never come from framebuffer pixels. */
-    return kGwedWsScreen_Bounded;
+    /* Guest state only. A pillarbox can never stretch or slice text, so
+     * Bounded is the fail-closed answer for anything not positively proven to
+     * be the arena: the cost of guessing wrong here is "less widescreen", not
+     * "broken widescreen".
+     *
+     * Deliberately NOT gated on the P6 liveness signal ($7E:0600 counting).
+     * The round intro is a scripted, frozen-counter screen that already shows
+     * the arena, and snapping the frame from a 342-wide arena to a
+     * pillarboxed 256 for the duration of every round intro would be a worse
+     * artefact than anything liveness protects against here. Liveness matters
+     * when a gate drives behaviour that could change the simulation; nothing
+     * in this file does. */
+    if (GwedWram16(GWED_WRAM_MODE) != GWED_MODE_BATTLE)
+        return kGwedWsScreen_Bounded;
+
+    switch (GwedWram16(GWED_WRAM_SUBMODE)) {
+    case GWED_SUB_FIGHT:      /* live round + round intro */
+    case GWED_SUB_QUOTE:      /* victory quote: portrait panel over the arena */
+    case GWED_SUB_ROUND_END:  /* KO banner - but also dialogue and ending */
+        break;
+    default:
+        return kGwedWsScreen_Bounded;
+    }
+
+    /* The sub-mode names a family, not a layout. Only the arena tilemap has
+     * an authored world to reflect about. */
+    return GwedBg1IsArenaMap() ? kGwedWsScreen_World : kGwedWsScreen_Bounded;
 }
 
 void GwedDisplay_PreparePpuFrame(void)
@@ -151,10 +297,56 @@ void GwedDisplay_PreparePpuFrame(void)
      * apart from the render target, so a reset or a savestate load silently
      * drops every one of these. */
     switch (GwedDisplay_ResolveScreen()) {
-    case kGwedWsScreen_World:
-        /* Symmetric border: the world layers render into the margins. */
+    case kGwedWsScreen_World: {
+        /* Symmetric border: the world layers render into the margins. There is
+         * deliberately no margin memset here - the whole point of this branch
+         * is that the layers and the backdrop fill them. */
         PpuSetExtraSpace(g_ppu, (uint8_t)g_ws_extra);
+
+        uint8_t clamp_mask = 0;
+
+        /* BG1 - the arena. Mid-scroll the margins hold real authored art, so
+         * they must render naturally; only at the camera walls does the view
+         * run past the authored world, and there it reflects about the
+         * world's own edge rather than the viewport's (P2b). The HUD band's
+         * lines are clamped instead: their hScroll is pinned to 0 by the
+         * raster IRQ, so an arena world bound would mean nothing there. Clamp
+         * bands win over world bands per line inside the PPU, so the relative
+         * order of these two calls does not matter - but both must follow
+         * PpuSetExtraSpace, which resets every layer policy. */
+        if (GwedWsBg1MirrorEnabled())
+            PpuSetWidescreenLayerWorldMirrorBand(
+                g_ppu, 0, (uint8_t)GWED_PICTURE_Y0, (uint8_t)GWED_PICTURE_Y1,
+                GWED_ARENA_WORLD_LEFT, GWED_ARENA_WORLD_RIGHT);
+        PpuSetWidescreenLayerClampBand(g_ppu, 0, (uint8_t)GWED_HUD_BAND_Y0,
+                                       (uint8_t)GWED_HUD_BAND_Y1);
+
+        /* BG2 - the skyline. 256 px wide with its scroll pinned to 0, so the
+         * hardware's own map wrap already tiles it into the margins and the
+         * default needs no policy at all. Any other BG2 layout on an arena
+         * screen (the victory quote's portrait panel) is a full-screen art
+         * plane whose off-screen columns are unverified: clamp it. */
+        {
+            bool skyline = g_ppu->bgXsc[1] == GWED_BG2_SKYLINE_BGXSC;
+            int bg2_mode = skyline ? GwedWsBg2Mode() : kGwedBg2Clamp;
+            if (bg2_mode == kGwedBg2Mirror)
+                PpuSetWidescreenLayerWorldMirrorBand(
+                    g_ppu, 1, (uint8_t)GWED_PICTURE_Y0,
+                    (uint8_t)GWED_PICTURE_Y1, 0, 256);
+            else if (bg2_mode == kGwedBg2Clamp)
+                clamp_mask |= 1u << 1;
+        }
+
+        /* BG3 - text and banners (the attract band, "1P WIN", the dialogue
+         * box). Glyph art never widens: keeping it in the authentic 256 means
+         * it can neither stretch nor be sliced. */
+        if (GwedWsBg3Enabled())
+            clamp_mask |= 1u << 2;
+
+        if (clamp_mask)
+            PpuSetWidescreenLayerClamp(g_ppu, clamp_mask);
         break;
+    }
     case kGwedWsScreen_Bounded:
     default:
         /* Pillarbox: keep the centring budget, render only the authentic 256
