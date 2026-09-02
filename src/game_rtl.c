@@ -143,6 +143,54 @@ static uint8_t  s_scanout_high_oam[0x20];
 static uint16_t s_scanout_cgram[0x100];
 static int      s_scanout_valid;
 
+/*
+ * Validation knob: corrupt the execution cursor so the recovery below actually
+ * runs.
+ *
+ *   GAME_FORCE_BAD_RESUME_PC=N     every Nth frame, point the cursor at MMIO
+ *   GAME_FORCE_BAD_RESUME_STICKY=1 also clobber the last-good cursor, so the
+ *                                  cold-boot arm is reachable too
+ *
+ * The recovery had been shipped and audited as present, and had never once
+ * executed -- zero occurrences in every log we hold. That is not a small
+ * distinction for a path whose whole job is to run when something else has
+ * already gone wrong: forks needed SNES_RB_FORCE_FORK before the cap could be
+ * trusted, and this is the same shape of problem.
+ *
+ * $002100 is chosen rather than a random value because it is a real hazard,
+ * not an obviously silly one: PPU registers are readable, so resuming there
+ * executes register side effects as instructions rather than faulting.
+ *
+ * Never set either of these in a real session. Recovering to the last-good
+ * cursor re-runs a frame from an earlier point, which is safe for the machine
+ * and visible to a player.
+ */
+static void game_force_bad_resume_pc(void)
+{
+    static int s_every = -1;
+    static unsigned long s_frames;
+
+    if (s_every < 0) {
+        const char *v = getenv("GAME_FORCE_BAD_RESUME_PC");
+        s_every = (v && v[0]) ? atoi(v) : 0;
+        if (s_every > 0)
+            fprintf(stderr, "game: FORCING a bad resume pc every %d frames "
+                    "(validation only)\n", s_every);
+    }
+    if (s_every <= 0 || !g_booted)
+        return;
+    if ((++s_frames % (unsigned long)s_every) != 0ul)
+        return;
+
+    g_resume_pc = 0x002100u;             /* PPU registers: readable, not code */
+    {
+        const char *sticky = getenv("GAME_FORCE_BAD_RESUME_STICKY");
+        if (sticky && sticky[0] && atoi(sticky) != 0)
+            g_last_good_resume_pc = 0x004200u;
+    }
+    fprintf(stderr, "game: forced bad resume pc at frame %lu\n", s_frames);
+}
+
 void GameRunOneFrame(void)
 {
     const uint64_t frame_end =
@@ -150,6 +198,7 @@ void GameRunOneFrame(void)
     int slices = 0;
 
     int booting = !g_booted;
+    game_force_bad_resume_pc();
     if (!booting && !cpu_pc24_resumable(g_resume_pc)) {
         /* The cursor cannot be code, so running it would execute whatever
          * happens to live there. Take the first plausible candidate instead,
