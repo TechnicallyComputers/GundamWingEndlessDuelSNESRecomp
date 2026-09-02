@@ -37,13 +37,14 @@ typedef SnesDisplayViewport GwedDisplayViewport;
  *            the cleared backdrop. Text cannot stretch and cannot be sliced,
  *            by construction — which is the safe default for every screen
  *            until the WRAM gate exists.
- * World    = the world layers extend into the margins (symmetric border).
+ * World    = the arena layers extend into the margins (symmetric border).
+ *             BG1 reflects about its authored world edges (P2b), BG2's map
+ *             wraps, BG3 (text/banners) stays clamped.
  *
- * TODO(beads-8wg.9.13.5): GwedDisplay_ResolveScreen() currently answers
- * Bounded for everything. The R1 recon work replaces its body with a lookup
- * on the proven WRAM mode/liveness gate (fight + attract demo -> World, every
- * text/menu/quote/ending screen -> Bounded). Classification is by guest state
- * ONLY; never by sampling framebuffer pixels.
+ * The choice is made from guest state ONLY - the $7E:1000/$7E:1004 mode words
+ * plus a precondition check on BG1's own tilemap configuration - and never by
+ * sampling framebuffer pixels. See GwedDisplay_ResolveScreen in the .c file
+ * for the gate and for why the P6 liveness signal is not part of it.
  */
 typedef enum GwedWsScreen {
     kGwedWsScreen_Bounded = 0,
@@ -83,7 +84,7 @@ int GwedDisplay_GetCurrentFrameWidth(void);
  * field on the floor. */
 void GwedDisplay_PreparePpuFrame(void);
 
-/* Which policy this frame gets. See the TODO on GwedWsScreen. */
+/* Which policy this frame gets, from the WRAM mode gate. */
 GwedWsScreen GwedDisplay_ResolveScreen(void);
 
 /* ── Host presentation (window/viewport geometry only) ──────────────────── */
