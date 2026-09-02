@@ -33,6 +33,7 @@
 #include "snes/ppu.h"
 #include "snes/snes.h"       /* snes_free on session reboot */
 #include "debug_server.h"
+#include "framedump.h"       /* --framedump: per-frame WRAM + crc32 sidecars */
 #include "snes_savestate_menu.h" /* Select+R / F7 save-state overlay */
 #include "cpu_trace.h"
 #include "desktop/sdl_compat.h"
@@ -1089,6 +1090,41 @@ int main(int argc, char **argv)
     char beside_exe[1024] = "";
     uint8_t sha[32];
     const uint8_t *want_sha = expected_rom_sha256(sha);
+    /* ── Harness flags ───────────────────────────────────────────────────
+     *
+     * --framedump <dir>     per-frame WRAM + crc32 sidecars (framedump.c;
+     *                       window from SNESRECOMP_FRAMEDUMP_START/_END)
+     * --exit-at-frame <N>   clean shutdown once the guest has run N frames
+     *
+     * Both exist for the widescreen P16 gate: a run has to be able to say
+     * "these two builds executed the same frames" without a human watching
+     * a window, and a wall-clock kill cannot say which frame it stopped on.
+     * Neither touches rendering, and both are inert when unset.
+     *
+     * Parsed before the positional scan below because their VALUES do not
+     * start with '-': a directory or a frame count sitting in argv would
+     * otherwise be mistaken for the ROM path. */
+    const char *framedump_dir = NULL;
+    int exit_at_frame = 0;
+    int flag_value_arg[2] = { 0, 0 };
+    {
+        int ai;
+        for (ai = 1; ai + 1 < argc; ++ai) {
+            if (!argv[ai])
+                continue;
+            if (strcmp(argv[ai], "--framedump") == 0) {
+                static char framedump_abs[1024];
+                framedump_dir =
+                    snesrecomp_abspath(argv[ai + 1], framedump_abs,
+                                       sizeof(framedump_abs))
+                        ? framedump_abs : argv[ai + 1];
+                flag_value_arg[0] = ai + 1;
+            } else if (strcmp(argv[ai], "--exit-at-frame") == 0) {
+                exit_at_frame = atoi(argv[ai + 1]);
+                flag_value_arg[1] = ai + 1;
+            }
+        }
+    }
     /* First non-flag argument, not argv[1]: this ecosystem's hosts take their
      * flags BEFORE the ROM (`<exe> --launcher <rom>`), so reading argv[1] here
      * would see "--launcher" and conclude no ROM was given. */
@@ -1097,6 +1133,7 @@ int main(int argc, char **argv)
         int ai;
         for (ai = 1; ai < argc; ++ai) {
             if (!argv[ai] || !argv[ai][0] || argv[ai][0] == '-') continue;
+            if (ai == flag_value_arg[0] || ai == flag_value_arg[1]) continue;
             pos_arg = ai;
             break;
         }
@@ -1325,10 +1362,26 @@ session_reboot:
     game_load_pad_map();
     game_open_pads();
 
+    /* Arm the per-frame WRAM dumper. Must be after SnesInit (the callback
+     * reads the guest's WRAM) and before the first RtlRunFrame, which is
+     * what calls it. Re-arming on a session reboot is harmless. */
+    if (framedump_dir)
+        FrameDump_Init(framedump_dir);
+
     while (running) {
         SDL_Event event;
         uint32 inputs;
         int savestate_menu_hotkey = 0;
+
+        /* --exit-at-frame: leave through the normal shutdown path (audio
+         * device, guest machine, SDL) with status 0, after the frame that
+         * reached the target has been dumped and presented. */
+        if (exit_at_frame > 0 && snes_frame_counter >= exit_at_frame) {
+            fprintf(stderr, "[harness] --exit-at-frame %d reached (frame %d)\n",
+                    exit_at_frame, snes_frame_counter);
+            running = 0;
+            break;
+        }
 
         while (SDL_PollEvent(&event)) {
             /* SDL2 spellings: sdl_compat.h defines SDL_ENABLE_OLD_NAMES for
