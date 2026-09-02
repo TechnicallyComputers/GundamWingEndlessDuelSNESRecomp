@@ -30,6 +30,7 @@
 #include "common_cpu_infra.h"
 #include "widescreen.h"
 #include "game_rtl.h"
+#include "gwed_display.h"
 #include "snes/ppu.h"
 #include "snes/snes.h"       /* snes_free on session reboot */
 #include "debug_server.h"
@@ -99,8 +100,16 @@ static void host_lobby_ensure_init(void)
 }
 #endif /* SNES_HAS_LOBBY_CLIENT */
 
+/* The authentic frame. GAME_WIDTH stays the constant it always was: it is the
+ * SNES's real column count, and everything that must not move with the opt-in
+ * widescreen feature (the guest, the savestate format) keys off it. */
 #define GAME_WIDTH  256
 #define GAME_HEIGHT 224
+/* Widest frame the host buffers must be able to hold. The widescreen feature
+ * pins one width per session (GwedDisplay_BeginSession); this is the ceiling
+ * the engine's OAM x-space allows (widescreen.h kWsExtraMax), not the width
+ * any particular session uses. */
+#define GAME_MAX_WIDTH (GAME_WIDTH + 2 * kWsExtraMax)
 
 extern Ppu *g_ppu;
 
@@ -151,21 +160,30 @@ static void start_debug_server(void)
  * while the texture is only mapped for the moment of the present. PpuBeginDrawing
  * is what points ppu->renderBuffer at this array — without that call it stays
  * NULL and nothing is ever drawn. */
-static uint32_t g_render_pixels[GAME_WIDTH * GAME_HEIGHT];
+static uint32_t g_render_pixels[GAME_MAX_WIDTH * GAME_HEIGHT];
 
 /* The framework calls this to hand the host a frame. renderBuffer is the
  * PPU's composited output in the runner's native layout. */
 void RtlDrawPpuFrame(uint8 *pixel_buffer, size_t pitch, uint32 render_flags)
 {
     (void)render_flags;
-    if (!g_ppu || !g_ppu->renderBuffer)
+    if (!g_ppu)
+        return;
+    /* Re-point the PPU at the render target and re-apply this frame's
+     * widescreen policy BEFORE the draw. ppu_reset() zeroes every policy
+     * field (a reset or a savestate load would otherwise silently drop them),
+     * and the draw below composites the whole frame in one go, so this is the
+     * only moment at which the policy can be set for it. With widescreen off
+     * this is exactly the single PpuBeginDrawing the faithful host made. */
+    GwedDisplay_PreparePpuFrame();
+    if (!g_ppu->renderBuffer)
         return;
     /* Render the frame before presenting it. Nothing else in a production
      * build calls draw_ppu_frame — common_rtl.c's call is inside SNES_COSIM —
      * so a host that omits it presents an untouched texture forever. */
     g_rtl_game_info->draw_ppu_frame();
     RtlWidescreenPresent(pixel_buffer, pitch, g_ppu->renderBuffer,
-                         GAME_WIDTH, GAME_HEIGHT);
+                         GwedDisplay_GetCurrentFrameWidth(), GAME_HEIGHT);
 }
 
 
@@ -429,7 +447,7 @@ static int g_vsync = 1;
  * motion ghosting, so it is a Display-settings checkbox, off by default.
  * Persisted as [Video] FrameBlend in config.ini. */
 static int g_frame_blend = 0;
-static uint32_t g_blend_prev[GAME_WIDTH * GAME_HEIGHT];
+static uint32_t g_blend_prev[GAME_MAX_WIDTH * GAME_HEIGHT];
 static int g_blend_prev_valid = 0;
 
 static int game_config_int(const char *section, const char *key, int fallback)
@@ -904,6 +922,12 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     /* Display → VSync checkbox (the legacy surface draws it as On/Off; this
      * host's renderer flag is boolean, so Adaptive is never offered). */
     gi.has_vsync = 1;
+    /* The shared SNES profile turns on the launcher's legacy 16:9 Display
+     * toggle. This title deliberately does not use it: widescreen is a Mods
+     * package (mods/preloaded/packages/gwed.enhancement.widescreen), which is
+     * the single activation authority for the feature (Beads beads-8wg.1.10).
+     * Two switches for one feature is two places for them to disagree. */
+    gi.widescreen_supported = 0;
     /* `sha` outlives the run_window call below, which is the only consumer. */
     if (expected_rom_sha256(sha)) {
         gi.known_sha256     = (const uint8_t (*)[32])&sha;
@@ -985,7 +1009,7 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
 
 static SDL_Texture *g_overlay_tex;
 
-static void game_draw_overlay(SDL_Renderer *renderer)
+static void game_draw_overlay(SDL_Renderer *renderer, const SDL_Rect *dst)
 {
     const uint32_t *px = NULL;
     int w = 0, h = 0;
@@ -1003,17 +1027,78 @@ static void game_draw_overlay(SDL_Renderer *renderer)
         SDL_SetTextureBlendMode(g_overlay_tex, SDL_BLENDMODE_BLEND);
     }
     SDL_UpdateTexture(g_overlay_tex, NULL, px, w * 4);
-    /* Same destination rect as the game texture: the panel is exactly 2x the
-     * SNES frame, so it lands on the window with no aspect correction. */
-    snesrecomp_sdl_render_texture(renderer, g_overlay_tex, NULL, NULL);
+    /* Same destination rect as the game texture. That rect is now aspect
+     * corrected (game_compute_present_rect), so the panel keeps landing
+     * exactly on the frame it annotates — the old "exactly 2x the SNES frame,
+     * no aspect correction" note stopped being true when the host started
+     * honouring the pixel aspect. */
+    snesrecomp_sdl_render_texture(renderer, g_overlay_tex, NULL, dst);
+}
+
+/* Where the frame lands in the window.
+ *
+ * This used to be NULL — SDL stretched the texture over the whole window, so
+ * the picture's shape was whatever shape the user had dragged the window
+ * into. Presentation only: the framebuffer bytes are untouched, which is what
+ * lets the P16 gate stay green across this change. */
+static void game_compute_present_rect(SDL_Renderer *renderer, SDL_Rect *dst)
+{
+    GwedDisplayViewport vp;
+    int out_w = 0, out_h = 0;
+
+    if (!snesrecomp_sdl_get_render_output_size(renderer, &out_w, &out_h) ||
+        out_w <= 0 || out_h <= 0) {
+        dst->x = dst->y = 0;
+        dst->w = GwedDisplay_GetCurrentFrameWidth();
+        dst->h = GAME_HEIGHT;
+        return;
+    }
+    GwedDisplay_ComputeViewport(GwedDisplay_GetCurrentFrameWidth(), GAME_HEIGHT,
+                                out_w, out_h, &vp);
+    dst->x = vp.x;
+    dst->y = vp.y;
+    dst->w = vp.width;
+    dst->h = vp.height;
+}
+
+/* The session's frame width is pinned before the texture is created, so this
+ * only ever fires if a future session reboot re-pins a different width while
+ * reusing the renderer. Cheap insurance against presenting a 342-wide frame
+ * through a 256-wide texture. */
+static SDL_Texture *game_ensure_texture(SDL_Renderer *renderer,
+                                        SDL_Texture *texture)
+{
+    int want = GwedDisplay_GetCurrentFrameWidth();
+    int tex_w = 0, tex_h = 0;
+
+    if (!texture)
+        return NULL;
+    if (snesrecomp_sdl_get_texture_size(texture, &tex_w, &tex_h) &&
+        tex_w == want && tex_h == GAME_HEIGHT)
+        return texture;
+    SDL_DestroyTexture(texture);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+                                SDL_TEXTUREACCESS_STREAMING, want, GAME_HEIGHT);
+    if (texture)
+        SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
+    else
+        fprintf(stderr, "SDL: %dx%d texture allocation failed: %s\n",
+                want, GAME_HEIGHT, SDL_GetError());
+    return texture;
 }
 
 /* One present. redraw_game is 0 while the guest is frozen — the texture
  * still holds the last frame, so re-presenting it costs nothing and keeps
  * the window repainting under the overlay. */
-static void game_present(SDL_Renderer *renderer, SDL_Texture *texture,
+static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
                          int redraw_game)
 {
+    SDL_Texture *texture = game_ensure_texture(renderer, *texture_slot);
+    SDL_Rect dst;
+
+    *texture_slot = texture;
+    if (!texture)
+        return;
     if (redraw_game) {
         void *pixels = NULL;
         int pitch = 0;
@@ -1024,12 +1109,13 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture *texture,
              * unblended frame so the mix never feeds back on itself. The
              * PPU's own renderBuffer stays pure for thumbnails/captures. */
             if (g_frame_blend) {
+                int width = GwedDisplay_GetCurrentFrameWidth();
                 int y, x;
                 for (y = 0; y < GAME_HEIGHT; ++y) {
                     uint32_t *row =
                         (uint32_t *)((uint8 *)pixels + (size_t)y * pitch);
-                    uint32_t *prev = g_blend_prev + (size_t)y * GAME_WIDTH;
-                    for (x = 0; x < GAME_WIDTH; ++x) {
+                    uint32_t *prev = g_blend_prev + (size_t)y * width;
+                    for (x = 0; x < width; ++x) {
                         uint32_t cur = row[x];
                         if (g_blend_prev_valid)
                             row[x] = (cur & prev[x]) +
@@ -1045,17 +1131,19 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture *texture,
          * after RtlDrawPpuFrame — that is the call that fills renderBuffer. */
         if (g_ppu && g_ppu->renderBuffer)
             snes_savestate_menu_note_frame((const uint32_t *)g_ppu->renderBuffer,
-                                           GAME_WIDTH, GAME_HEIGHT);
+                                           GwedDisplay_GetCurrentFrameWidth(),
+                                           GAME_HEIGHT);
     }
+    game_compute_present_rect(renderer, &dst);
     SDL_RenderClear(renderer);
-    snesrecomp_sdl_render_texture(renderer, texture, NULL, NULL);
-    game_draw_overlay(renderer);
+    snesrecomp_sdl_render_texture(renderer, texture, NULL, &dst);
+    game_draw_overlay(renderer, &dst);
     SDL_RenderPresent(renderer);
 }
 
 /* Modal pump: runs until the menu closes or the window does. */
 static void game_savestate_menu_loop(SDL_Renderer *renderer,
-                                     SDL_Texture *texture, int *running)
+                                     SDL_Texture **texture, int *running)
 {
     while (snes_savestate_menu_is_open() && *running) {
         SDL_Event event;
@@ -1360,8 +1448,15 @@ session_reboot:
      * (ppu.h: "the legacy renderer ignores these"), and colour math only
      * started being exercised at all once the raster-IRQ deadlock was fixed
      * and CGADSUB went from $00 to $3F. */
-    PpuBeginDrawing(g_ppu, (uint8_t *)g_render_pixels, GAME_WIDTH * 4,
-                    kPpuRenderFlags_NewRenderer);
+    /* Pin the session's frame width. Must be after the mod runtime's plugin
+     * activation above (that is what turns widescreen on) and before the first
+     * frame, the window and the texture — all three are sized from it. A
+     * rematch re-enters at session_reboot and re-pins, which is the only point
+     * at which the width may change. This also issues the PpuBeginDrawing that
+     * points the PPU at g_render_pixels; RtlDrawPpuFrame re-issues it (with
+     * the frame's policy) every frame. */
+    GwedDisplay_BeginSession((uint8_t *)g_render_pixels, sizeof(g_render_pixels),
+                             kPpuRenderFlags_NewRenderer);
     start_debug_server();
 #if defined(SNES_HAS_LOBBY_CLIENT)
     if (!g_netplay_pending) {
@@ -1397,8 +1492,24 @@ session_reboot:
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
         return 1;
     }
-    window = snesrecomp_sdl_create_window("Gundam Wing Endless Duel", GAME_WIDTH * 3,
-                                          GAME_HEIGHT * 3, 0);
+    /* Presentation aspect. There is no launcher control for it on this title
+     * (recomp-ui's ignore-aspect/integer-scale settings are not drawn for
+     * SNES, and gi.widescreen_supported is 0 above), so config.ini is the
+     * escape hatch: [Video] Aspect 0 = CRT 4:3 (7:6 pixels — 256 presents as
+     * 4:3 and the 342-wide widescreen frame as 16:9), 1 = square pixels
+     * (8:7 / 32:21), 2 = square frame. IgnoreAspect restores the old
+     * stretch-to-window behaviour for anyone who preferred it. */
+    GwedDisplay_SetPresentation(
+        SnesDisplayAspect_Clamp(game_config_int("[Video]", "Aspect", 0)),
+        game_config_int("[Video]", "IgnoreAspect", 0) != 0,
+        game_config_int("[Video]", "IntegerScale", 0) != 0);
+    {
+        int frame_w = GwedDisplay_GetCurrentFrameWidth();
+        int win_h = GAME_HEIGHT * 3;
+        window = snesrecomp_sdl_create_window(
+            "Gundam Wing Endless Duel",
+            GwedDisplay_GetWindowBaseWidth(frame_w, win_h), win_h, 0);
+    }
     /* Default OFF for this title. config.ini is generated at runtime by the
      * launcher and is not shipped, so a fresh install falls back to whatever
      * this default says -- and with vsync on, a 60.00 Hz panel duplicates a
@@ -1419,7 +1530,7 @@ session_reboot:
     texture = renderer
         ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                             SDL_TEXTUREACCESS_STREAMING,
-                            GAME_WIDTH, GAME_HEIGHT)
+                            GwedDisplay_GetCurrentFrameWidth(), GAME_HEIGHT)
         : NULL;
     if (!window || !renderer || !texture) {
         fprintf(stderr, "SDL setup failed: %s\n", SDL_GetError());
@@ -1547,9 +1658,9 @@ session_reboot:
                         break;
                     burst++;
                 }
-                game_present(renderer, texture, 1);
+                game_present(renderer, &texture, 1);
             } else {
-                game_present(renderer, texture, 0);   /* held frame */
+                game_present(renderer, &texture, 0);   /* held frame */
             }
             if (!g_vsync)
                 game_frame_limit();
@@ -1573,7 +1684,7 @@ session_reboot:
             (void)snes_savestate_menu_poll_open(GAME_SAVESTATE_MENU_GESTURE);
         if (snes_savestate_menu_poll_open(inputs) ||
             snes_savestate_menu_is_open()) {
-            game_savestate_menu_loop(renderer, texture, &running);
+            game_savestate_menu_loop(renderer, &texture, &running);
             continue;   /* guest was frozen: no frame to run or present */
         }
         {
@@ -1631,7 +1742,7 @@ session_reboot:
             for (ffi = 0; ffi < frames_this_iter; ffi++)
                 RtlRunFrame(inputs);
         }
-        game_present(renderer, texture, 1);
+        game_present(renderer, &texture, 1);
         if (!g_vsync)
             game_frame_limit();
     }
