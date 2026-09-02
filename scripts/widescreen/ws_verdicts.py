@@ -527,6 +527,127 @@ def cmd_margins(args, gate) -> int:
 
 ANCHOR_SHIFT = {"left": -1, "right": +1, "center": 0}
 
+# The elastic anchor band's documented mapping (engine: ppu.h
+# PpuSetWidescreenLayerElasticBand / PpuMergeElasticBackground, doctrine:
+# WIDESCREEN_PATTERNS P2c).  A band is a list of [srcX0, srcX1, dstX0, dstX1]
+# quads, read back out of get_ppu_state.widescreen.elasticBands.
+
+
+def _seg_src(seg, x: int) -> int:
+    """Source column for destination column x -- centre-nearest, integer."""
+    s0, s1, d0, d1 = seg
+    sw, dw = s1 - s0, d1 - d0
+    return s0 + ((2 * (x - d0) + 1) * sw) // (2 * dw)
+
+
+def _band_shape(band: dict, extra_l: int, extra_r: int) -> dict:
+    """Well-formedness of one exported elastic band, on its own terms.
+
+    Deliberately does NOT re-declare the game's px constants: the game owns
+    those, and duplicating them here would only test that two copies agree.
+    What this asserts is the part that must hold for ANY correct anchor band,
+    and each clause names a way the policy could be wrong:
+
+      * ascending, non-overlapping and with no HOLE in destination space --
+        a hole is a transparent gap, the exact defect the band exists to close;
+      * source spans inside the native 256 columns -- the band may only sample
+        the picture the game authored;
+      * either the identity band (one 0..256 -> 0..256 segment, i.e. a clamp,
+        which is how a transitional scanline is expressed) or a real anchor
+        band, in which case:
+          - the first destination column is -extraLeft and the last is
+            256+extraRight, so the band spans the whole widened line;
+          - the widths grow by exactly extraLeft+extraRight in total, so the
+            margin is absorbed and nothing is scaled twice;
+          - the outermost segments are RIGID and shifted by exactly the margin,
+            which is what "anchored to the 16:9 edge" means;
+          - at least one segment is rigid and unshifted, i.e. something stays
+            centred, and at least one is elastic, i.e. something absorbs.
+    """
+    segs = [list(map(int, q)) for q in band.get("segs", [])]
+    notes, ok = [], True
+    if not segs:
+        return {"kind": "empty", "valid": False, "segs": segs,
+                "notes": ["band is configured but carries no segments"]}
+    for i, (s0, s1, d0, d1) in enumerate(segs):
+        if not (0 <= s0 < s1 <= M.NATIVE_WIDTH):
+            ok = False
+            notes.append("segment %d source %d..%d leaves the native line"
+                         % (i, s0, s1))
+        if d1 <= d0:
+            ok = False
+            notes.append("segment %d destination %d..%d is empty" % (i, d0, d1))
+        if i:
+            prev_end = segs[i - 1][3]
+            if d0 < prev_end:
+                ok = False
+                notes.append("segment %d overlaps segment %d in destination"
+                             % (i, i - 1))
+            elif d0 > prev_end:
+                ok = False
+                notes.append("hole in the destination between segments %d and "
+                             "%d (x %d..%d would be transparent)"
+                             % (i - 1, i, prev_end, d0))
+    identity = (len(segs) == 1 and
+                segs[0] == [0, M.NATIVE_WIDTH, 0, M.NATIVE_WIDTH])
+    if identity:
+        return {"kind": "identity", "valid": ok, "segs": segs, "notes": notes,
+                "rigid": [0], "elastic": []}
+    rigid = [i for i, (s0, s1, d0, d1) in enumerate(segs)
+             if s1 - s0 == d1 - d0]
+    elastic = [i for i in range(len(segs)) if i not in rigid]
+    shift = [segs[i][2] - segs[i][0] for i in range(len(segs))]
+    grown = sum((d1 - d0) - (s1 - s0) for s0, s1, d0, d1 in segs)
+    if segs[0][2] != -extra_l:
+        ok = False
+        notes.append("band starts at destination %d, not -%d"
+                     % (segs[0][2], extra_l))
+    if segs[-1][3] != M.NATIVE_WIDTH + extra_r:
+        ok = False
+        notes.append("band ends at destination %d, not %d"
+                     % (segs[-1][3], M.NATIVE_WIDTH + extra_r))
+    if grown != extra_l + extra_r:
+        ok = False
+        notes.append("segments grow by %d px in total, not %d"
+                     % (grown, extra_l + extra_r))
+    if 0 not in rigid or shift[0] != -extra_l:
+        ok = False
+        notes.append("the leftmost segment is not a rigid group anchored to "
+                     "the left edge (rigid=%s shift=%d)"
+                     % (0 in rigid, shift[0]))
+    last = len(segs) - 1
+    if last not in rigid or shift[last] != extra_r:
+        ok = False
+        notes.append("the rightmost segment is not a rigid group anchored to "
+                     "the right edge (rigid=%s shift=%d)"
+                     % (last in rigid, shift[last]))
+    if not any(i in rigid and shift[i] == 0 for i in range(len(segs))):
+        ok = False
+        notes.append("no rigid unshifted segment: nothing stays centred")
+    if not elastic:
+        ok = False
+        notes.append("no elastic segment: the margin cannot be absorbed")
+    return {"kind": "anchor", "valid": ok, "segs": segs, "notes": notes,
+            "rigid": rigid, "elastic": elastic, "shift": shift,
+            "grown": grown}
+
+
+def _static_lines(samples, y0: int, y1: int, width: int) -> list:
+    """Scanlines whose pixels are identical across every sample given.
+
+    The two sides of this check are two PROCESSES at two different guest
+    frames -- attract_fight is a sampling scenario -- so a cross-side pixel
+    comparison is only legitimate on lines whose content does not animate.
+    That is measured here, not assumed: a line qualifies only if it is
+    byte-identical across repeated samples of the same process.
+    """
+    out = []
+    for y in range(y0, min(y1, min(len(r) for _, _, r in samples))):
+        ref = samples[0][2][y][:width * 3]
+        if all(rows[y][:width * 3] == ref for _, _, rows in samples[1:]):
+            out.append(y)
+    return out
+
 
 def _hud_slot_indices(spec: dict, slots: list) -> list:
     if "slots" in spec:
@@ -557,9 +678,18 @@ def cmd_hud_anchor(args, gate) -> int:
     with open(args.hud_json) as fh:
         hud = json.load(fh)
 
+    # Three processes, run sequentially (they share the build's state.toml):
+    # the authentic 4:3 frame, the wide composite, and a BG1-isolated wide
+    # frame.  The isolated one is what makes the "no transparent gap" claim
+    # measurable at all -- on the composite, BG2's skyline would paint any
+    # hole the anchored HUD layer left behind.
+    plan = [("native", 0, None), ("wide", args.ws_extra, None),
+            ("native_layer", 0, M.LAYER_MASKS["bg1"]),
+            ("wide_layer", args.ws_extra, M.LAYER_MASKS["bg1"])]
     sides = {}
-    for name, extra in (("native", 0), ("wide", args.ws_extra)):
+    for name, extra, mask in plan:
         with M.Instance(args.port, args.build, args.rom, extra,
+                        layer_mask=mask,
                         log_path=os.path.join(out, "%s.log" % name)) as inst:
             info = M.reach_scene(inst.c, args.scenario, gate, args.states_dir,
                                  args.settle, args.load_at)
@@ -571,11 +701,20 @@ def cmd_hud_anchor(args, gate) -> int:
                                   max(1, args.window_step)):
                     windows.setdefault(band["name"], {})[line] = \
                         inst.c.j("ppu_window %d %d" % (line, band["layer"]))
-            path = os.path.join(out, "%s_f%06d.bmp" % (name, M.frame(inst.c)))
-            inst.c.j("screenshot " + M.fwd(path))
+            # Two samples a few frames apart, so animated scanlines can be
+            # told from static ones by measurement (see _static_lines).
+            shots = []
+            for k in range(2):
+                if k:
+                    M.wait_frame(inst.c, M.frame(inst.c) + args.sample_gap)
+                path = os.path.join(out, "%s_s%d_f%06d.bmp"
+                                    % (name, k, M.frame(inst.c)))
+                inst.c.j("screenshot " + M.fwd(path))
+                shots.append(path)
         sides[name] = {"entry": info, "oam": oam, "ppu": ppu,
-                       "windows": windows, "bmp": path}
+                       "windows": windows, "bmp": shots[0], "shots": shots}
     rep.doc["sides"] = {k: {"entry": v["entry"], "bmp": v["bmp"],
+                            "shots": v["shots"],
                             "widescreen": v["ppu"].get("widescreen"),
                             "oam_frame": v["oam"]["frame"]}
                         for k, v in sides.items()}
@@ -629,41 +768,337 @@ def cmd_hud_anchor(args, gate) -> int:
                                   "detail": "--hud-json declares no 'obj' HUD"})
 
     # --- BG branch --------------------------------------------------------
+    #
+    # This used to assert that the HUD layer's hardware WINDOW edges expand
+    # past x=256.  On GWED that can never pass and never could: BG1's window
+    # clipping is DISABLED inside the HUD band (measured -- `ppu_window 40 0`
+    # replies valid:false), and a BG HUD does not need a window to be
+    # anchored.  Recorded as evidence below, asserted on no longer.
+    #
+    # What is asserted instead, in descending order of authority:
+    #   elastic_bands_wellformed  the engine's own exported mapping
+    #                             (get_ppu_state.widescreen.elasticBands) is a
+    #                             valid anchor band -- see _band_shape;
+    #   hud_lines_covered         every scanline recon declares to be HUD is
+    #                             governed by one of those bands;
+    #   hud_no_transparent_gap    on the BG1-ISOLATED wide frame, no column of
+    #                             the band is left unpainted;
+    #   hud_pixels_anchored       on the scanlines measured to be static, the
+    #                             wide frame's band equals the 4:3 frame's band
+    #                             remapped through the exported mapping -- so
+    #                             the rigid groups really are byte-exact at the
+    #                             16:9 edges, and the elastic runs really do
+    #                             follow the documented resample.
     bg_specs = hud.get("bg", [])
     if bg_specs:
         ws = sides["wide"]["ppu"].get("widescreen", {})
+        ws_native = sides["native"]["ppu"].get("widescreen", {})
+        extra_l = int(ws.get("left", args.ws_extra))
+        extra_r = int(ws.get("right", args.ws_extra))
         budget_ok = int(ws.get("budget", 0)) == args.ws_extra
-        bands = {}
-        bad = []
+        raw = ws.get("elasticBands")
+        layers = sorted({int(b["layer"]) for b in bg_specs})
+
+        # -- windows, as evidence only -------------------------------------
+        windows = {}
         for band in bg_specs:
-            rows = []
-            for line, w in sorted(sides["wide"]["windows"]
-                                  .get(band["name"], {}).items()):
-                n = sides["native"]["windows"].get(band["name"], {}).get(line, {})
-                edges = w.get("edges")
-                # A HUD band that must reach the 16:9 edges has to have its
-                # window edges expanded past the native 256 columns.
-                expanded = bool(edges) and (max(edges) > M.NATIVE_WIDTH
-                                            or min(edges) < 0)
-                rows.append({"line": line, "wide_edges": edges,
-                             "native_edges": n.get("edges"),
-                             "wide_valid": w.get("valid"),
-                             "expanded_past_native": expanded})
-            bands[band["name"]] = {"layer": band["layer"], "lines": rows}
-            if rows and not any(r["expanded_past_native"] for r in rows):
-                bad.append(band["name"])
-        detail = ("windows never expand past x=%d on: %s"
-                  % (M.NATIVE_WIDTH, ",".join(bad))) if bad else \
-                 "HUD band windows expand into the margins"
+            windows[band["name"]] = {
+                "layer": band["layer"],
+                "note": "recorded, not asserted: an unwindowed layer is not a "
+                        "misanchored one",
+                "lines": [{"line": line,
+                           "wide_edges": w.get("edges"),
+                           "wide_valid": w.get("valid"),
+                           "native_edges": sides["native"]["windows"]
+                           .get(band["name"], {}).get(line, {}).get("edges")}
+                          for line, w in sorted(sides["wide"]["windows"]
+                                                .get(band["name"], {}).items())]}
+        rep.doc["hud_bg_windows"] = windows
+
+        if not isinstance(raw, list):
+            rep.add("elastic_bands_wellformed", {
+                "status": "SKIP",
+                "detail": "get_ppu_state reports no widescreen.elasticBands "
+                          "(%r): this engine predates the elastic anchor band, "
+                          "so there is nothing to verify" % (raw,)})
+            rep.add("hud_lines_covered", {"status": "SKIP",
+                                          "detail": "no elasticBands export"})
+            rep.add("hud_no_transparent_gap", {
+                "status": "SKIP", "detail": "no elasticBands export"})
+            rep.add("hud_pixels_anchored", {"status": "SKIP",
+                                            "detail": "no elasticBands export"})
+            rep.write()
+            return 1 if rep.failed else 0
+
+        mine = [b for b in raw if int(b["layer"]) in layers]
+        shapes = []
+        bad = []
+        for b in mine:
+            sh = _band_shape(b, extra_l, extra_r)
+            sh.update({"slot": b["slot"], "layer": b["layer"],
+                       "y0": b["y0"], "y1": b["y1"]})
+            shapes.append(sh)
+            if not sh["valid"]:
+                bad.append("slot%d/BG%d y%d..%d: %s"
+                           % (b["slot"], int(b["layer"]) + 1, b["y0"],
+                              b["y1"], "; ".join(sh["notes"])))
         if not budget_ok:
             bad.append("widescreen.budget=%s != %d"
                        % (ws.get("budget"), args.ws_extra))
-        rep.add("hud_anchor_bg", {
-            "status": "FAIL" if bad else "PASS", "detail": detail,
-            "widescreen": ws, "budget_ok": budget_ok, "bands": bands})
+        if ws_native.get("elasticBands") and int(ws_native.get("budget", 0)):
+            bad.append("the 4:3 side reports a live margin (budget=%s)"
+                       % ws_native.get("budget"))
+        if not mine:
+            bad.append("no elastic band is configured on BG%s"
+                       % ",".join(str(l + 1) for l in layers))
+        rep.add("elastic_bands_wellformed", {
+            "status": "FAIL" if bad else "PASS",
+            "detail": "; ".join(bad) if bad else
+                      "%d elastic band(s) on BG%s, every one a valid anchor "
+                      "band spanning [-%d,%d)"
+                      % (len(mine), ",".join(str(l + 1) for l in layers),
+                         extra_l, M.NATIVE_WIDTH + extra_r),
+            "widescreen": ws, "budget_ok": budget_ok, "bands": shapes,
+            "native_widescreen": {"budget": ws_native.get("budget"),
+                                  "left": ws_native.get("left"),
+                                  "right": ws_native.get("right")}})
+        if bad:
+            rep.find("hud_band_malformed", "strong",
+                     "the exported elastic anchor band is not well formed: %s"
+                     % "; ".join(bad))
+
+        # -- every declared HUD scanline is governed ------------------------
+        covered, uncovered = {}, []
+        for band in bg_specs:
+            lo, hi = band["lines"]
+            owner = {}
+            for y in range(lo, hi + 1):
+                hit = [sh for sh in shapes
+                       if int(sh["layer"]) == int(band["layer"])
+                       and sh["y0"] <= y < sh["y1"]]
+                owner[y] = hit[0]["slot"] if hit else None
+            miss = [y for y, o in owner.items() if o is None]
+            covered[band["name"]] = {"layer": band["layer"],
+                                     "lines": [lo, hi],
+                                     "owner_by_line": owner,
+                                     "uncovered": miss}
+            if miss:
+                uncovered.append("%s: lines %s" % (band["name"], miss))
+        rep.add("hud_lines_covered", {
+            "status": "FAIL" if uncovered else "PASS",
+            "detail": ("no elastic band governs: %s" % "; ".join(uncovered))
+                      if uncovered else
+                      "every recon-declared HUD scanline is governed by an "
+                      "elastic band",
+            "bands": covered})
+
+        # -- pixels ---------------------------------------------------------
+        nat = [M.read_bmp_rgb(p) for p in sides["native"]["shots"]]
+        wid = [M.read_bmp_rgb(p) for p in sides["wide"]["shots"]]
+        iso = [M.read_bmp_rgb(p) for p in sides["wide_layer"]["shots"]]
+        niso = [M.read_bmp_rgb(p) for p in sides["native_layer"]["shots"]]
+        nw, nh, nrows = nat[0]
+        ww, wh, wrows = wid[0]
+        iw, ih, wirows = iso[0]
+        niw, nih, nirows = niso[0]
+        if nw != M.NATIVE_WIDTH or ww != M.NATIVE_WIDTH + extra_l + extra_r:
+            raise M.HarnessError("unexpected capture widths %d / %d"
+                                 % (nw, ww))
+
+        # (a) no transparent gap, on the isolated layer.
+        #
+        # "A gap" is a COLUMN of the band that nothing paints -- not a
+        # transparent pixel. Per-scanline blankness is the wrong unit and
+        # measuring it produced nonsense on both attempts: the row's modal
+        # colour on a HUD line is the CHROME (253 of 342 columns read "blank"
+        # on line 24), and the authentic band really does have dozens of
+        # transparent pixels per scanline (63 interior ones on line 24) even
+        # though every one of its columns px 1..254 is painted by SOME line.
+        # So coverage is accumulated down the band, which is also the unit
+        # recon measured and the unit the owner would see.
+        #
+        # The unpainted colour is identified WITHIN each frame, from the two
+        # columns the authentic HUD leaves empty (native px 0 and 255, carried
+        # by the anchoring to the widened frame's own two outer columns). They
+        # must agree with each other, or the line is not used -- the two sides
+        # are separate processes at different guest frames and GWED's arena
+        # paints its backdrop per scanline through HDMA, so nothing here may
+        # assume the two agree on a colour.
+        cover = {}
+        premise = []
+        for sh in shapes:
+            if sh["kind"] != "anchor":
+                continue
+            lines = [y for y in range(sh["y0"], sh["y1"])
+                     if y < ih and y < nih]
+            nat_cov = [False] * niw
+            wide_cov = [False] * iw
+            used = []
+            for y in lines:
+                nb = nirows[y][0:3]
+                if nirows[y][(niw - 1) * 3:(niw - 1) * 3 + 3] != nb:
+                    premise.append("4:3 line %d: columns 0 and %d disagree "
+                                   "about the unpainted colour" % (y, niw - 1))
+                    continue
+                wb = wirows[y][0:3]
+                if wirows[y][(iw - 1) * 3:(iw - 1) * 3 + 3] != wb:
+                    premise.append("wide line %d: columns 0 and %d disagree "
+                                   "about the unpainted colour" % (y, iw - 1))
+                    continue
+                used.append(y)
+                for x in range(niw):
+                    if nirows[y][x * 3:x * 3 + 3] != nb:
+                        nat_cov[x] = True
+                for x in range(iw):
+                    if wirows[y][x * 3:x * 3 + 3] != wb:
+                        wide_cov[x] = True
+            # What the mapping predicts: the destination column is covered
+            # exactly when the source column it samples is. The mapping is the
+            # same on every line of a band, so coverage transfers column-wise.
+            predicted = [False] * iw
+            for seg in sh["segs"]:
+                s0, s1, d0, d1 = seg
+                for x in range(max(d0, -extra_l),
+                               min(d1, M.NATIVE_WIDTH + extra_r)):
+                    sx = _seg_src(seg, x)
+                    if 0 <= sx < niw and nat_cov[sx]:
+                        predicted[x + extra_l] = True
+            wrong = [x for x in range(iw) if wide_cov[x] != predicted[x]]
+            uncovered = [x for x in range(iw) if not wide_cov[x]]
+            nat_uncovered = [x for x in range(niw) if not nat_cov[x]]
+            cover["slot%d" % sh["slot"]] = {
+                "y0": sh["y0"], "y1": sh["y1"], "lines_used": used,
+                "native_uncovered_columns": nat_uncovered,
+                "wide_uncovered_columns": uncovered,
+                "columns_disagreeing_with_the_mapping": wrong[:24]}
+            if wrong:
+                cover["slot%d" % sh["slot"]]["verdict"] = "FAIL"
+        bad_cover = [k for k, v in cover.items() if v.get("verdict") == "FAIL"]
+        if not cover:
+            # No anchor band at all (e.g. SNESRECOMP_WS_HUD=0, which clamps
+            # the whole band). There is no gap to look for, and reporting PASS
+            # would be a vacuous pass on a HUD that is not anchored at all --
+            # elastic_bands_wellformed is the check that fails for that.
+            rep.add("hud_no_transparent_gap", {
+                "status": "SKIP",
+                "detail": "no elastic anchor band is configured, so there is "
+                          "no anchored band whose columns could be unpainted"})
+        elif premise and not any(v["lines_used"] for v in cover.values()):
+            rep.add("hud_no_transparent_gap", {
+                "status": "SKIP",
+                "detail": "no band scanline yielded a usable unpainted-colour "
+                          "reference: %s" % "; ".join(premise[:6]),
+                "native_isolated_bmp": sides["native_layer"]["shots"][0],
+                "isolated_bmp": sides["wide_layer"]["shots"][0]})
+        else:
+            total_gap = sum(len(v["wide_uncovered_columns"])
+                            for v in cover.values())
+            nat_gap = sum(len(v["native_uncovered_columns"])
+                          for v in cover.values())
+            rep.add("hud_no_transparent_gap", {
+                "status": "FAIL" if bad_cover else "PASS",
+                "detail": ("the widened band's painted columns do not match "
+                           "what the mapping predicts on %s"
+                           % ",".join(bad_cover)) if bad_cover else
+                          "every column of the BG1-isolated wide band is "
+                          "painted exactly where the mapping says it should "
+                          "be: %d unpainted columns across %d bands, against "
+                          "%d in the authentic 4:3 band -- the anchoring "
+                          "opened no gap"
+                          % (total_gap, len(cover), nat_gap),
+                "skipped_lines": premise[:6],
+                "native_isolated_bmp": sides["native_layer"]["shots"][0],
+                "isolated_bmp": sides["wide_layer"]["shots"][0],
+                "bands": cover})
+            if bad_cover:
+                rep.find("hud_anchor_gap", "strong",
+                         "anchoring the HUD left columns unpainted that the "
+                         "mapping says should be painted: %s"
+                         % ",".join(bad_cover))
+
+        # (b) the mapping, in pixels, on the lines measured to be static
+        static = set(_static_lines(nat, 0, nh, M.NATIVE_WIDTH)) & \
+            set(_static_lines(wid, 0, wh, ww))
+        per_band, mismatched = {}, []
+        for sh in shapes:
+            if sh["kind"] != "anchor":
+                continue
+            lines = [y for y in range(sh["y0"], sh["y1"]) if y in static]
+            rigid_hits = rigid_miss = el_hits = el_miss = 0
+            examples = []
+            for y in lines:
+                for i, seg in enumerate(sh["segs"]):
+                    s0, s1, d0, d1 = seg
+                    for x in range(max(d0, -extra_l), min(d1, M.NATIVE_WIDTH + extra_r)):
+                        sx = _seg_src(seg, x)
+                        if not (0 <= sx < M.NATIVE_WIDTH):
+                            continue
+                        got = wrows[y][(x + extra_l) * 3:(x + extra_l) * 3 + 3]
+                        want = nrows[y][sx * 3:sx * 3 + 3]
+                        if i in sh["rigid"]:
+                            if got == want:
+                                rigid_hits += 1
+                            else:
+                                rigid_miss += 1
+                                if len(examples) < 8:
+                                    examples.append({"line": y, "seg": i,
+                                                     "dst": x, "src": sx,
+                                                     "wide": list(got),
+                                                     "native": list(want)})
+                        else:
+                            if got == want:
+                                el_hits += 1
+                            else:
+                                el_miss += 1
+                                if len(examples) < 8:
+                                    examples.append({"line": y, "seg": i,
+                                                     "dst": x, "src": sx,
+                                                     "wide": list(got),
+                                                     "native": list(want)})
+            per_band["slot%d" % sh["slot"]] = {
+                "layer": sh["layer"], "y0": sh["y0"], "y1": sh["y1"],
+                "static_lines": lines,
+                "rigid_columns_matched": rigid_hits,
+                "rigid_columns_mismatched": rigid_miss,
+                "elastic_columns_matched": el_hits,
+                "elastic_columns_mismatched": el_miss,
+                "examples": examples}
+            if lines and (rigid_miss or el_miss):
+                mismatched.append("slot%d y%d..%d (%d rigid, %d elastic)"
+                                  % (sh["slot"], sh["y0"], sh["y1"],
+                                     rigid_miss, el_miss))
+        checked = sum(v["rigid_columns_matched"] + v["elastic_columns_matched"]
+                      for v in per_band.values())
+        any_static = any(v["static_lines"] for v in per_band.values())
+        if not any_static:
+            rep.add("hud_pixels_anchored", {
+                "status": "SKIP",
+                "detail": "no HUD scanline was static across repeated samples "
+                          "of either process, so a cross-process pixel "
+                          "comparison would be measuring animation, not "
+                          "anchoring (this is a sampling scenario: the two "
+                          "sides sit at different guest frames)",
+                "bands": per_band})
+        else:
+            rep.add("hud_pixels_anchored", {
+                "status": "FAIL" if mismatched else "PASS",
+                "detail": ("the wide band does not match the 4:3 band remapped "
+                           "through the exported mapping: %s"
+                           % "; ".join(mismatched)) if mismatched else
+                          "%d columns across the static HUD scanlines equal "
+                          "the 4:3 frame remapped through the exported "
+                          "mapping, rigid groups byte-exact at the 16:9 edges"
+                          % checked,
+                "bands": per_band,
+                "native_bmp": sides["native"]["shots"][0],
+                "wide_bmp": sides["wide"]["shots"][0]})
+            if mismatched:
+                rep.find("hud_not_anchored", "strong",
+                         "the HUD band's pixels do not follow the exported "
+                         "elastic mapping: %s" % "; ".join(mismatched))
     else:
-        rep.add("hud_anchor_bg", {"status": "SKIP",
-                                  "detail": "--hud-json declares no 'bg' HUD"})
+        rep.add("elastic_bands_wellformed", {
+            "status": "SKIP", "detail": "--hud-json declares no 'bg' HUD"})
     rep.write()
     return 1 if rep.failed else 0
 

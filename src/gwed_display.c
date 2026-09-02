@@ -73,6 +73,14 @@ static bool GwedWsBg3Enabled(void)
     return GwedWsSwitch("SNESRECOMP_WS_BG3", "BG3 clamp policy", &s_state);
 }
 
+static bool GwedWsHudEnabled(void)
+{
+    static int s_state = -1;
+    return GwedWsSwitch("SNESRECOMP_WS_HUD",
+                        "HUD anchoring (falls back to a centred clamp)",
+                        &s_state);
+}
+
 /* SNESRECOMP_WS_BG2_MODE=wrap|mirror|clamp. wrap (default) leaves BG2 with no
  * policy at all: its map is 256 px wide and its scroll is pinned to 0, so the
  * hardware's own map wrap tiles the skyline into the margins seamlessly.
@@ -149,17 +157,91 @@ static uint16_t GwedWram16(uint32_t addr)
  * not known to be authored, so "let the map wrap" is only claimed for 0x7A. */
 #define GWED_BG2_SKYLINE_BGXSC 0x7Au
 
-/* HUD band: the raster IRQ pins BG1 to hScroll 0 / vScroll 440 for lines
- * 22..71 and restores vScroll on line 73, so line 72 still renders a HUD tile
- * row, at the arena's scroll. World bounds are meaningless on any of those
- * lines (their hScroll is not the camera), so BG1 is clamped across [22,73)
- * and the arena band gets the world policy everywhere else.
- * TODO(beads-8wg.9.13.3): recon B is to deliver these as measured constants
- * together with the HUD anchor split; until then they come from the
- * attract-fight per-line PPU journal (analysis/widescreen/recon/screens/
- * attract_fight/attract_fight_lines.json). */
-#define GWED_HUD_BAND_Y0 22u
-#define GWED_HUD_BAND_Y1 73u
+/* -- The fight HUD (recon B / R5, Beads beads-8wg.9.13.3) -----------------
+ *
+ * The raster IRQ pins BG1 to hScroll 0 / vScroll 440 for lines 22..71 and
+ * restores vScroll on line 73, so line 72 still renders a HUD tile row but at
+ * the arena's own scroll. World bounds are meaningless on any of those lines
+ * (their hScroll is not the camera), which is why the whole band is excluded
+ * from the world-mirror policy.
+ *
+ * Content is map rows 58-63 = lines 24..71. Lines 22-23 are the bottom two
+ * pixel rows of map row 57 - arena art in the fight, blank in the other two
+ * HUD scenes - drawn at the HUD's forced hScroll 0, so they are clamped, not
+ * remapped. Measured identically in attract_fight, ko_1p_win and
+ * victory_quote (analysis/widescreen/recon/hud.json).
+ *
+ * The bar is ONE continuous graphic: there is no fully transparent column
+ * anywhere in px 1..254 of rows 58-63. Anchoring alone would therefore open a
+ * 43 px transparent hole either side of the TIME pod, so each tile row gets an
+ * ELASTIC anchor band (WIDESCREEN_PATTERNS P2c): the rigid groups - frame
+ * caps, name plates, digits, the TIME label, the round-win markers - copy 1:1
+ * out to the 16:9 edges, and the margin is absorbed by material that can take
+ * it. The elastic runs below are spans whose pixel columns are IDENTICAL to
+ * one another in all three HUD scenes (so the stretch is exactly invisible),
+ * or a gauge interior (so the stretch is proportional and the fill fraction
+ * survives). All of them are tile-aligned, and all are mirror-symmetric about
+ * px 128 like the rest of the HUD. */
+#define GWED_HUD_BAND_Y0 22u   /* first line of the pinned-scroll band */
+#define GWED_HUD_BAND_Y1 73u   /* one past the last (line 72 = transitional) */
+/* Lines 22-23: leftover map row 57. Clamped. */
+#define GWED_HUD_LEADIN_Y1 24u
+/* Row 58, lines 24..31: name plates (px 16-79 / 176-239) anchored out, the
+ * TIME label (px 112-143) centred, and the plain chrome between them - map
+ * cols 11-13 and 18-20, three identical $0777 tiles each - stretched. */
+#define GWED_HUD_R58_Y0 24u
+#define GWED_HUD_R58_Y1 32u
+#define GWED_HUD_R58_LX0 88u
+#define GWED_HUD_R58_LX1 112u
+#define GWED_HUD_R58_RX0 144u
+#define GWED_HUD_R58_RX1 168u
+/* Row 59, lines 32..39: the health gauges. The whole bar interior is elastic,
+ * so the bar gets 43 px longer and keeps its fill fraction; the 8 px frame
+ * caps stay rigid at the edges and the TIME digits' pod (px 120-135) is the
+ * centre group. */
+#define GWED_HUD_R59_Y0 32u
+#define GWED_HUD_R59_Y1 40u
+#define GWED_HUD_R59_LX0 8u
+#define GWED_HUD_R59_LX1 120u
+#define GWED_HUD_R59_RX0 136u
+#define GWED_HUD_R59_RX1 248u
+/* Row 60, lines 40..47: the boost gauges, map cols 3-14 / 17-28. Narrower
+ * than row 59 because this row's outer 24 px carry shaped chrome, not bar. */
+#define GWED_HUD_R60_Y0 40u
+#define GWED_HUD_R60_Y1 48u
+#define GWED_HUD_R60_LX0 24u
+#define GWED_HUD_R60_LX1 120u
+#define GWED_HUD_R60_RX0 136u
+#define GWED_HUD_R60_RX1 232u
+/* Rows 61-63, lines 48..71: energy counters (px 8-55 / 200-247) and the
+ * round-win markers (px 88-119 / 136-167) are all rigid; the elastic run is
+ * ONE column of the flat chrome, px 62 and its mirror px 193.
+ *
+ * Deliberately one column and not the six (px 62-67) that recon measured as
+ * identical. Those six are only identical while nothing overlays them, and
+ * the combo counter does: during a multi-hit combo the game replaces the
+ * energy box with a wider "nn HIT" readout whose right cap, charge arrow and
+ * shoulder land exactly there, and a 6->49 px stretch of that magnifies each
+ * of the six columns into an 8 px block (measured on a BG1-isolated capture:
+ * the widened band came out as six 8-9 px steps instead of one flat run).
+ * A single source column can only ever be REPEATED, so the widened run is
+ * flat in every state: plain plate normally, and the readout box's own
+ * interior during a combo, which just makes the box longer. There is no
+ * multi-column run that is flat in both states -- measured, the combo state
+ * has no run wider than two anywhere in px 56..85. */
+#define GWED_HUD_R61_Y0 48u
+#define GWED_HUD_R61_Y1 72u
+#define GWED_HUD_R61_LX0 62u
+#define GWED_HUD_R61_LX1 63u
+#define GWED_HUD_R61_RX0 193u
+#define GWED_HUD_R61_RX1 194u
+/* Line 72: a HUD tile row drawn at the ARENA's hScroll, so none of the px
+ * constants above apply to it. An identity elastic band renders its authentic
+ * 256 columns and contributes nothing to the margins - a clamp, expressed in
+ * the same vocabulary, because PpuSetWidescreenLayerClampBand only holds one
+ * range per layer and lines 22-23 already own it. */
+#define GWED_HUD_TAIL_Y0 72u
+#define GWED_HUD_TAIL_Y1 73u
 /* The full visible picture. ppu_runLine() is called with 1..224 and the band
  * test is a half-open [y0,y1), so the end has to be 225. */
 #define GWED_PICTURE_Y0  0u
@@ -269,6 +351,77 @@ GwedWsScreen GwedDisplay_ResolveScreen(void)
     return GwedBg1IsArenaMap() ? kGwedWsScreen_World : kGwedWsScreen_Bounded;
 }
 
+/* The HUD band's per-line policy. Called only from the World branch, and only
+ * after PpuSetExtraSpace (which clears every layer policy).
+ *
+ * With SNESRECOMP_WS_HUD=0 this degrades to the previous behaviour: one clamp
+ * band over the whole band, i.e. the HUD stays native-centred inside the 16:9
+ * frame. That is also the fail-closed answer if the engine refuses a band -
+ * every setter is validated and every rejection is reported, so a bad constant
+ * can only ever cost us the anchoring, never tear a glyph. */
+static void GwedApplyHudPolicy(void)
+{
+    if (!GwedWsHudEnabled()) {
+        PpuSetWidescreenLayerClampBand(g_ppu, 0, (uint8_t)GWED_HUD_BAND_Y0,
+                                       (uint8_t)GWED_HUD_BAND_Y1);
+        return;
+    }
+
+    /* Lines 22-23 keep the clamp: they are the tail of an arena tile row and
+     * have no HUD layout to remap. */
+    PpuSetWidescreenLayerClampBand(g_ppu, 0, (uint8_t)GWED_HUD_BAND_Y0,
+                                   (uint8_t)GWED_HUD_LEADIN_Y1);
+
+    static const struct {
+        uint8_t y0, y1;
+        uint16_t lx0, lx1, rx0, rx1;
+        const char *name;
+    } kBands[] = {
+        { GWED_HUD_R58_Y0, GWED_HUD_R58_Y1, GWED_HUD_R58_LX0,
+          GWED_HUD_R58_LX1, GWED_HUD_R58_RX0, GWED_HUD_R58_RX1,
+          "row58 names + TIME label" },
+        { GWED_HUD_R59_Y0, GWED_HUD_R59_Y1, GWED_HUD_R59_LX0,
+          GWED_HUD_R59_LX1, GWED_HUD_R59_RX0, GWED_HUD_R59_RX1,
+          "row59 health gauges" },
+        { GWED_HUD_R60_Y0, GWED_HUD_R60_Y1, GWED_HUD_R60_LX0,
+          GWED_HUD_R60_LX1, GWED_HUD_R60_RX0, GWED_HUD_R60_RX1,
+          "row60 boost gauges" },
+        { GWED_HUD_R61_Y0, GWED_HUD_R61_Y1, GWED_HUD_R61_LX0,
+          GWED_HUD_R61_LX1, GWED_HUD_R61_RX0, GWED_HUD_R61_RX1,
+          "rows61-63 counters + win markers" },
+        /* Identity: no elastic run named, so the line clamps. */
+        { GWED_HUD_TAIL_Y0, GWED_HUD_TAIL_Y1, 0, 0, 0, 0,
+          "line72 transitional" },
+    };
+    enum { kBandCount = (int)(sizeof(kBands) / sizeof(kBands[0])) };
+    /* The engine rejects an out-of-range slot and this function then falls
+     * back to the clamp, so overflowing would be safe but silent. Fail at
+     * compile time instead, where whoever adds the sixth band will see it. */
+    _Static_assert(kBandCount <= kPpuWsElasticBands,
+                   "more HUD bands than the PPU has elastic band slots");
+
+    for (int i = 0; i < kBandCount; ++i) {
+        if (PpuSetWidescreenLayerElasticSplitBandSlot(
+                g_ppu, (uint8_t)i, 0, kBands[i].y0, kBands[i].y1,
+                kBands[i].lx0, kBands[i].lx1, kBands[i].rx0, kBands[i].rx1))
+            continue;
+        /* Fail closed and say so once: clamp the whole band instead. */
+        static bool s_warned;
+        if (!s_warned) {
+            s_warned = true;
+            fprintf(stderr, "[ws] HUD elastic band %d (%s) refused by the PPU "
+                            "- falling back to the centred clamp\n",
+                    i, kBands[i].name);
+        }
+        for (int j = 0; j < kBandCount; ++j)
+            PpuSetWidescreenLayerElasticSplitBandSlot(g_ppu, (uint8_t)j, 0,
+                                                      0, 0, 0, 0, 0, 0);
+        PpuSetWidescreenLayerClampBand(g_ppu, 0, (uint8_t)GWED_HUD_BAND_Y0,
+                                       (uint8_t)GWED_HUD_BAND_Y1);
+        return;
+    }
+}
+
 void GwedDisplay_PreparePpuFrame(void)
 {
     if (!g_ppu || !s_render_pixels)
@@ -318,8 +471,7 @@ void GwedDisplay_PreparePpuFrame(void)
             PpuSetWidescreenLayerWorldMirrorBand(
                 g_ppu, 0, (uint8_t)GWED_PICTURE_Y0, (uint8_t)GWED_PICTURE_Y1,
                 GWED_ARENA_WORLD_LEFT, GWED_ARENA_WORLD_RIGHT);
-        PpuSetWidescreenLayerClampBand(g_ppu, 0, (uint8_t)GWED_HUD_BAND_Y0,
-                                       (uint8_t)GWED_HUD_BAND_Y1);
+        GwedApplyHudPolicy();
 
         /* BG2 - the skyline. 256 px wide with its scroll pinned to 0, so the
          * hardware's own map wrap already tiles it into the margins and the
