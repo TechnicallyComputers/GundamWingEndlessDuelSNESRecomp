@@ -9,6 +9,7 @@ Three programs, one shared measurement module:
 | `ws_metrics.py`  | shared measurement library: process control, the WRAM gate, BMP metrics, seam detector, OAM decode, report writer |
 | `ws_recon.py`, `recon_*.py` | the **recon** library and probes — Beads `beads-8wg.9.13.2`, a different agent's files |
 | `p16_gate.py` | the P16 baseline-vs-candidate gate — Beads `beads-8wg.9.13.1` |
+| `hud_pngs.py` | HUD renders for eyeball review (not a verdict) — Beads `beads-8wg.9.13.5` |
 
 Recon answers *what does the game do*.  The verdicts answer *is the widescreen
 presentation correct*, and every answer is a measurement with an evidence path.
@@ -248,6 +249,93 @@ UNVERIFIED (`attract_fight` then parks on the recon-recorded anchor frame
 3286 instead of polling).
 
 ---
+
+## `hud-anchor`: what it asserts, and what it stopped asserting
+
+`hud_anchor_bg` used to assert that the HUD layer's hardware **window** edges
+expand past x=256.  On GWED that can never pass and never could: BG1's window
+clipping is *disabled* inside the HUD band (measured — `ppu_window 40 0`
+replies `valid:false`), and a BG HUD does not need a window to be anchored.
+The window state is still recorded, under `hud_bg_windows`, as evidence; it is
+no longer a verdict.
+
+What replaced it, once `beads-8wg.2.25`'s elastic anchor band landed, is four
+checks against the engine's **own exported mapping**
+(`get_ppu_state.widescreen.elasticBands`, a list of
+`[srcX0, srcX1, dstX0, dstX1]` quads per configured band):
+
+| check | assertion |
+|---|---|
+| `elastic_bands_wellformed` | every configured band is a valid anchor band *on its own terms*: ascending and non-overlapping in destination space with **no hole** (a hole is a transparent gap, the defect the band exists to close), sources inside the native 256, first destination `-extraLeft` and last `256+extraRight`, widths growing by exactly `extraLeft+extraRight`, outermost segments rigid and shifted by exactly the margin, at least one rigid unshifted segment (something stays centred) and at least one elastic one (something absorbs).  Or the identity band `{0,256,0,256}`, i.e. a clamp. |
+| `hud_lines_covered` | every scanline `--hud-json`'s `bg[]` declares to be HUD is governed by one of those bands. |
+| `hud_no_transparent_gap` | on a **BG1-isolated** wide capture, each band's painted *columns* are exactly the columns the mapping predicts from a BG1-isolated 4:3 capture. |
+| `hud_pixels_anchored` | on the scanlines measured to be static, the wide band equals the 4:3 band remapped through the exported mapping — rigid groups byte-exact at the 16:9 edges. |
+
+Three measurement traps this check had to be walked through, all of them
+recorded because each one produced a confident wrong answer first:
+
+* **Blankness is per-column-over-the-band, not per-scanline.**  Measuring a
+  scanline against its own modal colour calls the *chrome* the backdrop (253
+  of 342 columns read "blank" on line 24), and the authentic band really does
+  have dozens of transparent pixels per scanline (63 interior ones on line 24)
+  even though every column in px 1..254 is painted by *some* line.  Coverage
+  is therefore accumulated down the band, which is also the unit recon
+  measured.
+* **The unpainted colour is identified within each frame.**  The 4:3 and wide
+  sides are separate processes at different guest frames, and GWED's arena
+  paints its backdrop per scanline through HDMA, so requiring the two to agree
+  on a colour only measures whether the gradient moved (it had, on every band
+  line).  Each frame's own two outer columns — the ones the authentic HUD
+  leaves empty — supply its reference, and they must agree with each other or
+  the line is skipped.
+* **The pixel comparison only runs on scanlines measured to be static.**
+  `attract_fight` is a sampling scenario; two samples are taken per side and a
+  line is compared only if it is byte-identical across both on both sides.
+  Gauge rows animate and drop out; the name-plate row does not.
+
+Verified discriminating: with `SNESRECOMP_WS_HUD=0` (the centred-clamp
+fallback) `elastic_bands_wellformed` and `hud_lines_covered` both FAIL and the
+other two SKIP rather than passing vacuously.
+
+## `center-parity` and the HUD band
+
+`center_parity_byte_exact` asserts the wide frame's centred 256 columns are
+byte-identical to the 4:3 frame.  **That is no longer true on HUD scanlines**
+once a World fight screen is inside the compared window: anchoring moves the
+HUD's rigid groups outward by the margin, so on lines 24..71 a centre crop of
+the wide frame holds different source columns than the 4:3 frame does.  This
+is the feature working, not a defect.
+
+`boot_attract:900` does not reach one — the attract fight arrives around frame
+3286, and every screen before it is Bounded (pillarboxed), where the centre
+crop *is* the 4:3 frame — which is why the check still PASSes 60/60 frames
+after the HUD change.  Any future centre-parity scenario that does include a
+fight screen must either exclude lines 24..72 or apply the exported elastic
+mapping before comparing; do not "fix" it by relaxing the byte-exactness,
+which is what makes the check worth anything on the Bounded screens.
+
+## `hud_pngs.py` — renders for eyeball review
+
+Not a verdict: it captures the three HUD scenes (attract fight, KO / "1P WIN",
+victory quote) in both frames and writes PNGs at 3x with the 7:6 CRT pixel
+aspect, plus a 6x strip of the HUD band alone.  `--isolate` adds BG1-isolated
+captures, which is where the *layer's* own stretch is judged with none of the
+arena behind it.
+
+```powershell
+& $py hud_pngs.py --build <dir> --rom <rom> `
+    --states-dir F:\Projects\snesrecomp\GundamWingEndlessDuelSNESRecomp\tools\validation_states `
+    --out <out> --port 4478 --isolate
+```
+
+The two frozen HUD screens are reached by savestate **plus a WRAM gate**, not
+by a frame count.  Recon's `pre_stage_ending_dialogue + 400 frames` now lands
+on the per-pilot epilogue art, and gating on the mode words alone lands on the
+blanked inter-stage transition (a black capture).  The gate is mode `0x0010` /
+sub-mode `0x001E`, BG1 configured for the arena tilemap, `inidisp` not
+force-blank, **and** BG1 tilemap row 58 columns 14..17 holding the four tiles
+that spell `TIME` (map word `0x734E`, byte `0xE69C`) — emulated VRAM, never a
+rendered pixel.
 
 ## `--hud-json`
 
