@@ -714,25 +714,60 @@ def obj_size_for(obsel: int, big: bool):
 
 
 def signed_x_interpretations(raw_x: int, ws_extra: int = DEFAULT_WS_EXTRA):
-    """The two readings of a 9-bit OAM X, both reported, neither assumed.
+    """The readings of a 9-bit OAM X: the hardware one, and the engine's.
 
-    A 9-bit X is 0..511 and the SNES treats >=256 as negative (x-512): that is
-    how a sprite walks off the LEFT edge.  A widescreen host that publishes
-    `PpuWsSetOamLeftHints/RightHints` instead asks the PPU to read raw X in
-    [256, 256+extra) as a sprite in the RIGHT margin.  The two readings
-    disagree for exactly that window, so the harness records both and never
-    silently picks one.
+    A 9-bit X is 0..511 and hardware treats >=256 as negative (x-512): that is
+    how a sprite walks off the LEFT edge.  The engine's widescreen decode
+    (`runner/src/snes/ppu.c PpuDecodeOamX`) moves that wrap threshold OUT with
+    the margin -- `raw >= 256 + extraRightCur` wraps, everything below stays
+    positive -- so raw X in [256, 256+extra) renders in the RIGHT margin
+    whether or not the game publishes `PpuWsSetOamRightHints`.  Hints only
+    make that band STRICT (opt-in per slot); without them the positive
+    reading is what the PPU actually uses.
+
+    `engine` is therefore the reading a pixel check must position by, and
+    `signed` is kept beside it because it is the reading a 4:3 build (or a
+    hint-strict slot that was not marked) would use.  Both are reported and
+    `ambiguous` still flags the window where they disagree -- a game whose
+    accepted X range makes the two bands overlap needs the hints.
     """
     ambiguous = 256 <= raw_x < 256 + ws_extra
     return {"raw_x": raw_x,
             "signed": raw_x - 512 if raw_x >= 256 else raw_x,
+            "engine": raw_x - 512 if raw_x >= 256 + ws_extra else raw_x,
             "right_margin_hint": raw_x if ambiguous else None,
             "ambiguous": ambiguous}
 
 
+def row_backdrops(rows, width: int) -> list:
+    """Per-scanline modal colour.
+
+    A frame-wide "dominant backdrop" assumes the backdrop is ONE colour.  That
+    is false for any title whose backdrop is an HDMA gradient: GWED's arena
+    paints a different fixed colour on every scanline, so an OBJ-isolated
+    capture measures ~85% "non-backdrop" against the frame mode and every ink
+    test becomes meaningless.  The backdrop is constant ALONG a scanline
+    though, so the row's own mode is the right reference -- sprites cover a
+    small share of any single row in an OBJ-isolated frame, which is what
+    makes the mode the backdrop and not the sprite.
+    """
+    out = []
+    for row in rows:
+        hist = Counter()
+        for x in range(width):
+            hist[row[x * 3:x * 3 + 3]] += 1
+        out.append(hist.most_common(1)[0][0])
+    return out
+
+
 def rect_has_ink(rows, width: int, height: int, x0: int, y0: int, w: int,
-                 h: int, backdrop: bytes) -> dict:
-    """Non-backdrop pixel count inside a sprite rect, clipped to the frame."""
+                 h: int, backdrop: bytes, backdrop_rows: list = None) -> dict:
+    """Non-backdrop pixel count inside a sprite rect, clipped to the frame.
+
+    `backdrop_rows` (from row_backdrops) takes precedence over the single
+    `backdrop` colour when supplied -- see row_backdrops for why a frame-wide
+    backdrop is the wrong reference on a per-line gradient.
+    """
     xa, xb = max(0, x0), min(width, x0 + w)
     ya, yb = max(0, y0), min(height, y0 + h)
     if xb <= xa or yb <= ya:
@@ -740,12 +775,14 @@ def rect_has_ink(rows, width: int, height: int, x0: int, y0: int, w: int,
     ink = 0
     for y in range(ya, yb):
         row = rows[y]
+        ref = backdrop_rows[y] if backdrop_rows else backdrop
         for x in range(xa, xb):
-            if row[x * 3:x * 3 + 3] != backdrop:
+            if row[x * 3:x * 3 + 3] != ref:
                 ink += 1
     n = (xb - xa) * (yb - ya)
     return {"clipped_out": False, "bounds": [xa, ya, xb, yb], "pixels": n,
-            "ink": ink, "ink_fraction": ink / n if n else 0.0}
+            "ink": ink, "ink_fraction": ink / n if n else 0.0,
+            "backdrop_reference": "per_row" if backdrop_rows else "frame"}
 
 
 # ── reporting ───────────────────────────────────────────────────────────────
