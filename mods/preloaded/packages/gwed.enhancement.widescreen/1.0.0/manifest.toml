@@ -1,0 +1,24 @@
+format_version = 1
+id = "gwed.enhancement.widescreen"
+version = "1.0.0"
+name = "Gundam Wing Endless Duel Widescreen"
+author = "mstan"
+description = "Presents the game in 16:9 by widening the rendered field to 342x224 (one third more horizontal area at the CRT 7:6 pixel aspect). Presentation only: the guest CPU, WRAM, OAM and save states are untouched, so 4:3 play is bit-identical with this off and two netplay peers stay in sync whichever view each of them chose. Screens with no authored art past the native 256 columns are pillarboxed rather than stretched, so text is never distorted or sliced."
+license = "MIT"
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "gwed-jp"
+rom_sha256 = "dd94308d822636c6ddf73c5e2644c84f2eb8fb4d9201150fc5f37d44d6f423f1"
+
+[[feature]]
+id = "widescreen"
+name = "Widescreen (16:9)"
+description = "Extend the view to 16:9. Off restores the authentic 4:3 frame."
+group = "Display"
+default_enabled = false
+
+[[plugin]]
+feature = "widescreen"
+id = "gwed.widescreen"
