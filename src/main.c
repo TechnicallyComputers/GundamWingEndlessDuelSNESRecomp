@@ -31,6 +31,7 @@
 #include "widescreen.h"
 #include "game_rtl.h"
 #include "gwed_display.h"
+#include "gwed_ws_patch.h"   /* P8 guarded in-memory ROM patch (sprite bounds) */
 #include "snes/ppu.h"
 #include "snes/snes.h"       /* snes_free on session reboot */
 #include "debug_server.h"
@@ -73,7 +74,78 @@
 static SnesNetplayConfig g_netplay_cfg;
 static int g_netplay_pending;    /* launcher armed a session; start after SnesInit */
 static int g_netplay_from_lobby; /* admit pump waits for the lobby peer */
+/* Negotiated host margin from SnesLobbyMatchCaps: -1 = no caps blob received
+ * (a legacy peer), 0 = peer is running 4:3, else the peer's per-side margin.
+ * Only the P8 sprite-bounds ROM patch consults it — the wide presentation
+ * itself needs no agreement (see GwedFillMatchCaps). */
+static int g_netplay_caps_ws_extra = -1;
+/* 1 once snes_netplay_start has succeeded for this session. Distinguishes
+ * "a peer is simulating alongside us" from "offline", which is the only
+ * thing the P8 patch's agreement gate needs to know. */
+static int g_netplay_active_session;
 
+/* Defined below (the [Video] section reader). Declared here because the caps
+ * callback runs inside the launcher, before the session has been configured,
+ * so it must read the ini rather than the display module's live state. */
+static int game_config_int(const char *section, const char *key, int fallback);
+
+/* ── Match caps (MetalWarriorsSNESRecomp/src/main.c MwFillMatchCaps) ──────
+ *
+ * The lobby host fills this once and the server hands the blob to every
+ * guest, so both peers boot from ONE settlement instead of each reading its
+ * own local settings. Two very different things ride in here:
+ *
+ *   widescreen / widescreen_hud / ignore_aspect  — presentation. The PPU
+ *     widescreen fields sit outside `ppu_saveload`, so peers looking at
+ *     different aspect ratios are still digest-equal; these are published so
+ *     the room can *show* what the match will look like, not because the
+ *     simulation depends on them.
+ *   ws_extra — the one that matters. It is the agreement token for the P8
+ *     sprite-bounds ROM patch, which DOES change guest WRAM (the OAM staging
+ *     buffer at $7E:0D00). A guest whose own margin differs from the host's
+ *     leaves that patch disarmed, keeping the wide backgrounds and HUD and
+ *     falling back to native sprite bounds. Publishing our own pinned margin
+ *     rather than a constant is deliberate: with the Mods package off this
+ *     reports 0, which is exactly the "do not patch" signal a 4:3 host should
+ *     send.
+ *
+ * input_delay is deliberately left as default_caps filled it — that is the
+ * lobby waiting room's own setting and not ours to overwrite. */
+static void GwedFillMatchCaps(void *ctx, const void *settings_v,
+                              SnesLobbyMatchCaps *out)
+{
+    int ws_extra;
+    (void)ctx;
+    /* `settings_v` is recomp-ui's RecompLauncherCSettings. MetalWarriors
+     * reads settings->ignore_aspect out of it; this title cannot, because
+     * recomp-ui does not draw the ignore-aspect / integer-scale controls for
+     * SNES and gi.widescreen_supported is 0 here, so that field is never
+     * anything but its default. config.ini [Video] IgnoreAspect is this
+     * game's real authority (see GwedDisplay_SetPresentation, which is
+     * configured from the same key AFTER this callback has already run), and
+     * reading the ini directly also keeps this callback free of the
+     * RECOMP_LAUNCHER-only header. */
+    (void)settings_v;
+    if (!out)
+        return;
+    /* The width is pinned per session (GwedDisplay_BeginSession); before the
+     * first session it is 256, so derive from what the Mods package asked for
+     * and the same SNESRECOMP_WS_EXTRA override the session will use. That
+     * makes the room's published caps and the booted session agree. */
+    ws_extra = (GwedDisplay_ComputeFrameWidth(
+                    GwedDisplay_IsWidescreenEnabled()) - 256) / 2;
+    out->valid = 1;
+    out->widescreen = ws_extra > 0;
+    /* The HUD anchoring rides the same presentation policy as the margins;
+     * there is no separate switch for it in this title. */
+    out->widescreen_hud = ws_extra > 0;
+    out->ignore_aspect = game_config_int("[Video]", "IgnoreAspect", 0) != 0;
+    out->ws_extra = ws_extra;
+    fprintf(stderr, "netplay: publishing match caps widescreen=%d hud=%d "
+                    "ws_extra=%d ignore_aspect=%d\n",
+            out->widescreen, out->widescreen_hud, out->ws_extra,
+            out->ignore_aspect);
+}
 
 static void host_lobby_ensure_init(void)
 {
@@ -90,7 +162,7 @@ static void host_lobby_ensure_init(void)
     id.default_lobby_name = "Netplay Lobby";
     memset(&opts, 0, sizeof(opts));
     opts.rematch_set_ready = 1;
-    /* fill_match_caps NULL → input delay 2, no widescreen caps exchange. */
+    opts.fill_match_caps = &GwedFillMatchCaps;
     if (snes_host_lobby_init(&id, &opts) != 0)
         fprintf(stderr, "netplay: snes_host_lobby_init failed\n");
 }
@@ -959,10 +1031,17 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
         g_netplay_cfg = res.net_cfg;
         g_netplay_pending = 1;
         g_netplay_from_lobby = 1;
+        /* The host's settled margin. -1 means the peer published no caps blob
+         * at all, which the P8 patch treats as disagreement (fail closed).
+         * Captured here and not read again later because a rematch comes back
+         * through this same function with a fresh launch result. */
+        g_netplay_caps_ws_extra = res.caps_ws_extra;
         fprintf(stderr,
-                "netplay: lobby launch slot=%d bind=%s peer=%s delay=%d\n",
+                "netplay: lobby launch slot=%d bind=%s peer=%s delay=%d "
+                "caps_ws_extra=%d\n",
                 ls.netplay_launch.local_slot, ls.netplay_launch.bind_hostport,
-                ls.netplay_launch.peer_hostport, ls.netplay_launch.input_delay);
+                ls.netplay_launch.peer_hostport, ls.netplay_launch.input_delay,
+                g_netplay_caps_ws_extra);
     }
 #endif
     /* Persist toggled Display boxes before the game reads config.ini below
@@ -1378,6 +1457,9 @@ session_reboot:
                              kPpuRenderFlags_NewRenderer);
     start_debug_server();
 #if defined(SNES_HAS_LOBBY_CLIENT)
+    /* Re-resolved every session: a rematch that comes back offline must not
+     * inherit the previous match's "a peer is watching" state. */
+    g_netplay_active_session = 0;
     if (!g_netplay_pending) {
         /* Headless / scripted direct connect: SNES_NETPLAY=1 with
          * SNES_NET_SLOT / SNES_NET_BIND / SNES_NET_PEER (see
@@ -1398,9 +1480,33 @@ session_reboot:
             fprintf(stderr,
                     "netplay: snes_netplay_start failed (%d) — continuing "
                     "offline\n", nrc);
+        else
+            g_netplay_active_session = 1;
         g_netplay_pending = 0;
     }
+    GwedWsPatch_SetNetplaySession(g_netplay_active_session,
+                                  g_netplay_caps_ws_extra);
 #endif
+
+    /* ── Arm the guest-side sprite-bounds patch (P8) ─────────────────────
+     *
+     * This is the ONE part of the widescreen feature that is not
+     * presentation-only, so its placement is load-bearing and it is here
+     * rather than inside GwedDisplay_BeginSession for two reasons:
+     *
+     *   - it must be AFTER SnesInit, because the cart's private ROM image is
+     *     malloc'd and memcpy'd there (snes_loadRom); patching before it
+     *     would write a dying session's image, and
+     *   - it must be AFTER the netplay resolution above, because the
+     *     agreement token only exists once the session (lobby launch OR the
+     *     SNES_NETPLAY env path) is settled.
+     *
+     * A rematch re-enters at session_reboot and therefore re-arms against
+     * the fresh image with the new match's caps, which is why the module's
+     * bookkeeping never caches a ROM pointer. GwedWsPatch_Arm itself refuses
+     * unless g_ws_active, so a 4:3 run cannot reach the guest at all — that
+     * is P16 by construction rather than by discipline. */
+    GwedWsPatch_Arm(g_ws_extra);
 
     /* snesrecomp_sdl_* wrap the SDL2/SDL3 API differences, so this host
      * builds against either backend (-DSNESRECOMP_SDL_BACKEND=SDL2|SDL3). */

@@ -11,6 +11,7 @@
  */
 
 #include "gwed_display.h"
+#include "gwed_ws_patch.h"
 #include "mod_runtime.h"
 
 #define GWED_WIDESCREEN_PACKAGE "gwed.enhancement.widescreen"
@@ -23,6 +24,17 @@
 static void gwed_widescreen_reset(void)
 {
     GwedDisplay_SetWidescreenEnabled(false);
+    /* Drop the guest-side sprite-bounds patch with the feature.
+     *
+     * The mod runtime runs reset callbacks at the top of every session's
+     * activation pass, i.e. after SnesInit has already replaced the cart's
+     * ROM image, so by the time this fires the bytes are pristine again and
+     * the real work here is clearing the bookkeeping so the next
+     * GwedWsPatch_Arm re-applies from scratch. Disarm is written to tolerate
+     * exactly that (it restores only bytes it still recognises as its own),
+     * because the alternative — trusting a stale pointer into a freed cart —
+     * is a use-after-free on every rematch. */
+    GwedWsPatch_Disarm();
 }
 
 static void gwed_widescreen_activate(void)

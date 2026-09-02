@@ -839,23 +839,29 @@ def cmd_sprite_nocull(args, gate) -> int:
         backdrop = bytes.fromhex(metrics["dominant_backdrop_rgb"])
         s["backdrop_rgb"] = metrics["dominant_backdrop_rgb"]
         s["margin_metrics"] = metrics["regions"]
+        # Per-scanline backdrop: this title's arena backdrop is an HDMA
+        # gradient, so the frame-wide mode calls ~85% of an OBJ-isolated
+        # capture "ink" and the test decides nothing. See M.row_backdrops.
+        row_bd = M.row_backdrops(rows, w)
         for slot in s["oam"]["slots"]:
             interp = M.signed_x_interpretations(slot["raw_x"], args.ws_extra)
             histogram[interp["signed"]] = histogram.get(interp["signed"], 0) + 1
-            sx = interp["signed"]
+            # Position by the reading the PPU ACTUALLY uses at this margin
+            # (PpuDecodeOamX wraps at 256+extra, not at 256), or the sprite
+            # the emitter just started emitting gets looked for 512 px away
+            # and scored as "in the margin but blank".
+            sx = interp["engine"]
             in_left = -args.ws_extra <= sx < 0
             in_right = M.NATIVE_WIDTH <= sx < M.NATIVE_WIDTH + args.ws_extra
-            # The right-margin window is exactly where the two X readings
-            # disagree, so it is flagged under the hint reading too.
-            in_right_hint = interp["ambiguous"]
-            if not (in_left or in_right or in_right_hint):
+            if not (in_left or in_right):
                 continue
             if not (0 <= slot["y"] < M.FRAME_HEIGHT):
                 continue
             sw, sh = M.obj_size_for(obsel, slot["big"])
             # Frame coordinates: native X 0 sits at framebuffer column extra.
             fx = args.ws_extra + sx
-            ink = M.rect_has_ink(rows, w, h, fx, slot["y"], sw, sh, backdrop)
+            ink = M.rect_has_ink(rows, w, h, fx, slot["y"], sw, sh, backdrop,
+                                 backdrop_rows=row_bd)
             candidates.append({
                 "frame": s["frame"], "slot": slot["slot"], "y": slot["y"],
                 "tile": slot["tile"], "size": [sw, sh],

@@ -54,7 +54,8 @@ mis-measuring:
 & $py ws_verdicts.py text-letterbox --scenario state:pre_title --frames 60 --port 4482
 
 # (e) sprites in the margins both exist in OAM and draw pixels
-& $py ws_verdicts.py sprite-nocull  --scenario attract_fight --port 4486
+& $py ws_verdicts.py sprite-nocull  --scenario attract_fight --port 4486 `
+      --expect-margin-object expect_margin_attract_fight.json
 ```
 
 Each prints `PASS|FAIL|SKIP <check> <scenario>` lines and writes
@@ -123,6 +124,38 @@ must not share a build directory at the same time — give the second one its
 own copy of the exe directory (`ws_metrics.stage_build`, or
 `Copy-Item src\dir\* dst\dir\` — never `Copy-Item src\dir dst\dir`, which
 nests).
+
+---
+
+## `sprite-nocull` and the two ways it used to mis-measure
+
+Both were found while landing the P8 emitter patch (`beads-8wg.9.13.6`), and
+both made the check report a defect that was not there:
+
+* **The X decode.** A 9-bit OAM X of 256..298 is a *right-margin* sprite to
+  this engine, not an off-screen-left one: `ppu.c PpuDecodeOamX` wraps at
+  `256 + extraRightCur`, so the wrap threshold moves out with the margin and
+  the positive reading applies whether or not the game publishes
+  `PpuWsSetOamRightHints` (hints only make that band strict, per slot).  The
+  check used the hardware reading, looked for the sprite 512 px away, and
+  scored it "in the margin but blank".  `ws_metrics.signed_x_interpretations`
+  now reports `engine` beside `signed`, and the pixel test positions by
+  `engine`.
+* **The backdrop.** `margin_metrics` measures against one frame-wide dominant
+  colour, which is right for a flat backdrop and wrong for this title: the
+  arena's backdrop is an HDMA gradient with a different colour on every
+  scanline, so an OBJ-isolated capture measures ~85% "non-backdrop" and the
+  ink test decides nothing.  The backdrop *is* constant along a scanline, so
+  `ws_metrics.row_backdrops` takes the per-row mode and `rect_has_ink` accepts
+  it via `backdrop_rows=`.
+
+`--expect-margin-object expect_margin_attract_fight.json` declares what must
+appear (`[{"margin": "right"}]` — the attract demo drives a fighter past the
+right edge, measured in recon R6).  Without a declaration stage 1 can only
+SKIP, because an empty margin and a scene with nothing in it look identical.
+The control that proves the check is not vacuous is
+`SNESRECOMP_WS_OAM=0`: the same command then FAILs stage 1, because the
+vanilla emitter rejects every sprite past 255.
 
 ---
 
