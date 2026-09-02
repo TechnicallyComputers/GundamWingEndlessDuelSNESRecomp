@@ -36,7 +36,11 @@
 #include "snes_savestate_menu.h" /* Select+R / F7 save-state overlay */
 #include "cpu_trace.h"
 #include "desktop/sdl_compat.h"
-#include "host_paths.h"      /* snesrecomp_exe_dir_path */
+#include "host_paths.h"
+#include "snes_text_xlate.h"
+#if defined(SNESRECOMP_NET_ROLLBACK)
+#include "netplay/snes_netplay_rb.h"
+#endif      /* snesrecomp_exe_dir_path */
 #include "launcher.h"        /* snesrecomp_launcher_resolve_rom_sha256 */
 #include "launcher_cache.h"  /* snesrecomp_rom_cache_read */
 #include "codegen_setup.h"   /* kGameCodegenIdentity - the ROM digests */
@@ -1083,6 +1087,55 @@ static void game_savestate_menu_loop(SDL_Renderer *renderer,
     }
 }
 
+#ifndef GWED_BUILD_ID
+#define GWED_BUILD_ID "unknown"
+#endif
+
+/*
+ * Tell the peer what we are before the match starts.
+ *
+ * A real session desynced mid-fight and answering "were they the same build?"
+ * meant comparing two logs that recorded no version at all, and then guessing.
+ * Two fingerprints go on the wire and into the log:
+ *
+ *   build   — the game repo's git describe, which pins the snesrecomp
+ *             submodule, so one value covers the whole tree. NOT a hash of the
+ *             binary: identical source gives different bytes on Linux and
+ *             Windows, and every cross-platform match would cry mismatch.
+ *   content — the active localization. That mod patches ROM text, RAM and VRAM
+ *             IN GUEST MEMORY, so two peers on different languages genuinely
+ *             cannot simulate alike. It is a real divergence source, whatever
+ *             else may also be one.
+ *
+ * Both are logged whether or not netplay is running, because the question
+ * "what was this build?" is asked of single-player logs too.
+ */
+static uint32_t gwed_fnv1a(const char *s)
+{
+    uint32_t h = 2166136261u;
+    for (; s && *s; ++s) {
+        h ^= (uint32_t)(unsigned char)*s;
+        h *= 16777619u;
+    }
+    return h;
+}
+
+static void gwed_publish_identity(void)
+{
+    char content[96];
+    uint32_t build_fp, content_fp;
+
+    snes_text_xlate_identity_c(content, sizeof(content));
+    build_fp = gwed_fnv1a(GWED_BUILD_ID);
+    content_fp = gwed_fnv1a(content);
+
+    fprintf(stderr, "game: build %s (fp=%08x), content %s (fp=%08x)\n",
+            GWED_BUILD_ID, (unsigned)build_fp, content, (unsigned)content_fp);
+#if defined(SNESRECOMP_NET_ROLLBACK)
+    snes_netplay_rb_set_identity(build_fp, content_fp);
+#endif
+}
+
 int main(int argc, char **argv)
 {
     char rom_path[1024] = "";
@@ -1261,7 +1314,9 @@ session_reboot:
         }
     }
     if (g_netplay_pending) {
-        int nrc = snes_netplay_start(&g_netplay_cfg);
+        int nrc;
+        gwed_publish_identity();
+        nrc = snes_netplay_start(&g_netplay_cfg);
         if (nrc != 0)
             fprintf(stderr,
                     "netplay: snes_netplay_start failed (%d) — continuing "

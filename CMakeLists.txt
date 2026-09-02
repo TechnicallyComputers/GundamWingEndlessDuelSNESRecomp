@@ -70,7 +70,28 @@ target_include_directories(GundamWingEndlessDuelSNESRecomp PRIVATE
     ${CMAKE_SOURCE_DIR}/recomp
 )
 target_link_libraries(GundamWingEndlessDuelSNESRecomp PRIVATE ${SNESRECOMP_RUNNER_LIBRARIES})
+# Build identity. Two peers that are not running the same build will diverge,
+# and until now neither the log nor the wire carried anything that could say
+# so: a real match desynced mid-fight and establishing "same build?" took
+# forensic comparison of two logs that recorded no version at all.
+#
+# The game repo's SHA is the right identifier because it pins the snesrecomp
+# submodule, so one value covers both. Deliberately NOT a hash of the binary:
+# the same source produces different bytes on Linux and Windows, which would
+# report a mismatch on every cross-platform match -- the case this exists to
+# serve.
+execute_process(
+  COMMAND git -C "${CMAKE_CURRENT_SOURCE_DIR}" describe --always --dirty --abbrev=12
+  OUTPUT_VARIABLE GWED_BUILD_ID
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_QUIET)
+if(NOT GWED_BUILD_ID)
+  set(GWED_BUILD_ID "unknown")
+endif()
+message(STATUS "Build identity: ${GWED_BUILD_ID}")
+
 target_compile_definitions(GundamWingEndlessDuelSNESRecomp PRIVATE
+    GWED_BUILD_ID="${GWED_BUILD_ID}"
     SNES_GAME_VERSION="${SNESRECOMP_BUILD_VERSION}"
     SNES_GAME_TITLE="Gundam Wing Endless Duel"
 )
