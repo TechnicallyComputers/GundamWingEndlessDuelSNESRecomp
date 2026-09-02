@@ -96,6 +96,7 @@ BIOS/ROM/save plumbing so you are not stuck repeating each game’s wizard by ha
 | `snesrecomp/` | Framework submodule (owns `lib/recomp-net`, `lib/retcomm-rbengine`) |
 | `translations/` | Runtime localization tables and Endless Duel-specific source data |
 | `docs/TRANSLATION_TILEMAP_REFERENCE.md` | Reference workflow for runtime translations, tilemaps, and visual QA |
+| `docs/WIDESCREEN.md` | Opt-in 16:9 (342x224): architecture, P1-P16 status with measurements, validation harness |
 | `tools/` | `regen.sh` — the ROM → C pipeline |
 | `scripts/` | `package_release.sh` — player-facing zip |
 | `framework_pins.txt` | Exact framework commits this project was scaffolded against |
