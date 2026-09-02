@@ -25,6 +25,8 @@
 
 #include "game_rtl.h"
 
+#include "gwed_ws_patch.h"   /* P8 sprite-bounds ROM patch: drop it per session */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -610,6 +612,15 @@ void GameSessionReset(void)
     memset(s_scanout_high_oam, 0, sizeof(s_scanout_high_oam));
     memset(s_scanout_cgram, 0, sizeof(s_scanout_cgram));
     memset(g_q22_at_nmi, 0, sizeof(g_q22_at_nmi));
+    /* Guest-side widescreen patches are per-session state too. The mod
+     * runtime's reset callback (src/widescreen_mod.c) also disarms, but that
+     * only runs when the Mods runtime is compiled in and reached; this makes
+     * "no session boundary leaves the patch table thinking it is armed" an
+     * invariant of the session teardown itself. Disarm, never arm, belongs
+     * here: this hook runs BEFORE SnesInit, so the cart image it would write
+     * is the retired machine's, not the one about to boot. Arming happens in
+     * main.c once the fresh image and the netplay caps both exist. */
+    GwedWsPatch_Disarm();
     /* Self-reporting: a rematch that boots correctly prints this immediately
      * before its SnesInit. Its ABSENCE in a black-screen rematch log is the
      * diagnosis — the hook was not reached, so the guest resumed a dead

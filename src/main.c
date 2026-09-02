@@ -30,9 +30,12 @@
 #include "common_cpu_infra.h"
 #include "widescreen.h"
 #include "game_rtl.h"
+#include "gwed_display.h"
+#include "gwed_ws_patch.h"   /* P8 guarded in-memory ROM patch (sprite bounds) */
 #include "snes/ppu.h"
 #include "snes/snes.h"       /* snes_free on session reboot */
 #include "debug_server.h"
+#include "framedump.h"       /* --framedump: per-frame WRAM + crc32 sidecars */
 #include "snes_savestate_menu.h" /* Select+R / F7 save-state overlay */
 #include "cpu_trace.h"
 #include "desktop/sdl_compat.h"
@@ -71,7 +74,78 @@
 static SnesNetplayConfig g_netplay_cfg;
 static int g_netplay_pending;    /* launcher armed a session; start after SnesInit */
 static int g_netplay_from_lobby; /* admit pump waits for the lobby peer */
+/* Negotiated host margin from SnesLobbyMatchCaps: -1 = no caps blob received
+ * (a legacy peer), 0 = peer is running 4:3, else the peer's per-side margin.
+ * Only the P8 sprite-bounds ROM patch consults it — the wide presentation
+ * itself needs no agreement (see GwedFillMatchCaps). */
+static int g_netplay_caps_ws_extra = -1;
+/* 1 once snes_netplay_start has succeeded for this session. Distinguishes
+ * "a peer is simulating alongside us" from "offline", which is the only
+ * thing the P8 patch's agreement gate needs to know. */
+static int g_netplay_active_session;
 
+/* Defined below (the [Video] section reader). Declared here because the caps
+ * callback runs inside the launcher, before the session has been configured,
+ * so it must read the ini rather than the display module's live state. */
+static int game_config_int(const char *section, const char *key, int fallback);
+
+/* ── Match caps (MetalWarriorsSNESRecomp/src/main.c MwFillMatchCaps) ──────
+ *
+ * The lobby host fills this once and the server hands the blob to every
+ * guest, so both peers boot from ONE settlement instead of each reading its
+ * own local settings. Two very different things ride in here:
+ *
+ *   widescreen / widescreen_hud / ignore_aspect  — presentation. The PPU
+ *     widescreen fields sit outside `ppu_saveload`, so peers looking at
+ *     different aspect ratios are still digest-equal; these are published so
+ *     the room can *show* what the match will look like, not because the
+ *     simulation depends on them.
+ *   ws_extra — the one that matters. It is the agreement token for the P8
+ *     sprite-bounds ROM patch, which DOES change guest WRAM (the OAM staging
+ *     buffer at $7E:0D00). A guest whose own margin differs from the host's
+ *     leaves that patch disarmed, keeping the wide backgrounds and HUD and
+ *     falling back to native sprite bounds. Publishing our own pinned margin
+ *     rather than a constant is deliberate: with the Mods package off this
+ *     reports 0, which is exactly the "do not patch" signal a 4:3 host should
+ *     send.
+ *
+ * input_delay is deliberately left as default_caps filled it — that is the
+ * lobby waiting room's own setting and not ours to overwrite. */
+static void GwedFillMatchCaps(void *ctx, const void *settings_v,
+                              SnesLobbyMatchCaps *out)
+{
+    int ws_extra;
+    (void)ctx;
+    /* `settings_v` is recomp-ui's RecompLauncherCSettings. MetalWarriors
+     * reads settings->ignore_aspect out of it; this title cannot, because
+     * recomp-ui does not draw the ignore-aspect / integer-scale controls for
+     * SNES and gi.widescreen_supported is 0 here, so that field is never
+     * anything but its default. config.ini [Video] IgnoreAspect is this
+     * game's real authority (see GwedDisplay_SetPresentation, which is
+     * configured from the same key AFTER this callback has already run), and
+     * reading the ini directly also keeps this callback free of the
+     * RECOMP_LAUNCHER-only header. */
+    (void)settings_v;
+    if (!out)
+        return;
+    /* The width is pinned per session (GwedDisplay_BeginSession); before the
+     * first session it is 256, so derive from what the Mods package asked for
+     * and the same SNESRECOMP_WS_EXTRA override the session will use. That
+     * makes the room's published caps and the booted session agree. */
+    ws_extra = (GwedDisplay_ComputeFrameWidth(
+                    GwedDisplay_IsWidescreenEnabled()) - 256) / 2;
+    out->valid = 1;
+    out->widescreen = ws_extra > 0;
+    /* The HUD anchoring rides the same presentation policy as the margins;
+     * there is no separate switch for it in this title. */
+    out->widescreen_hud = ws_extra > 0;
+    out->ignore_aspect = game_config_int("[Video]", "IgnoreAspect", 0) != 0;
+    out->ws_extra = ws_extra;
+    fprintf(stderr, "netplay: publishing match caps widescreen=%d hud=%d "
+                    "ws_extra=%d ignore_aspect=%d\n",
+            out->widescreen, out->widescreen_hud, out->ws_extra,
+            out->ignore_aspect);
+}
 
 static void host_lobby_ensure_init(void)
 {
@@ -88,14 +162,22 @@ static void host_lobby_ensure_init(void)
     id.default_lobby_name = "Netplay Lobby";
     memset(&opts, 0, sizeof(opts));
     opts.rematch_set_ready = 1;
-    /* fill_match_caps NULL → input delay 2, no widescreen caps exchange. */
+    opts.fill_match_caps = &GwedFillMatchCaps;
     if (snes_host_lobby_init(&id, &opts) != 0)
         fprintf(stderr, "netplay: snes_host_lobby_init failed\n");
 }
 #endif /* SNES_HAS_LOBBY_CLIENT */
 
+/* The authentic frame. GAME_WIDTH stays the constant it always was: it is the
+ * SNES's real column count, and everything that must not move with the opt-in
+ * widescreen feature (the guest, the savestate format) keys off it. */
 #define GAME_WIDTH  256
 #define GAME_HEIGHT 224
+/* Widest frame the host buffers must be able to hold. The widescreen feature
+ * pins one width per session (GwedDisplay_BeginSession); this is the ceiling
+ * the engine's OAM x-space allows (widescreen.h kWsExtraMax), not the width
+ * any particular session uses. */
+#define GAME_MAX_WIDTH (GAME_WIDTH + 2 * kWsExtraMax)
 
 extern Ppu *g_ppu;
 
@@ -146,21 +228,30 @@ static void start_debug_server(void)
  * while the texture is only mapped for the moment of the present. PpuBeginDrawing
  * is what points ppu->renderBuffer at this array — without that call it stays
  * NULL and nothing is ever drawn. */
-static uint32_t g_render_pixels[GAME_WIDTH * GAME_HEIGHT];
+static uint32_t g_render_pixels[GAME_MAX_WIDTH * GAME_HEIGHT];
 
 /* The framework calls this to hand the host a frame. renderBuffer is the
  * PPU's composited output in the runner's native layout. */
 void RtlDrawPpuFrame(uint8 *pixel_buffer, size_t pitch, uint32 render_flags)
 {
     (void)render_flags;
-    if (!g_ppu || !g_ppu->renderBuffer)
+    if (!g_ppu)
+        return;
+    /* Re-point the PPU at the render target and re-apply this frame's
+     * widescreen policy BEFORE the draw. ppu_reset() zeroes every policy
+     * field (a reset or a savestate load would otherwise silently drop them),
+     * and the draw below composites the whole frame in one go, so this is the
+     * only moment at which the policy can be set for it. With widescreen off
+     * this is exactly the single PpuBeginDrawing the faithful host made. */
+    GwedDisplay_PreparePpuFrame();
+    if (!g_ppu->renderBuffer)
         return;
     /* Render the frame before presenting it. Nothing else in a production
      * build calls draw_ppu_frame — common_rtl.c's call is inside SNES_COSIM —
      * so a host that omits it presents an untouched texture forever. */
     g_rtl_game_info->draw_ppu_frame();
     RtlWidescreenPresent(pixel_buffer, pitch, g_ppu->renderBuffer,
-                         GAME_WIDTH, GAME_HEIGHT);
+                         GwedDisplay_GetCurrentFrameWidth(), GAME_HEIGHT);
 }
 
 
@@ -424,7 +515,7 @@ static int g_vsync = 1;
  * motion ghosting, so it is a Display-settings checkbox, off by default.
  * Persisted as [Video] FrameBlend in config.ini. */
 static int g_frame_blend = 0;
-static uint32_t g_blend_prev[GAME_WIDTH * GAME_HEIGHT];
+static uint32_t g_blend_prev[GAME_MAX_WIDTH * GAME_HEIGHT];
 static int g_blend_prev_valid = 0;
 
 static int game_config_int(const char *section, const char *key, int fallback)
@@ -899,6 +990,12 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     /* Display → VSync checkbox (the legacy surface draws it as On/Off; this
      * host's renderer flag is boolean, so Adaptive is never offered). */
     gi.has_vsync = 1;
+    /* The shared SNES profile turns on the launcher's legacy 16:9 Display
+     * toggle. This title deliberately does not use it: widescreen is a Mods
+     * package (mods/preloaded/packages/gwed.enhancement.widescreen), which is
+     * the single activation authority for the feature (Beads beads-8wg.1.10).
+     * Two switches for one feature is two places for them to disagree. */
+    gi.widescreen_supported = 0;
     /* `sha` outlives the run_window call below, which is the only consumer. */
     if (expected_rom_sha256(sha)) {
         gi.known_sha256     = (const uint8_t (*)[32])&sha;
@@ -934,10 +1031,17 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
         g_netplay_cfg = res.net_cfg;
         g_netplay_pending = 1;
         g_netplay_from_lobby = 1;
+        /* The host's settled margin. -1 means the peer published no caps blob
+         * at all, which the P8 patch treats as disagreement (fail closed).
+         * Captured here and not read again later because a rematch comes back
+         * through this same function with a fresh launch result. */
+        g_netplay_caps_ws_extra = res.caps_ws_extra;
         fprintf(stderr,
-                "netplay: lobby launch slot=%d bind=%s peer=%s delay=%d\n",
+                "netplay: lobby launch slot=%d bind=%s peer=%s delay=%d "
+                "caps_ws_extra=%d\n",
                 ls.netplay_launch.local_slot, ls.netplay_launch.bind_hostport,
-                ls.netplay_launch.peer_hostport, ls.netplay_launch.input_delay);
+                ls.netplay_launch.peer_hostport, ls.netplay_launch.input_delay,
+                g_netplay_caps_ws_extra);
     }
 #endif
     /* Persist toggled Display boxes before the game reads config.ini below
@@ -980,7 +1084,7 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
 
 static SDL_Texture *g_overlay_tex;
 
-static void game_draw_overlay(SDL_Renderer *renderer)
+static void game_draw_overlay(SDL_Renderer *renderer, const SDL_Rect *dst)
 {
     const uint32_t *px = NULL;
     int w = 0, h = 0;
@@ -998,17 +1102,78 @@ static void game_draw_overlay(SDL_Renderer *renderer)
         SDL_SetTextureBlendMode(g_overlay_tex, SDL_BLENDMODE_BLEND);
     }
     SDL_UpdateTexture(g_overlay_tex, NULL, px, w * 4);
-    /* Same destination rect as the game texture: the panel is exactly 2x the
-     * SNES frame, so it lands on the window with no aspect correction. */
-    snesrecomp_sdl_render_texture(renderer, g_overlay_tex, NULL, NULL);
+    /* Same destination rect as the game texture. That rect is now aspect
+     * corrected (game_compute_present_rect), so the panel keeps landing
+     * exactly on the frame it annotates — the old "exactly 2x the SNES frame,
+     * no aspect correction" note stopped being true when the host started
+     * honouring the pixel aspect. */
+    snesrecomp_sdl_render_texture(renderer, g_overlay_tex, NULL, dst);
+}
+
+/* Where the frame lands in the window.
+ *
+ * This used to be NULL — SDL stretched the texture over the whole window, so
+ * the picture's shape was whatever shape the user had dragged the window
+ * into. Presentation only: the framebuffer bytes are untouched, which is what
+ * lets the P16 gate stay green across this change. */
+static void game_compute_present_rect(SDL_Renderer *renderer, SDL_Rect *dst)
+{
+    GwedDisplayViewport vp;
+    int out_w = 0, out_h = 0;
+
+    if (!snesrecomp_sdl_get_render_output_size(renderer, &out_w, &out_h) ||
+        out_w <= 0 || out_h <= 0) {
+        dst->x = dst->y = 0;
+        dst->w = GwedDisplay_GetCurrentFrameWidth();
+        dst->h = GAME_HEIGHT;
+        return;
+    }
+    GwedDisplay_ComputeViewport(GwedDisplay_GetCurrentFrameWidth(), GAME_HEIGHT,
+                                out_w, out_h, &vp);
+    dst->x = vp.x;
+    dst->y = vp.y;
+    dst->w = vp.width;
+    dst->h = vp.height;
+}
+
+/* The session's frame width is pinned before the texture is created, so this
+ * only ever fires if a future session reboot re-pins a different width while
+ * reusing the renderer. Cheap insurance against presenting a 342-wide frame
+ * through a 256-wide texture. */
+static SDL_Texture *game_ensure_texture(SDL_Renderer *renderer,
+                                        SDL_Texture *texture)
+{
+    int want = GwedDisplay_GetCurrentFrameWidth();
+    int tex_w = 0, tex_h = 0;
+
+    if (!texture)
+        return NULL;
+    if (snesrecomp_sdl_get_texture_size(texture, &tex_w, &tex_h) &&
+        tex_w == want && tex_h == GAME_HEIGHT)
+        return texture;
+    SDL_DestroyTexture(texture);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+                                SDL_TEXTUREACCESS_STREAMING, want, GAME_HEIGHT);
+    if (texture)
+        SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
+    else
+        fprintf(stderr, "SDL: %dx%d texture allocation failed: %s\n",
+                want, GAME_HEIGHT, SDL_GetError());
+    return texture;
 }
 
 /* One present. redraw_game is 0 while the guest is frozen — the texture
  * still holds the last frame, so re-presenting it costs nothing and keeps
  * the window repainting under the overlay. */
-static void game_present(SDL_Renderer *renderer, SDL_Texture *texture,
+static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
                          int redraw_game)
 {
+    SDL_Texture *texture = game_ensure_texture(renderer, *texture_slot);
+    SDL_Rect dst;
+
+    *texture_slot = texture;
+    if (!texture)
+        return;
     if (redraw_game) {
         void *pixels = NULL;
         int pitch = 0;
@@ -1019,12 +1184,13 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture *texture,
              * unblended frame so the mix never feeds back on itself. The
              * PPU's own renderBuffer stays pure for thumbnails/captures. */
             if (g_frame_blend) {
+                int width = GwedDisplay_GetCurrentFrameWidth();
                 int y, x;
                 for (y = 0; y < GAME_HEIGHT; ++y) {
                     uint32_t *row =
                         (uint32_t *)((uint8 *)pixels + (size_t)y * pitch);
-                    uint32_t *prev = g_blend_prev + (size_t)y * GAME_WIDTH;
-                    for (x = 0; x < GAME_WIDTH; ++x) {
+                    uint32_t *prev = g_blend_prev + (size_t)y * width;
+                    for (x = 0; x < width; ++x) {
                         uint32_t cur = row[x];
                         if (g_blend_prev_valid)
                             row[x] = (cur & prev[x]) +
@@ -1040,17 +1206,19 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture *texture,
          * after RtlDrawPpuFrame — that is the call that fills renderBuffer. */
         if (g_ppu && g_ppu->renderBuffer)
             snes_savestate_menu_note_frame((const uint32_t *)g_ppu->renderBuffer,
-                                           GAME_WIDTH, GAME_HEIGHT);
+                                           GwedDisplay_GetCurrentFrameWidth(),
+                                           GAME_HEIGHT);
     }
+    game_compute_present_rect(renderer, &dst);
     SDL_RenderClear(renderer);
-    snesrecomp_sdl_render_texture(renderer, texture, NULL, NULL);
-    game_draw_overlay(renderer);
+    snesrecomp_sdl_render_texture(renderer, texture, NULL, &dst);
+    game_draw_overlay(renderer, &dst);
     SDL_RenderPresent(renderer);
 }
 
 /* Modal pump: runs until the menu closes or the window does. */
 static void game_savestate_menu_loop(SDL_Renderer *renderer,
-                                     SDL_Texture *texture, int *running)
+                                     SDL_Texture **texture, int *running)
 {
     while (snes_savestate_menu_is_open() && *running) {
         SDL_Event event;
@@ -1089,6 +1257,41 @@ int main(int argc, char **argv)
     char beside_exe[1024] = "";
     uint8_t sha[32];
     const uint8_t *want_sha = expected_rom_sha256(sha);
+    /* ── Harness flags ───────────────────────────────────────────────────
+     *
+     * --framedump <dir>     per-frame WRAM + crc32 sidecars (framedump.c;
+     *                       window from SNESRECOMP_FRAMEDUMP_START/_END)
+     * --exit-at-frame <N>   clean shutdown once the guest has run N frames
+     *
+     * Both exist for the widescreen P16 gate: a run has to be able to say
+     * "these two builds executed the same frames" without a human watching
+     * a window, and a wall-clock kill cannot say which frame it stopped on.
+     * Neither touches rendering, and both are inert when unset.
+     *
+     * Parsed before the positional scan below because their VALUES do not
+     * start with '-': a directory or a frame count sitting in argv would
+     * otherwise be mistaken for the ROM path. */
+    const char *framedump_dir = NULL;
+    int exit_at_frame = 0;
+    int flag_value_arg[2] = { 0, 0 };
+    {
+        int ai;
+        for (ai = 1; ai + 1 < argc; ++ai) {
+            if (!argv[ai])
+                continue;
+            if (strcmp(argv[ai], "--framedump") == 0) {
+                static char framedump_abs[1024];
+                framedump_dir =
+                    snesrecomp_abspath(argv[ai + 1], framedump_abs,
+                                       sizeof(framedump_abs))
+                        ? framedump_abs : argv[ai + 1];
+                flag_value_arg[0] = ai + 1;
+            } else if (strcmp(argv[ai], "--exit-at-frame") == 0) {
+                exit_at_frame = atoi(argv[ai + 1]);
+                flag_value_arg[1] = ai + 1;
+            }
+        }
+    }
     /* First non-flag argument, not argv[1]: this ecosystem's hosts take their
      * flags BEFORE the ROM (`<exe> --launcher <rom>`), so reading argv[1] here
      * would see "--launcher" and conclude no ROM was given. */
@@ -1097,6 +1300,7 @@ int main(int argc, char **argv)
         int ai;
         for (ai = 1; ai < argc; ++ai) {
             if (!argv[ai] || !argv[ai][0] || argv[ai][0] == '-') continue;
+            if (ai == flag_value_arg[0] || ai == flag_value_arg[1]) continue;
             pos_arg = ai;
             break;
         }
@@ -1242,10 +1446,20 @@ session_reboot:
      * (ppu.h: "the legacy renderer ignores these"), and colour math only
      * started being exercised at all once the raster-IRQ deadlock was fixed
      * and CGADSUB went from $00 to $3F. */
-    PpuBeginDrawing(g_ppu, (uint8_t *)g_render_pixels, GAME_WIDTH * 4,
-                    kPpuRenderFlags_NewRenderer);
+    /* Pin the session's frame width. Must be after the mod runtime's plugin
+     * activation above (that is what turns widescreen on) and before the first
+     * frame, the window and the texture — all three are sized from it. A
+     * rematch re-enters at session_reboot and re-pins, which is the only point
+     * at which the width may change. This also issues the PpuBeginDrawing that
+     * points the PPU at g_render_pixels; RtlDrawPpuFrame re-issues it (with
+     * the frame's policy) every frame. */
+    GwedDisplay_BeginSession((uint8_t *)g_render_pixels, sizeof(g_render_pixels),
+                             kPpuRenderFlags_NewRenderer);
     start_debug_server();
 #if defined(SNES_HAS_LOBBY_CLIENT)
+    /* Re-resolved every session: a rematch that comes back offline must not
+     * inherit the previous match's "a peer is watching" state. */
+    g_netplay_active_session = 0;
     if (!g_netplay_pending) {
         /* Headless / scripted direct connect: SNES_NETPLAY=1 with
          * SNES_NET_SLOT / SNES_NET_BIND / SNES_NET_PEER (see
@@ -1266,9 +1480,33 @@ session_reboot:
             fprintf(stderr,
                     "netplay: snes_netplay_start failed (%d) — continuing "
                     "offline\n", nrc);
+        else
+            g_netplay_active_session = 1;
         g_netplay_pending = 0;
     }
+    GwedWsPatch_SetNetplaySession(g_netplay_active_session,
+                                  g_netplay_caps_ws_extra);
 #endif
+
+    /* ── Arm the guest-side sprite-bounds patch (P8) ─────────────────────
+     *
+     * This is the ONE part of the widescreen feature that is not
+     * presentation-only, so its placement is load-bearing and it is here
+     * rather than inside GwedDisplay_BeginSession for two reasons:
+     *
+     *   - it must be AFTER SnesInit, because the cart's private ROM image is
+     *     malloc'd and memcpy'd there (snes_loadRom); patching before it
+     *     would write a dying session's image, and
+     *   - it must be AFTER the netplay resolution above, because the
+     *     agreement token only exists once the session (lobby launch OR the
+     *     SNES_NETPLAY env path) is settled.
+     *
+     * A rematch re-enters at session_reboot and therefore re-arms against
+     * the fresh image with the new match's caps, which is why the module's
+     * bookkeeping never caches a ROM pointer. GwedWsPatch_Arm itself refuses
+     * unless g_ws_active, so a 4:3 run cannot reach the guest at all — that
+     * is P16 by construction rather than by discipline. */
+    GwedWsPatch_Arm(g_ws_extra);
 
     /* snesrecomp_sdl_* wrap the SDL2/SDL3 API differences, so this host
      * builds against either backend (-DSNESRECOMP_SDL_BACKEND=SDL2|SDL3). */
@@ -1277,8 +1515,24 @@ session_reboot:
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
         return 1;
     }
-    window = snesrecomp_sdl_create_window("Gundam Wing Endless Duel", GAME_WIDTH * 3,
-                                          GAME_HEIGHT * 3, 0);
+    /* Presentation aspect. There is no launcher control for it on this title
+     * (recomp-ui's ignore-aspect/integer-scale settings are not drawn for
+     * SNES, and gi.widescreen_supported is 0 above), so config.ini is the
+     * escape hatch: [Video] Aspect 0 = CRT 4:3 (7:6 pixels — 256 presents as
+     * 4:3 and the 342-wide widescreen frame as 16:9), 1 = square pixels
+     * (8:7 / 32:21), 2 = square frame. IgnoreAspect restores the old
+     * stretch-to-window behaviour for anyone who preferred it. */
+    GwedDisplay_SetPresentation(
+        SnesDisplayAspect_Clamp(game_config_int("[Video]", "Aspect", 0)),
+        game_config_int("[Video]", "IgnoreAspect", 0) != 0,
+        game_config_int("[Video]", "IntegerScale", 0) != 0);
+    {
+        int frame_w = GwedDisplay_GetCurrentFrameWidth();
+        int win_h = GAME_HEIGHT * 3;
+        window = snesrecomp_sdl_create_window(
+            "Gundam Wing Endless Duel",
+            GwedDisplay_GetWindowBaseWidth(frame_w, win_h), win_h, 0);
+    }
     /* Default OFF for this title. config.ini is generated at runtime by the
      * launcher and is not shipped, so a fresh install falls back to whatever
      * this default says -- and with vsync on, a 60.00 Hz panel duplicates a
@@ -1299,7 +1553,7 @@ session_reboot:
     texture = renderer
         ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                             SDL_TEXTUREACCESS_STREAMING,
-                            GAME_WIDTH, GAME_HEIGHT)
+                            GwedDisplay_GetCurrentFrameWidth(), GAME_HEIGHT)
         : NULL;
     if (!window || !renderer || !texture) {
         fprintf(stderr, "SDL setup failed: %s\n", SDL_GetError());
@@ -1325,10 +1579,26 @@ session_reboot:
     game_load_pad_map();
     game_open_pads();
 
+    /* Arm the per-frame WRAM dumper. Must be after SnesInit (the callback
+     * reads the guest's WRAM) and before the first RtlRunFrame, which is
+     * what calls it. Re-arming on a session reboot is harmless. */
+    if (framedump_dir)
+        FrameDump_Init(framedump_dir);
+
     while (running) {
         SDL_Event event;
         uint32 inputs;
         int savestate_menu_hotkey = 0;
+
+        /* --exit-at-frame: leave through the normal shutdown path (audio
+         * device, guest machine, SDL) with status 0, after the frame that
+         * reached the target has been dumped and presented. */
+        if (exit_at_frame > 0 && snes_frame_counter >= exit_at_frame) {
+            fprintf(stderr, "[harness] --exit-at-frame %d reached (frame %d)\n",
+                    exit_at_frame, snes_frame_counter);
+            running = 0;
+            break;
+        }
 
         while (SDL_PollEvent(&event)) {
             /* SDL2 spellings: sdl_compat.h defines SDL_ENABLE_OLD_NAMES for
@@ -1411,9 +1681,9 @@ session_reboot:
                         break;
                     burst++;
                 }
-                game_present(renderer, texture, 1);
+                game_present(renderer, &texture, 1);
             } else {
-                game_present(renderer, texture, 0);   /* held frame */
+                game_present(renderer, &texture, 0);   /* held frame */
             }
             if (!g_vsync)
                 game_frame_limit();
@@ -1437,7 +1707,7 @@ session_reboot:
             (void)snes_savestate_menu_poll_open(GAME_SAVESTATE_MENU_GESTURE);
         if (snes_savestate_menu_poll_open(inputs) ||
             snes_savestate_menu_is_open()) {
-            game_savestate_menu_loop(renderer, texture, &running);
+            game_savestate_menu_loop(renderer, &texture, &running);
             continue;   /* guest was frozen: no frame to run or present */
         }
         {
@@ -1495,7 +1765,7 @@ session_reboot:
             for (ffi = 0; ffi < frames_this_iter; ffi++)
                 RtlRunFrame(inputs);
         }
-        game_present(renderer, texture, 1);
+        game_present(renderer, &texture, 1);
         if (!g_vsync)
             game_frame_limit();
     }
