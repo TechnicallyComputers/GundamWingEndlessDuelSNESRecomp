@@ -215,26 +215,34 @@ static uint16_t GwedWram16(uint32_t addr)
 #define GWED_HUD_R60_RX1 232u
 /* Rows 61-63, lines 48..71: energy counters (px 8-55 / 200-247) and the
  * round-win markers (px 88-119 / 136-167) are all rigid; the elastic run is
- * ONE column of the flat chrome, px 62 and its mirror px 193.
+ * ONE column, px 87 and its mirror px 168.
  *
- * Deliberately one column and not the six (px 62-67) that recon measured as
- * identical. Those six are only identical while nothing overlays them, and
- * the combo counter does: during a multi-hit combo the game replaces the
- * energy box with a wider "nn HIT" readout whose right cap, charge arrow and
- * shoulder land exactly there, and a 6->49 px stretch of that magnifies each
- * of the six columns into an 8 px block (measured on a BG1-isolated capture:
- * the widened band came out as six 8-9 px steps instead of one flat run).
- * A single source column can only ever be REPEATED, so the widened run is
- * flat in every state: plain plate normally, and the readout box's own
- * interior during a combo, which just makes the box longer. There is no
- * multi-column run that is flat in both states -- measured, the combo state
- * has no run wider than two anywhere in px 56..85. */
+ * It was px 62. That column is inside the combo readout: during a multi-hit
+ * combo the game replaces the energy box with a wider "nn HIT" box whose
+ * interior runs to px 62 and whose cap, charge arrow and shoulder occupy
+ * 63..~85, so repeating 62 seventy-odd times drew the box all the way to the
+ * centre group. The note that used to sit here saw that coming and accepted
+ * it -- "just makes the box longer" -- on the grounds that no multi-column
+ * run in 56..85 is flat in both states. True, and beside the point: the
+ * column does not have to be in 56..85 at all.
+ *
+ * Measured on the combo-state capture (4x crop of the cap region): the
+ * shoulder ends by ~px 80, and from there to the win markers at 88 BG1 is
+ * TRANSPARENT on every line below the thin chrome bar at the top of the
+ * band, and that bar is a uniform horizontal run. A transparent column
+ * repeated is invisible (the arena's own band shows through, as it does
+ * natively), and a uniform bar column repeated is invisible. In the normal
+ * state the energy box ends at 55 and the recon found 62-67 identical
+ * plate, so 87 is plate there as well. 87 rather than 86: one column of
+ * margin from the shoulder's furthest measured reach, and still short of the
+ * rigid marker at 88. Either state now keeps its box rigid on the left
+ * edge, which is the whole point of anchoring. */
 #define GWED_HUD_R61_Y0 48u
 #define GWED_HUD_R61_Y1 72u
-#define GWED_HUD_R61_LX0 62u
-#define GWED_HUD_R61_LX1 63u
-#define GWED_HUD_R61_RX0 193u
-#define GWED_HUD_R61_RX1 194u
+#define GWED_HUD_R61_LX0 87u
+#define GWED_HUD_R61_LX1 88u
+#define GWED_HUD_R61_RX0 168u
+#define GWED_HUD_R61_RX1 169u
 /* Line 72: a HUD tile row drawn at the ARENA's hScroll, so none of the px
  * constants above apply to it. An identity elastic band renders its authentic
  * 256 columns and contributes nothing to the margins - a clamp, expressed in
