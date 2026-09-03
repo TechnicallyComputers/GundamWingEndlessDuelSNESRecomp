@@ -112,13 +112,30 @@ static int GwedWsBg2Mode(void)
 
 /* -- The fight-screen gate (recon A, Beads beads-8wg.9.13.2) --------------
  *
- * $7E:1000 is the coarse mode word: 0x0010 for the whole battle family.
- * $7E:1004 is the sub-mode: 0x0012 live fight / round intro, 0x0014 victory
- * quote, 0x001E round end + inter-stage dialogue + ending. 0x000A/0x000C are
- * the attract crawl and the title menu, 0x0000 the cinematic and the logo.
+ * $7E:1000 and $7E:1004 were read by recon as a coarse mode word (0x0010 for
+ * "the whole battle family") and a sub-mode (0x0012 live fight, 0x0014
+ * victory quote, 0x001E round end). That held for the one attract fight recon
+ * sampled and for the player-fight savestates. It does NOT hold across the
+ * attract cycle. Logged with the arena map loaded, 2026-09-03:
  *
- * Read as raw WRAM bytes, never from framebuffer pixels (standing rule), and
- * never from the PPU scroll: this is a mode discriminator, not pixel phase. */
+ *     attract fight   $1000   $1004
+ *     city            0010    0012      <- the recon sample
+ *     purple sky      0016    0018
+ *     dark arena      0012    0014
+ *     purple sky 2    0014    0016
+ *
+ * $1004 == $1000 + 2 on every one: for attract demos the "mode" is a demo
+ * INDEX stepping by two, not a family, and a gate keyed on 0x0010/0x0012
+ * refused three stages out of four while BG1 held the arena map on all of
+ * them. That was the field report: the first demo plays wide, the rest do
+ * not.
+ *
+ * The words are still read -- for the log, where they name what a refused
+ * screen was doing -- but they no longer classify. The BG1 arena precondition
+ * below does, alone: it is the leg recon called load-bearing, it is the leg
+ * recon's whole-cycle sweep proved unique to arena screens, and it is the
+ * leg that agreed on every stage. Read as raw WRAM bytes, never from
+ * framebuffer pixels (standing rule), and never from the PPU scroll. */
 #define GWED_WRAM_MODE      0x1000u
 #define GWED_WRAM_SUBMODE   0x1004u
 #define GWED_MODE_BATTLE    0x0010u
@@ -328,6 +345,43 @@ void GwedDisplay_BeginSession(uint8_t *render_pixels, size_t render_pixels_bytes
     GwedDisplay_PreparePpuFrame();
 }
 
+/* Say what the gate decided and what it read, whenever that changes.
+ *
+ * The gate fails closed to a pillarbox, and a pillarbox that is wrong is
+ * silent: it just looks like a scene the recon never covered. Reported in the
+ * field: the first attract demo plays wide and the next few do not, and
+ * nothing in the log could say which of the three legs refused them. The
+ * three legs are logged together so a refusal names its cause. Change-
+ * triggered, so a long attract cycle costs a handful of lines. */
+static GwedWsScreen GwedWsLogScreen(GwedWsScreen verdict)
+{
+    static int s_last = -1;
+    static uint16_t s_mode, s_sub;
+    static uint8_t s_bg1sc, s_chr;
+    extern int snes_frame_counter;
+    uint16_t mode = GwedWram16(GWED_WRAM_MODE);
+    uint16_t sub = GwedWram16(GWED_WRAM_SUBMODE);
+    uint8_t bg1sc = g_ppu ? g_ppu->bgXsc[0] : 0xFF;
+    uint8_t chr = g_ppu ? (uint8_t)(g_ppu->bgTileAdr & 0xF) : 0xFF;
+    if ((int)verdict != s_last || mode != s_mode || sub != s_sub ||
+        bg1sc != s_bg1sc || chr != s_chr) {
+        const char *why = "";
+        if (verdict != kGwedWsScreen_World) {
+            if (bg1sc == GWED_BG1_ARENA_BGXSC && chr != 0)
+                why = "  <-- arena map, but BG1 char base is not 0";
+            else if (bg1sc == GWED_BG1_ARENA_BGXSC)
+                why = "  <-- arena map: this should not be Bounded";
+        }
+        fprintf(stderr, "[ws] screen=%s frame=%d mode=%04x sub=%04x "
+                        "bg1sc=%02x bg1chr=%x%s\n",
+                verdict == kGwedWsScreen_World ? "World" : "Bounded",
+                snes_frame_counter, mode, sub, bg1sc, chr, why);
+        s_last = (int)verdict; s_mode = mode; s_sub = sub;
+        s_bg1sc = bg1sc; s_chr = chr;
+    }
+    return verdict;
+}
+
 GwedWsScreen GwedDisplay_ResolveScreen(void)
 {
     /* Guest state only. A pillarbox can never stretch or slice text, so
@@ -335,28 +389,25 @@ GwedWsScreen GwedDisplay_ResolveScreen(void)
      * be the arena: the cost of guessing wrong here is "less widescreen", not
      * "broken widescreen".
      *
+     * "Positively proven to be the arena" is one thing: BG1's tilemap register
+     * points at the arena map ($2107 == 0x6B, 64x64 at byte $D000) with its
+     * character base at 0. Recon established that as the load-bearing
+     * precondition -- if BG1 is not the arena map, reflecting about the
+     * arena's edges is meaningless -- and its sweep of the whole attract cycle
+     * found no non-arena screen that reads it. The mode words that used to
+     * gate ahead of it were an attract-demo index misread as a family (see
+     * the gate note above) and refused most of the cycle's fights; they are
+     * now diagnostic only.
+     *
      * Deliberately NOT gated on the P6 liveness signal ($7E:0600 counting).
      * The round intro is a scripted, frozen-counter screen that already shows
-     * the arena, and snapping the frame from a 342-wide arena to a
-     * pillarboxed 256 for the duration of every round intro would be a worse
-     * artefact than anything liveness protects against here. Liveness matters
-     * when a gate drives behaviour that could change the simulation; nothing
-     * in this file does. */
-    if (GwedWram16(GWED_WRAM_MODE) != GWED_MODE_BATTLE)
-        return kGwedWsScreen_Bounded;
-
-    switch (GwedWram16(GWED_WRAM_SUBMODE)) {
-    case GWED_SUB_FIGHT:      /* live round + round intro */
-    case GWED_SUB_QUOTE:      /* victory quote: portrait panel over the arena */
-    case GWED_SUB_ROUND_END:  /* KO banner - but also dialogue and ending */
-        break;
-    default:
-        return kGwedWsScreen_Bounded;
-    }
-
-    /* The sub-mode names a family, not a layout. Only the arena tilemap has
-     * an authored world to reflect about. */
-    return GwedBg1IsArenaMap() ? kGwedWsScreen_World : kGwedWsScreen_Bounded;
+     * the arena, and snapping the frame from a wide arena to a pillarboxed
+     * 256 for the duration of every round intro would be a worse artefact
+     * than anything liveness protects against here. Liveness matters when a
+     * gate drives behaviour that could change the simulation; nothing in this
+     * file does. */
+    return GwedWsLogScreen(GwedBg1IsArenaMap() ? kGwedWsScreen_World
+                                               : kGwedWsScreen_Bounded);
 }
 
 /* The HUD band's per-line policy. Called only from the World branch, and only

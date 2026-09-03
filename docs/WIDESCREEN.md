@@ -90,6 +90,28 @@ No framebuffer sampling anywhere. The state words come from recon pass A
 quote, `(0x10,0x1E)` round end / inter-stage dialogue / ending. Writers are
 ROM-confirmed in bank `$01` ~`$B550-$B630`.
 
+**Amended 2026-09-03 — the mode words do not classify attract fights.** The
+reading above came from one attract fight and the player-fight savestates. With
+the gate's inputs logged across a whole inputless attract cycle, every attract
+demo has the arena map loaded (`$2107 == 0x6B`, char base 0) but reads a
+different word pair, and `$7E:1004 == $7E:1000 + 2` on all of them:
+
+| attract fight | `$7E:1000` | `$7E:1004` |
+|---|---|---|
+| city (the recon sample) | `0010` | `0012` |
+| purple sky | `0016` | `0018` |
+| dark arena | `0012` | `0014` |
+| purple sky 2 | `0014` | `0016` |
+
+For attract demos `$1000` is a demo *index* stepping by two, not a family, and a
+gate keyed on `0x0010/0x0012` refused every demo but the first — the field
+report was exactly that. The gate is now the BG1 precondition **alone**: it is
+the leg this section already calls load-bearing, it is the leg the whole-cycle
+sweep proved unique to arena screens, and it agreed on every stage. The words
+are still read, for the `[ws] screen=` log line, where they say what a refused
+screen was doing. Each newly admitted stage was checked with the P2b seam
+detector on BG1-isolated wide captures before this shipped (see the commit).
+
 The **BG1 register precondition is load-bearing**, and was not in the plan.
 `0x001E` is shared by the KO / round-end screen, which *is* the arena, and by
 the inter-stage dialogue and ending screens, which are not; recon captured
