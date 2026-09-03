@@ -17,7 +17,12 @@ id = "localization"
 name = "Localization"
 description = "Select the text language applied at runtime."
 group = "Language"
-default_enabled = true
+# Opt-in, like any other mod. On by default meant a player who never opened the
+# mod menu was silently running ROM/RAM/VRAM patches, so two netplay peers could
+# differ without either of them choosing anything -- which is exactly how a real
+# match desynced. A mod that changes what the guest simulates has to be a
+# decision someone made.
+default_enabled = false
 
 [[option]]
 feature = "localization"
