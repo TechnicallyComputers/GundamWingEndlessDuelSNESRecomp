@@ -1122,15 +1122,32 @@ static uint32_t gwed_fnv1a(const char *s)
 
 static void gwed_publish_identity(void)
 {
-    char content[96];
+    char content[2048];
     uint32_t build_fp, content_fp;
+    int need;
 
-    snes_text_xlate_identity_c(content, sizeof(content));
+    /* The WHOLE effective mod set, not just the language. Any mod that patches
+     * guest memory is simulation state, and localization is only the one we
+     * happened to catch: two peers running different sets cannot stay in sync,
+     * whichever mod differs. */
+    need = snes_mod_runtime_effective_set_c(content, sizeof(content));
+    if (need >= (int)sizeof(content)) {
+        /* Never fingerprint a truncated set — two different selections could
+         * share a prefix and compare equal, which is worse than not checking. */
+        fprintf(stderr, "game: mod set is %d bytes, larger than the %zu-byte "
+                "buffer — identity not published\n",
+                need, sizeof(content));
+        return;
+    }
     build_fp = gwed_fnv1a(GWED_BUILD_ID);
     content_fp = gwed_fnv1a(content);
 
-    fprintf(stderr, "game: build %s (fp=%08x), content %s (fp=%08x)\n",
-            GWED_BUILD_ID, (unsigned)build_fp, content, (unsigned)content_fp);
+    fprintf(stderr, "game: build %s (fp=%08x)\n",
+            GWED_BUILD_ID, (unsigned)build_fp);
+    /* Printed in full, not just hashed: a fingerprint says THAT two peers
+     * differ, and the text says WHICH mod and which option. */
+    fprintf(stderr, "game: mod set (fp=%08x):\n%s",
+            (unsigned)content_fp, content);
 #if defined(SNESRECOMP_NET_ROLLBACK)
     snes_netplay_rb_set_identity(build_fp, content_fp);
 #endif
