@@ -1155,7 +1155,8 @@ static void gwed_publish_identity(void)
     {
         static char s_modset[2048];
         snprintf(s_modset, sizeof(s_modset), "%s", content);
-        snes_netplay_rb_set_modset(s_modset, &snes_mod_runtime_check_set_c);
+        snes_netplay_rb_set_modset(s_modset, &snes_mod_runtime_check_set_c,
+                                   &snes_mod_runtime_adopt_set_c);
     }
 #endif
 #if defined(SNESRECOMP_NET_ROLLBACK)
