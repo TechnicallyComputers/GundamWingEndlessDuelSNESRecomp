@@ -24,6 +24,7 @@
  */
 
 #include "game_rtl.h"
+#include "netplay/snes_state_digest.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -700,4 +701,25 @@ void GameSessionReset(void)
      * diagnosis — the hook was not reached, so the guest resumed a dead
      * machine's PC. */
     fprintf(stderr, "game: session reset (cold boot for rematch)\n");
+
+    /* NOT hard-reset here, and the reason is load-bearing.
+     *
+     * This hook runs BEFORE the machine exists -- g_snes is still NULL, and a
+     * RtlReset() call here core-dumps on the first launch. Verified by trying
+     * it: the process died before its first frame.
+     *
+     * That matters because the guest genuinely is not cold on a rematch.
+     * RtlReset() was written for exactly this job and has ZERO callers in the
+     * whole tree; the only guest hard reset in the build runs once, when the
+     * ROM loads. So WRAM, APU, PPU and DMA come out of the previous match
+     * untouched, and two peers agree at tick 0 only when they happen to be on
+     * the same session ORDINAL -- observed across two real matches, first
+     * session 6172c831 and second 250f1b80 on both machines alike, which is
+     * what identified the ordinal rather than the platform or the build.
+     *
+     * The reset belongs after SnesInit on the rematch path, not here. Left
+     * undone rather than done in the wrong place: the boot-digest gate now
+     * refuses such a match outright, so the failure is loud and safe while the
+     * right placement is worked out. */
+
 }
