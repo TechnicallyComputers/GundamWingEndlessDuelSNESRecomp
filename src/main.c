@@ -1149,6 +1149,16 @@ static void gwed_publish_identity(void)
     fprintf(stderr, "game: mod set (fp=%08x):\n%s",
             (unsigned)content_fp, content);
 #if defined(SNESRECOMP_NET_ROLLBACK)
+    /* Static so the netplay layer can hold the pointer for the session: it
+     * publishes this verbatim as host, and checks the host's against it as a
+     * peer. */
+    {
+        static char s_modset[2048];
+        snprintf(s_modset, sizeof(s_modset), "%s", content);
+        snes_netplay_rb_set_modset(s_modset, &snes_mod_runtime_check_set_c);
+    }
+#endif
+#if defined(SNESRECOMP_NET_ROLLBACK)
     snes_netplay_rb_set_identity(build_fp, content_fp);
 #endif
 }
