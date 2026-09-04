@@ -219,27 +219,30 @@ target_include_directories(GundamWingEndlessDuelSNESRecomp PRIVATE
     ${SNESRECOMP_ROOT}/host
     ${RECOMP_UI_ROOT}/src)
 
-add_custom_target(GundamWingEndlessDuelSNESRecompStageLocalization ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/mods"
-        "$<TARGET_FILE_DIR:GundamWingEndlessDuelSNESRecomp>/mods"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/translations"
-        "$<TARGET_FILE_DIR:GundamWingEndlessDuelSNESRecomp>/translations"
-    # The translation table also goes INSIDE the localization package, because
-    # the package is the unit a host transfers to a guest. Staged rather than
-    # committed twice: the repo keeps one copy under translations/, and the
-    # built product carries a self-contained package.
-    #
-    # Without this the package is a manifest describing a translation whose
-    # data ships separately, so a guest that downloads the mod gets the
-    # description and none of the data -- it then runs untranslated while
-    # reporting the same mod set as the host.
+# Localization ships beside the executable: mods/ is the package a netplay
+# host transfers to a guest, translations/ the table it reads. Staged on every
+# build of the executable (framework helper), not as a sibling ALL target --
+# the launcher's Generate & rebuild builds `--target GundamWingEndlessDuelSNESRecomp`
+# and a sibling target is skipped, which shipped a rebuilt game with an empty
+# Mods page while the setup host beside the pack root had the catalog.
+snesrecomp_target_stage_dir(GundamWingEndlessDuelSNESRecomp
+    "${CMAKE_SOURCE_DIR}/mods" mods)
+snesrecomp_target_stage_dir(GundamWingEndlessDuelSNESRecomp
+    "${CMAKE_SOURCE_DIR}/translations" translations)
+# The translation table also goes INSIDE the localization package, because
+# the package is the unit a host transfers to a guest. Staged rather than
+# committed twice: the repo keeps one copy under translations/, and the
+# built product carries a self-contained package.
+#
+# Without this the package is a manifest describing a translation whose
+# data ships separately, so a guest that downloads the mod gets the
+# description and none of the data -- it then runs untranslated while
+# reporting the same mod set as the host.
+add_custom_command(TARGET GundamWingEndlessDuelSNESRecomp POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/translations/endless_duel.toml"
-        "$<TARGET_FILE_DIR:GundamWingEndlessDuelSNESRecomp>/mods/preloaded/packages/gwed.localization/1.0.0/endless_duel.toml")
-add_dependencies(GundamWingEndlessDuelSNESRecompStageLocalization
-    GundamWingEndlessDuelSNESRecomp)
+        "$<TARGET_FILE_DIR:GundamWingEndlessDuelSNESRecomp>/mods/preloaded/packages/gwed.localization/1.0.0/endless_duel.toml"
+    VERBATIM)
 
 # Delay-sync netplay + MotK lobby client (defines SNES_HAS_LOBBY_CLIENT, which
 # is what compiles the netplay blocks in src/main.c and lights the launcher's

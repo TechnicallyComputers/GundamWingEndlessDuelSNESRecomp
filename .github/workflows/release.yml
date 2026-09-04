@@ -201,10 +201,7 @@ jobs:
             -DSNESRECOMP_NET_ICE=ON \
             -DSNESRECOMP_BUILD_VERSION="${RELEASE_VERSION}" \
             "${EXTRA[@]+"${EXTRA[@]}"}"
-          # StageLocalization puts mods/ and translations/ beside the exe;
-          # the packager refuses a zip without them.
-          cmake --build build-ci -j"${JOBS}" \
-            --target "${EXE_NAME}" "${EXE_NAME}StageLocalization"
+          cmake --build build-ci -j"${JOBS}" --target "${EXE_NAME}"
 
       - name: Package setup pack
         run: |
