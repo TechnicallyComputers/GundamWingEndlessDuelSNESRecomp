@@ -39,8 +39,37 @@ if(GIT_FOUND)
             OUTPUT_VARIABLE _git_dirty OUTPUT_STRIP_TRAILING_WHITESPACE
             ERROR_QUIET)
         if(NOT _git_dirty STREQUAL "")
-            set(SNESRECOMP_DEV_VERSION "${SNESRECOMP_DEV_VERSION}-dirty")
+            # "-dirty" alone says a build is not its commit; it does not say
+            # WHICH uncommitted state it is, so two peers built from different
+            # working trees reported the same identity and a stale binary was
+            # indistinguishable from a current one. Hashing the diff gives the
+            # uncommitted state a name: same tree -> same id, changed tree ->
+            # different id, and copying one artifact to both machines still
+            # matches (unlike a timestamp, which would never match).
+            # The parent's diff renders a dirty submodule as one gitlink line
+            # ("Subproject commit <sha>-dirty") that is identical whatever
+            # changed inside it -- and the framework and launcher ARE
+            # submodules, so most edits were invisible to this hash. Digest
+            # each working tree that contributes code to the build.
+            execute_process(
+                COMMAND "${GIT_EXECUTABLE}" diff HEAD
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                OUTPUT_VARIABLE _git_diff ERROR_QUIET)
+            foreach(_sub snesrecomp recomp-ui)
+                if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_sub}/.git")
+                    execute_process(
+                        COMMAND "${GIT_EXECUTABLE}" diff HEAD
+                        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${_sub}"
+                        OUTPUT_VARIABLE _sub_diff ERROR_QUIET)
+                    string(APPEND _git_diff "${_sub_diff}")
+                endif()
+            endforeach()
+            string(SHA1 _git_diff_sha "${_git_diff}")
+            string(SUBSTRING "${_git_diff_sha}" 0 8 _git_diff_short)
+            set(SNESRECOMP_DEV_VERSION
+                "${SNESRECOMP_DEV_VERSION}-dirty.${_git_diff_short}")
             set(_git_dirty_flag TRUE)
+            set(_git_dirty_tag "-dirty.${_git_diff_short}")
         endif()
     endif()
 endif()
@@ -54,7 +83,7 @@ message(STATUS "Lobby version pin (non-release): ${SNESRECOMP_DEV_VERSION}")
 # so CI artifacts are unaffected; anything else carries what it really is.
 set(GAME_RELEASE_PIN "${GAME_RELEASE_VERSION}")
 if(_git_dirty_flag)
-    set(GAME_RELEASE_PIN "${GAME_RELEASE_VERSION}+${_git_sha}-dirty")
+    set(GAME_RELEASE_PIN "${GAME_RELEASE_VERSION}+${_git_sha}${_git_dirty_tag}")
     message(WARNING
         "Release build from a modified tree: pinning lobby version as "
         "'${GAME_RELEASE_PIN}'. It will not match a clean ${GAME_RELEASE_VERSION} build.")
@@ -145,6 +174,12 @@ execute_process(
 if(NOT GWED_BUILD_ID)
   set(GWED_BUILD_ID "unknown")
 endif()
+# git describe --dirty says "dirty" and stops there; name the uncommitted state
+# so two peers can tell a stale binary from a current one.
+if(_git_dirty_tag)
+  string(REPLACE "-dirty" "" GWED_BUILD_ID "${GWED_BUILD_ID}")
+  set(GWED_BUILD_ID "${GWED_BUILD_ID}${_git_dirty_tag}")
+endif()
 message(STATUS "Build identity: ${GWED_BUILD_ID}")
 
 target_compile_definitions(GundamWingEndlessDuelSNESRecomp PRIVATE
@@ -178,7 +213,19 @@ add_custom_target(GundamWingEndlessDuelSNESRecompStageLocalization ALL
         "$<TARGET_FILE_DIR:GundamWingEndlessDuelSNESRecomp>/mods"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/translations"
-        "$<TARGET_FILE_DIR:GundamWingEndlessDuelSNESRecomp>/translations")
+        "$<TARGET_FILE_DIR:GundamWingEndlessDuelSNESRecomp>/translations"
+    # The translation table also goes INSIDE the localization package, because
+    # the package is the unit a host transfers to a guest. Staged rather than
+    # committed twice: the repo keeps one copy under translations/, and the
+    # built product carries a self-contained package.
+    #
+    # Without this the package is a manifest describing a translation whose
+    # data ships separately, so a guest that downloads the mod gets the
+    # description and none of the data -- it then runs untranslated while
+    # reporting the same mod set as the host.
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/translations/endless_duel.toml"
+        "$<TARGET_FILE_DIR:GundamWingEndlessDuelSNESRecomp>/mods/preloaded/packages/gwed.localization/1.0.0/endless_duel.toml")
 add_dependencies(GundamWingEndlessDuelSNESRecompStageLocalization
     GundamWingEndlessDuelSNESRecomp)
 

@@ -1308,6 +1308,17 @@ static void gwed_publish_identity(void)
         return;
     }
     build_fp = gwed_fnv1a(GWED_BUILD_ID);
+#if defined(SNESRECOMP_NET_ROLLBACK)
+    /* Captured before the xlate line is appended: check_set parses this as a
+     * SELECTION, and the translation identity is an outcome, not something a
+     * player can select. */
+    {
+        static char s_modset[2048];
+        snprintf(s_modset, sizeof(s_modset), "%s", content);
+        snes_netplay_rb_set_modset(s_modset, &snes_mod_runtime_check_set_c,
+                                   &snes_mod_runtime_adopt_set_c);
+    }
+#endif
 
     /* Fingerprint what the mods DID, not only what was selected.
      *
@@ -1324,12 +1335,22 @@ static void gwed_publish_identity(void)
      * instead of desyncing. Kept OUT of the modset text: that text is parsed
      * by check_set as a selection, and this is an outcome, not a selection. */
     {
-        char ident[2048 + 64];
         char xlate[32];
         snes_text_xlate_identity_c(xlate, (int)sizeof(xlate));
-        snprintf(ident, sizeof(ident), "%sxlate=%s\n", content, xlate);
-        content_fp = gwed_fnv1a(ident);
-        fprintf(stderr, "game: active translation: %s\n", xlate);
+        /* Appended to `content` itself, not fingerprinted separately.
+         *
+         * A refusal tells the player to compare the "game: mod set" block in
+         * the two logs. If the fingerprint covers something that block does
+         * not print, those blocks come out IDENTICAL while the fingerprints
+         * differ, and the instruction sends them looking at matching text. The
+         * printed identity and the hashed identity have to be the same thing.
+         *
+         * `content` stops being the modset text at this point; the pure
+         * selection is copied out below, before this line is added. */
+        if ((size_t)need + strlen(xlate) + 8 < sizeof(content))
+            snprintf(content + need, sizeof(content) - (size_t)need,
+                     "xlate=%s\n", xlate);
+        content_fp = gwed_fnv1a(content);
     }
 
     fprintf(stderr, "game: build %s (fp=%08x)\n",
@@ -1338,17 +1359,6 @@ static void gwed_publish_identity(void)
      * differ, and the text says WHICH mod and which option. */
     fprintf(stderr, "game: mod set (fp=%08x):\n%s",
             (unsigned)content_fp, content);
-#if defined(SNESRECOMP_NET_ROLLBACK)
-    /* Static so the netplay layer can hold the pointer for the session: it
-     * publishes this verbatim as host, and checks the host's against it as a
-     * peer. */
-    {
-        static char s_modset[2048];
-        snprintf(s_modset, sizeof(s_modset), "%s", content);
-        snes_netplay_rb_set_modset(s_modset, &snes_mod_runtime_check_set_c,
-                                   &snes_mod_runtime_adopt_set_c);
-    }
-#endif
 #if defined(SNESRECOMP_NET_ROLLBACK)
     snes_netplay_rb_set_identity(build_fp, content_fp);
 #endif
