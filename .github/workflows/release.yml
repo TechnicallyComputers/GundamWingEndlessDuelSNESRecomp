@@ -1,25 +1,31 @@
-# Build Gundam Wing Endless Duel on Linux. MANUAL TRIGGER ONLY.
+# Build Gundam Wing Endless Duel for Linux, Windows, macOS arm64 and macOS
+# Intel, and optionally publish the four zips as a GitHub Release.
 #
-# There is deliberately no push or pull_request trigger. Releases across the
-# port set are driven from the studio bulk tool, and a per-repo workflow that
-# fires on every push competes with it: it burns minutes rebuilding commits
-# nobody asked about, and it makes "did CI pass" ambiguous when the bulk run
-# and a push-triggered run disagree. Run this from the Actions tab, or with
-#   gh workflow run release.yml
-# and pass publish_release from a v* tag to cut a release.
+# THE ROM IS NEVER IN CI AND NEVER IN A ZIP. Players supply their own copy and
+# the binary reads it at launch.
 #
-# The ROM is never stored in CI and never shipped. This workflow therefore
-# builds the framework and the host, but CANNOT generate src/gen/*.c — that
-# needs a ROM. Two ways to make the build step real, both deliberate choices
-# for the project owner rather than defaults chosen here:
+# That constraint is the whole shape of this workflow. src/gen/*.c and
+# recomp/funcs.h are recompiler output derived from ROM bytes, so they are not
+# committed and cannot be regenerated here. The build gets them from a private
+# assets repository that a human publishes to from their own machine:
 #
-#   1. Publish prebuilt generated C to a private assets repo and fetch it
-#     with a token (the pattern MetalWarriorsSNESRecomp uses).
-#   2. Keep CI to the checks that need no ROM: submodule pins, framework
-#      tests, and a compile of the host sources.
+#   bash tools/publish_ci_src_gen.sh          # after a local tools/regen.sh
 #
-# As shipped this does (2), so a fresh project has a green pipeline that
-# tells the truth about what it verified.
+# Required repository secret:
+#   CI_ASSETS_TOKEN — fine-grained PAT with Contents: Read on the assets repo
+#                     (default TechnicallyComputers/psxrecomp-ci-assets).
+# Optional repository variables:
+#   CI_SRC_GEN_REPO  — override the assets repo
+#   CI_SRC_GEN_ASSET — override the path within it
+#
+# Without that secret this workflow fails on its first step with instructions,
+# rather than quietly building something that is not the game. A green check
+# here means four real game binaries were produced.
+#
+# Triggers: manual (Actions tab / `gh workflow run release.yml`) and v* tags.
+# Deliberately NOT push/pull_request: releases across the port set are driven
+# from the studio bulk tool, and a per-push run competes with it for minutes
+# and for the meaning of "did CI pass".
 
 name: Build
 
@@ -30,62 +36,306 @@ on:
         description: 'Publish a GitHub Release (requires a v* tag ref)'
         type: boolean
         default: false
+      verify_pins:
+        description: 'Fail if the submodules disagree with framework_pins.txt'
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
+env:
+  SRC_GEN_REPO: ${{ vars.CI_SRC_GEN_REPO || 'TechnicallyComputers/psxrecomp-ci-assets' }}
+  SRC_GEN_ASSET: ${{ vars.CI_SRC_GEN_ASSET || 'gundamwing/src-gen.zip' }}
+  SDL3_VERSION: '3.4.10'
+
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      publish: ${{ steps.meta.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 1
 
-      - name: Install build dependencies
+      # Fail here, once, rather than four times in the matrix.
+      - name: Check the CI assets token
+        env:
+          CI_ASSETS_TOKEN: ${{ secrets.CI_ASSETS_TOKEN }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build libsdl2-dev zip
+          set -euo pipefail
+          if [[ -z "${CI_ASSETS_TOKEN}" ]]; then
+            echo "::error::CI_ASSETS_TOKEN is missing or empty."
+            echo "This workflow builds the real game, which needs the generated C"
+            echo "from ${SRC_GEN_REPO}:${SRC_GEN_ASSET}."
+            echo "Add a fine-grained PAT with Contents: Read on that repo as the"
+            echo "repository secret CI_ASSETS_TOKEN, and publish the archive with"
+            echo "  bash tools/publish_ci_src_gen.sh"
+            echo "Fork pull requests cannot read repository secrets — run this from"
+            echo "the main repo."
+            exit 1
+          fi
+          echo "CI_ASSETS_TOKEN present."
 
       - name: Record framework pins
         run: |
-          echo "Framework pins this build used:"
-          cat framework_pins.txt
-          git submodule status --recursive
+          set -euo pipefail
+          ARGS=()
+          if [[ "${{ inputs.verify_pins }}" == "true" ]]; then
+            ARGS+=(--check framework_pins.txt)
+          fi
+          bash snesrecomp/tools/ci/record_pins.sh "${ARGS[@]}"
 
-      - name: Framework tests
-        run: bash snesrecomp/tests/run_c_tests.sh
-
-      - name: Verify the host compiles
+      - name: Resolve release version
+        id: meta
         run: |
-          # No ROM in CI, so src/gen/ is empty and the game target cannot
-          # link. Compile the host translation units on their own so a syntax
-          # or API break still fails the pipeline.
-          for src in src/main.c src/game_rtl.c src/codegen_setup.c; do
-            echo "  cc $src"
-            cc -fsyntax-only -I src -I recomp \
-               -I snesrecomp/runner/src -I snesrecomp/runner/src/snes \
-               $(pkg-config --cflags sdl2) "$src"
-          done
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          if [[ -z "${VERSION}" ]]; then
+            echo "::error::VERSION is empty"
+            exit 1
+          fi
 
-      - name: Refuse to publish from a non-tag ref
-        if: inputs.publish_release && !startsWith(github.ref, 'refs/tags/v')
+          PUBLISH=false
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            PUBLISH=true
+          elif [[ "${{ inputs.publish_release }}" == "true" ]]; then
+            PUBLISH=true
+          fi
+
+          if [[ "${PUBLISH}" == "true" ]]; then
+            if [[ "${GITHUB_REF}" != refs/tags/v* ]]; then
+              echo "::error::a release was requested, but this run is on ${GITHUB_REF}."
+              echo "Re-run selecting a v* tag."
+              exit 1
+            fi
+            # VERSION is the lobby pin compiled into the binary. A tag that
+            # disagrees with it ships a release whose peers match on a
+            # different string than the one people were told to install.
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            if [[ "${TAG_VERSION}" != "${VERSION}" ]]; then
+              echo "::error::tag ${GITHUB_REF_NAME} does not match VERSION ${VERSION}."
+              echo "The lobby version pin is compiled from VERSION; bump it and retag."
+              exit 1
+            fi
+          fi
+
+          echo "version=${VERSION}" >>"$GITHUB_OUTPUT"
+          echo "publish=${PUBLISH}" >>"$GITHUB_OUTPUT"
+          echo "version ${VERSION}, publish ${PUBLISH}"
+
+  build:
+    name: ${{ matrix.artifact }}
+    needs: preflight
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            artifact: linux-x64
+            shell: bash
+          - os: windows-2022
+            artifact: windows-x64
+            shell: 'msys2 {0}'
+          - os: macos-15
+            artifact: macos-arm64
+            shell: bash
+            deployment_target: '11.0'
+          - os: macos-15-intel
+            artifact: macos-x64
+            shell: bash
+            deployment_target: '11.0'
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    env:
+      RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      # Everything before the MSYS2 setup runs in plain bash, because the
+      # job's default shell does not exist yet on the Windows runner.
+      - name: Record framework pins
+        shell: bash
+        run: bash snesrecomp/tools/ci/record_pins.sh
+
+      - name: Restore generated C
+        shell: bash
+        env:
+          CI_ASSETS_TOKEN: ${{ secrets.CI_ASSETS_TOKEN }}
         run: |
-          echo "publish_release was set, but this run is on ${GITHUB_REF}." >&2
-          echo "Re-run the workflow selecting a v* tag." >&2
-          exit 1
+          bash snesrecomp/tools/ci/fetch_src_gen.sh \
+            --repo "${SRC_GEN_REPO}" \
+            --asset "${SRC_GEN_ASSET}" \
+            --expect 'src/gen/*.c'
+
+      - name: Setup MSYS2 (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-SDL3
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-python
+            zip
+
+      - name: Install deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          # X11/wayland/audio headers are for the SDL3 source build below;
+          # ubuntu-24.04 predates libsdl3-dev and has no package for it.
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config python3 zip \
+            libgl1-mesa-dev libx11-dev libxext-dev libxrandr-dev \
+            libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
+            libxkbcommon-dev libwayland-dev wayland-protocols \
+            libdecor-0-dev libasound2-dev libpulse-dev libudev-dev
+
+      - name: Install deps (macOS)
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja pkg-config dylibbundler
+
+      # Only Linux builds SDL3 from source, so only Linux needs the cache.
+      - name: Cache SDL3 build
+        if: runner.os == 'Linux'
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/sdl3-prefix
+            .cache/SDL3-${{ env.SDL3_VERSION }}.tar.gz
+          key: sdl3-${{ matrix.artifact }}-${{ env.SDL3_VERSION }}
+
+      - name: Provide SDL3
+        run: |
+          bash snesrecomp/tools/ci/provision_sdl3.sh --version "${SDL3_VERSION}"
+
+      - name: Configure and build
+        env:
+          DEPLOYMENT_TARGET: ${{ matrix.deployment_target || '' }}
+        run: |
+          set -euo pipefail
+          EXTRA=()
+          if [[ -n "${DEPLOYMENT_TARGET}" ]]; then
+            EXTRA+=("-DCMAKE_OSX_DEPLOYMENT_TARGET=${DEPLOYMENT_TARGET}")
+          fi
+          if [[ "$(uname -s)" == "Linux" ]]; then
+            # SDL3 is built into a CI cache directory that will not exist on a
+            # player's disk, so the packager copies it beside the executable.
+            # $ORIGIN is what makes the loader look there.
+            EXTRA+=('-DCMAKE_BUILD_RPATH=$ORIGIN')
+          fi
+          JOBS="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+          cmake -S . -B build-ci -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSNESRECOMP_ENABLE_TRACE=OFF \
+            -DSNESRECOMP_NET_ICE=ON \
+            -DSNESRECOMP_BUILD_VERSION="${RELEASE_VERSION}" \
+            "${EXTRA[@]}"
+          # The localization staging target is what puts mods/ and
+          # translations/ beside the executable; the packager refuses to ship
+          # a zip without them.
+          cmake --build build-ci -j"${JOBS}" \
+            --target GundamWingEndlessDuelSNESRecomp \
+                     GundamWingEndlessDuelSNESRecompStageLocalization
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          bash scripts/package_release.sh build-ci "${{ matrix.artifact }}"
+          ls -la dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gundamwingendlessduel-${{ matrix.artifact }}
+          path: dist/gundamwingendlessduel-*-${{ matrix.artifact }}.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: GitHub Release
+    needs: [preflight, build]
+    if: needs.preflight.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect zips
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find artifacts -type f -name 'gundamwingendlessduel-*.zip' -exec cp -v {} dist/ \;
+          # Four platforms in, four zips out. A release that silently carries
+          # three is the failure this counts for.
+          count="$(find dist -name 'gundamwingendlessduel-*.zip' | wc -l | tr -d ' ')"
+          if [[ "${count}" -ne 4 ]]; then
+            echo "::error::expected 4 platform zips, found ${count}"
+            ls -la dist
+            exit 1
+          fi
+          ( cd dist && sha256sum gundamwingendlessduel-*.zip > SHA256SUMS )
+          cat dist/SHA256SUMS
 
       - name: Release notes
-        if: inputs.publish_release
         run: |
-          echo "Gundam Wing Endless Duel ${GITHUB_REF_NAME}" > notes.md
-          echo "" >> notes.md
-          echo "Players supply their own ROM. No ROM data is included." >> notes.md
-          cat framework_pins.txt >> notes.md
+          set -euo pipefail
+          {
+            echo "Gundam Wing Endless Duel Recompiled ${GITHUB_REF_NAME}"
+            echo
+            echo "Players supply their own ROM. No ROM data is included in these"
+            echo "packages — pick your copy of Shin Kidou Senki Gundam W - Endless"
+            echo "Duel (Japan) on first launch (SHA-256"
+            echo "dd94308d822636c6ddf73c5e2644c84f2eb8fb4d9201150fc5f37d44d6f423f1)."
+            echo
+            echo "Netplay lobbies match on this version string, so every peer in a"
+            echo "match must be on the same release."
+            echo
+            echo '### Framework revisions'
+            echo
+            echo '```'
+            bash snesrecomp/tools/ci/record_pins.sh
+            echo '```'
+          } > notes.md
+          cat notes.md
 
       - name: Publish release
-        if: inputs.publish_release
         uses: softprops/action-gh-release@v2
         with:
+          name: "Gundam Wing Endless Duel Recompiled ${{ github.ref_name }}"
           body_path: notes.md
+          files: |
+            dist/gundamwingendlessduel-*.zip
+            dist/SHA256SUMS
+          fail_on_unmatched_files: true
