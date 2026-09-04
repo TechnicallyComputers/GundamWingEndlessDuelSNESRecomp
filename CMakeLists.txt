@@ -4,21 +4,75 @@ project(GundamWingEndlessDuelSNESRecomp C CXX)
 set(CMAKE_C_STANDARD 11)
 
 # Release pin for lobby matching. Release builds stamp the VERSION file so two
-# peers can prove they are the same build; everything else stamps "dev".
+# peers can prove they are the same build.
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" _GAME_VER_RAW)
 string(STRIP "${_GAME_VER_RAW}" GAME_RELEASE_VERSION)
+
+# Everything else stamps "dev+<short commit>", and "-dirty" when the tree has
+# uncommitted changes.
+#
+# A bare "dev" made every development build claim the same identity, so the
+# server's version_mismatch check -- the thing that is supposed to stop two
+# different builds meeting -- passed for any pair of them. Two peers running
+# different code seated happily and the divergence surfaced later as a desync,
+# which is the expensive way to learn it.
+#
+# The dirty marker is a warning, not an identity: two dirty trees are NOT
+# distinguished from each other, because hashing the working tree on every
+# configure costs more than it is worth. It says "this build is not what its
+# commit says", which is the part a reader needs.
+set(SNESRECOMP_DEV_VERSION "dev")
+find_package(Git QUIET)
+if(GIT_FOUND)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-parse --short=8 HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE _git_sha OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET RESULT_VARIABLE _git_rc)
+    if(_git_rc EQUAL 0 AND _git_sha)
+        set(SNESRECOMP_DEV_VERSION "dev+${_git_sha}")
+        # Submodules count: the framework is most of what a build IS, so a
+        # bumped snesrecomp with an untouched game tree is a different build.
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" status --porcelain --untracked-files=no
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            OUTPUT_VARIABLE _git_dirty OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET)
+        if(NOT _git_dirty STREQUAL "")
+            set(SNESRECOMP_DEV_VERSION "${SNESRECOMP_DEV_VERSION}-dirty")
+            set(_git_dirty_flag TRUE)
+        endif()
+    endif()
+endif()
+message(STATUS "Lobby version pin (non-release): ${SNESRECOMP_DEV_VERSION}")
+
+# A Release-TYPE build is not automatically a released BUILD. Configuring with
+# -DCMAKE_BUILD_TYPE=Release in a working tree with local changes stamped the
+# bare VERSION string, so a binary full of uncommitted work presented itself as
+# 0.1.0 and matched every other 0.1.0 on the wire -- the same lie a bare "dev"
+# told, wearing a release number. A clean tree still stamps the plain version,
+# so CI artifacts are unaffected; anything else carries what it really is.
+set(GAME_RELEASE_PIN "${GAME_RELEASE_VERSION}")
+if(_git_dirty_flag)
+    set(GAME_RELEASE_PIN "${GAME_RELEASE_VERSION}+${_git_sha}-dirty")
+    message(WARNING
+        "Release build from a modified tree: pinning lobby version as "
+        "'${GAME_RELEASE_PIN}'. It will not match a clean ${GAME_RELEASE_VERSION} build.")
+endif()
+
 set(SNESRECOMP_BUILD_VERSION "" CACHE STRING
-    "Lobby release pin (empty = Release uses VERSION, else dev)")
+    "Lobby release pin (empty = Release uses VERSION, else dev+<sha>)")
 if(SNESRECOMP_BUILD_VERSION STREQUAL "")
     get_property(_is_multi GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
     if(_is_multi)
-        set(SNESRECOMP_BUILD_VERSION "$<IF:$<CONFIG:Release>,${GAME_RELEASE_VERSION},dev>")
+        set(SNESRECOMP_BUILD_VERSION "$<IF:$<CONFIG:Release>,${GAME_RELEASE_PIN},${SNESRECOMP_DEV_VERSION}>")
     elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-        set(SNESRECOMP_BUILD_VERSION "${GAME_RELEASE_VERSION}")
+        set(SNESRECOMP_BUILD_VERSION "${GAME_RELEASE_PIN}")
     else()
-        set(SNESRECOMP_BUILD_VERSION "dev")
+        set(SNESRECOMP_BUILD_VERSION "${SNESRECOMP_DEV_VERSION}")
     endif()
 endif()
+message(STATUS "Lobby version pin: ${SNESRECOMP_BUILD_VERSION}")
 
 # ICE (STUN/TURN via static libjuice) — required for internet play. The
 # public lobby hands out HOSTED sessions, and a build without ICE refuses
