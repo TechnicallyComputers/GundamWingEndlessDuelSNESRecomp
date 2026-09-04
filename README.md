@@ -83,7 +83,7 @@ scripts/package_release.sh build-setup linux-x64 [--embed-toolchain]
 "setup" host from a tree that has generated C. `.github/workflows/release.yml`
 does the same for four platforms.
 
-<!-- retcomm-readme-launcher -->
+<!-- retcomm-readme-launcher
 ## RetComM Launcher
 
 You can run this title **standalone** (release zip + the built-in recomp-ui
@@ -106,7 +106,7 @@ the Retro Compilation Manager hub for self-compiling recomps.
 RetComM checks for updates, rebuilds with existing build data when possible,
 shares the portable toolchain used by per-title launchers, and automates
 BIOS/ROM/save plumbing so you are not stuck repeating each game’s wizard by hand.
-<!-- /retcomm-readme-launcher -->
+/retcomm-readme-launcher -->
 
 ## Layout
 
