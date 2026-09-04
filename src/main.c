@@ -521,9 +521,15 @@ static int g_vsync = 1;
  * Averaging each presented frame with the previous one makes both phases
  * present in every displayed frame, so the flicker becomes steady 50%
  * translucency and stops caring about pacing at all. Costs half a frame of
- * motion ghosting, so it is a Display-settings checkbox, off by default.
- * Persisted as [Video] FrameBlend in config.ini. */
-static int g_frame_blend = 0;
+ * motion ghosting, so it is a Display-settings checkbox. Persisted as
+ * [Video] FrameBlend in config.ini.
+ *
+ * ON by default for this title: Endless Duel leans on 30 Hz flicker for
+ * thruster flames, shadows and HUD translucency, so a fresh install without
+ * blending shows the artifact the checkbox exists to remove. The default
+ * lives in one place so the launcher seed and the boot read cannot drift. */
+#define GWED_FRAME_BLEND_DEFAULT 1
+static int g_frame_blend = GWED_FRAME_BLEND_DEFAULT;
 static uint32_t g_blend_prev[GAME_MAX_WIDTH * GAME_HEIGHT];
 static int g_blend_prev_valid = 0;
 
@@ -1085,7 +1091,7 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
      * show the current state rather than resetting every boot. VSync uses
      * the ABI's 1-based encoding (0 would mean "unset" and be reseeded On,
      * silently flipping this title's ships-off default). */
-    fb_seed = game_config_int("[Video]", "FrameBlend", 0) ? 1 : 0;
+    fb_seed = game_config_int("[Video]", "FrameBlend", GWED_FRAME_BLEND_DEFAULT) ? 1 : 0;
     ls.frame_blend   = fb_seed;
     vs_seed = game_config_int("[Video]", "Vsync", 0) ? 1 : 0;
     ls.vsync         = vs_seed ? RECOMP_LAUNCHER_VSYNC_ON
@@ -1829,7 +1835,8 @@ session_reboot:
     /* Launcher Display checkbox lands here via the [Video] FrameBlend
      * write-back in run_gui_launcher, so this read is the single source of
      * truth for both the GUI and text-mode boot paths. */
-    g_frame_blend = game_config_int("[Video]", "FrameBlend", 0) != 0;
+    g_frame_blend = game_config_int("[Video]", "FrameBlend",
+                                    GWED_FRAME_BLEND_DEFAULT) != 0;
     g_blend_prev_valid = 0;   /* never blend across a session reboot */
     if (g_frame_blend)
         fprintf(stderr,
