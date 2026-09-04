@@ -123,15 +123,6 @@ set(SNESRECOMP_ENABLE_MODS ON CACHE BOOL
     "Enable Endless Duel's built-in localization mod catalog" FORCE)
 include(${SNESRECOMP_ROOT}/runner/runner.cmake)
 
-# Generated recompiler output. Not committed: it is derived from a copyrighted
-# ROM, so every developer regenerates it locally from their own copy.
-file(GLOB GAME_GEN_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/gen/*.c)
-if(NOT GAME_GEN_SOURCES)
-    message(FATAL_ERROR
-        "src/gen/ is empty — run `bash tools/regen.sh` with a verified "
-        "Shin Kidou Senki Gundam W - Endless Duel (Japan).sfc at the repo root before building.")
-endif()
-
 add_executable(GundamWingEndlessDuelSNESRecomp
     ${SNESRECOMP_RUNNER_SOURCES}
     src/main.c
@@ -143,8 +134,18 @@ add_executable(GundamWingEndlessDuelSNESRecomp
     src/translation_mod.c
     src/widescreen_mod.c
     src/gen_stubs.c
-    ${GAME_GEN_SOURCES}
 )
+
+# Generated recompiler output. Not committed: it is derived from a copyrighted
+# ROM, so every developer regenerates it locally from their own copy -- and a
+# release does not ship it either. With -DSNESRECOMP_SETUP_HOST=ON and an empty
+# src/gen/, this builds the SETUP HOST instead: the same executable minus the
+# recompiled code, whose only path is the launcher's Generate & rebuild wizard.
+# That is what the release zips contain; the player's own machine produces the
+# playable binary from their own ROM. Without the option an empty src/gen/ is
+# still a hard error (the framework owns the message).
+snesrecomp_target_generated_code(GundamWingEndlessDuelSNESRecomp
+    ${CMAKE_SOURCE_DIR}/src/gen)
 
 target_include_directories(GundamWingEndlessDuelSNESRecomp PRIVATE
     ${SNESRECOMP_RUNNER_INCLUDE_DIRS}
@@ -207,6 +208,17 @@ include(${RECOMP_UI_ROOT}/recomp_ui.cmake)
 recomp_target_launcher_ui(GundamWingEndlessDuelSNESRecomp CONSOLE snes
     BOXART "${CMAKE_SOURCE_DIR}/launcher_assets/img/boxart.tga")
 
+# Generate & rebuild from inside the launcher: pick ROM -> recompile locally
+# -> cmake --build -> relaunch. The implementation is the framework's; this
+# project contributes no configuration (snesrecomp_codegen_host_autowire in
+# src/main.c). recomp-ui/src is on the include path because the host speaks
+# RecompLauncherCGameInfo.
+target_sources(GundamWingEndlessDuelSNESRecomp PRIVATE
+    ${SNESRECOMP_ROOT}/host/snesrecomp_codegen_host.c)
+target_include_directories(GundamWingEndlessDuelSNESRecomp PRIVATE
+    ${SNESRECOMP_ROOT}/host
+    ${RECOMP_UI_ROOT}/src)
+
 add_custom_target(GundamWingEndlessDuelSNESRecompStageLocalization ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/mods"
@@ -233,13 +245,6 @@ add_dependencies(GundamWingEndlessDuelSNESRecompStageLocalization
 # is what compiles the netplay blocks in src/main.c and lights the launcher's
 # netplay button). LAN by default; opt into ICE with -DSNESRECOMP_NET_ICE=ON.
 snesrecomp_enable_recomp_net(GundamWingEndlessDuelSNESRecomp)
-
-# Generated C is machine output: it is not held to the runner's warning bar,
-# and treating it as such buries real warnings from hand-written host code.
-if(NOT MSVC)
-    set_source_files_properties(${GAME_GEN_SOURCES} PROPERTIES
-        COMPILE_OPTIONS "-w")
-endif()
 
 snesrecomp_enable_recomp_net(GundamWingEndlessDuelSNESRecomp)
 # Rollback netcode is an optional framework feature. Calling it unguarded

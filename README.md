@@ -61,6 +61,28 @@ prefer that; `.gitignore` blocks it from ever being committed either way.
 `tools/regen.sh` verifies the ROM, generates `src/gen/*.c`, and re-syncs
 `recomp/funcs.h`. Re-run it whenever you change anything under `recomp/`.
 
+### Releases are setup packs
+
+A release zip does not contain the game — nothing derived from the ROM ever
+does. It contains a **setup host** (this executable built with
+`-DSNESRECOMP_SETUP_HOST=ON`, i.e. without recompiled code), the recompiler,
+and this source tree. On first run the launcher takes your ROM, generates,
+rebuilds into `build/`, and relaunches into the real game. The build tools
+(the retcomm `cmake-clang-v1` pack) are embedded in the zip, or downloaded
+once per machine if you chose a lean pack.
+
+To produce one locally:
+
+```sh
+cmake -S . -B build-setup -DCMAKE_BUILD_TYPE=Release -DSNESRECOMP_SETUP_HOST=ON
+cmake --build build-setup -j
+scripts/package_release.sh build-setup linux-x64 [--embed-toolchain]
+```
+
+`src/gen/` must be empty for that configure; the framework refuses to build a
+"setup" host from a tree that has generated C. `.github/workflows/release.yml`
+does the same for four platforms.
+
 <!-- retcomm-readme-launcher -->
 ## RetComM Launcher
 

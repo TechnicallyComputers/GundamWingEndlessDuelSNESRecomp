@@ -56,6 +56,7 @@
  * project was scaffolded with --no-recomp-ui, and every launcher block in
  * this file compiles out with it. */
 #include "recomp_launcher.h"
+#include "snesrecomp_codegen_host.h"  /* Generate & rebuild wizard (framework) */
 #include "launcher_profile.h"
 #include "launcher_binds.h"  /* launcher_ini_kv_write — persist Display toggles */
 #endif
@@ -1131,6 +1132,13 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     gi.netplay = snes_host_lobby_callbacks();
 #endif
 
+    /* Generate & rebuild: the launcher's first-run wizard takes the player's
+     * own ROM, runs the recompiler locally, rebuilds, and relaunches. The
+     * framework owns every path and default; this host supplies only the
+     * label. It is what makes a SETUP HOST (a build with no recompiled code,
+     * see CMakeLists) into a playable game on the player's machine. */
+    snesrecomp_codegen_host_autowire(&gi, "Gundam Wing Endless Duel");
+
     out[0] = '\0';
     lr = recomp_launcher_run_window("Gundam Wing Endless Duel", &ls, &gi, assets_dir,
                                     (initial_rom && initial_rom[0]) ? initial_rom
@@ -1217,9 +1225,18 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
         return -1;
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && out[0])
         return 1;
-    /* UNAVAILABLE (assets or GL missing) and RELAUNCH (only reachable once a
-     * host wires gi.rebuild_with_progress, which this scaffold does not) both
-     * mean "the GUI produced no ROM" — resolve one the text-mode way. */
+    if (lr == RECOMP_LAUNCHER_RESULT_RELAUNCH) {
+        /* Generate & rebuild finished: the playable binary is in build/. Hand
+         * over to it (exec on POSIX; on Windows a helper rebuilds after this
+         * process exits, because the running .exe cannot be overwritten).
+         * Does not return. */
+#if defined(SNES_HAS_LOBBY_CLIENT)
+        snes_host_lobby_leave();
+#endif
+        snesrecomp_codegen_host_relaunch_or_exit(out);
+    }
+    /* UNAVAILABLE (assets or GL missing) means "the GUI produced no ROM" —
+     * resolve one the text-mode way. */
     out[0] = '\0';
     return 0;
 }
