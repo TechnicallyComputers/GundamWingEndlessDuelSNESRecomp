@@ -92,6 +92,10 @@ static int g_netplay_active_session;
  * callback runs inside the launcher, before the session has been configured,
  * so it must read the ini rather than the display module's live state. */
 static int game_config_int(const char *section, const char *key, int fallback);
+/* Same file and section walk as game_config_int, for values that are not
+ * numbers -- a controller GUID is 32 hex characters, not an int. */
+static int game_config_str(const char *section, const char *key,
+                           char *out, size_t cap);
 
 /* ── Match caps (MetalWarriorsSNESRecomp/src/main.c MwFillMatchCaps) ──────
  *
@@ -521,6 +525,53 @@ static int g_vsync = 1;
 static int g_frame_blend = 0;
 static uint32_t g_blend_prev[GAME_MAX_WIDTH * GAME_HEIGHT];
 static int g_blend_prev_valid = 0;
+
+static int game_config_str(const char *section, const char *key,
+                           char *out, size_t cap)
+{
+    static const char *paths[] = {"config.ini", "../config.ini"};
+    size_t p;
+    if (!out || !cap) return 0;
+    out[0] = '\0';
+    for (p = 0; p < sizeof(paths) / sizeof(paths[0]); ++p) {
+        FILE *f = fopen(paths[p], "rb");
+        char line[512];
+        int in_section = 0;
+        if (!f)
+            continue;
+        while (fgets(line, sizeof(line), f)) {
+            char *s = line, *eq;
+            while (*s == ' ' || *s == '\t') s++;
+            if (*s == '[') {
+                in_section = (SDL_strncasecmp(s, section, strlen(section)) == 0);
+                continue;
+            }
+            if (!in_section || *s == '#' || *s == ';')
+                continue;
+            eq = strchr(s, '=');
+            if (!eq)
+                continue;
+            *eq = 0;
+            {
+                char *k = s, *v = eq + 1, *end = k + strlen(k);
+                while (end > k && (end[-1] == ' ' || end[-1] == '\t')) *--end = 0;
+                if (SDL_strcasecmp(k, key) == 0) {
+                    char *ve;
+                    while (*v == ' ' || *v == '\t') v++;
+                    ve = v + strlen(v);
+                    while (ve > v && (ve[-1] == '\n' || ve[-1] == '\r' ||
+                                      ve[-1] == ' '  || ve[-1] == '\t'))
+                        *--ve = 0;
+                    snprintf(out, cap, "%s", v);
+                    fclose(f);
+                    return out[0] != '\0';
+                }
+            }
+        }
+        fclose(f);
+    }
+    return 0;
+}
 
 static int game_config_int(const char *section, const char *key, int fallback)
 {
@@ -969,7 +1020,66 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     ls.enable_audio  = 1;
     ls.audio_freq    = 32000;
     ls.volume        = 100;
-    ls.player_src[0] = 1;      /* keyboard */
+    ls.player_src[0] = 1;      /* keyboard, unless a slot was saved below */
+
+    /* ---- controller state, restored per slot ---------------------------
+     *
+     * Which device each player uses, and its deadzone, are remembered in
+     * config.ini so a configured controller survives closing the app. Without
+     * this the launcher reseeded Keyboard every boot and a player re-picked
+     * their pad each session -- and, because the pad-bind rows follow the
+     * selected source, their mappings looked absent until they did.
+     *
+     * The GUID is the identity that persists: SDL instance ids are assigned
+     * per connection and mean nothing across runs. */
+    {
+        int q;
+        /* Every slot the ABI can carry, not a hardcoded pair: this title shows
+         * two, but a multitap build shows more and a loop that stopped at two
+         * would silently forget the rest. */
+        for (q = 0; q < RECOMP_LAUNCHER_MAX_PLAYERS; ++q) {
+            char key[32];
+            char guid[64];
+            int src, dz;
+
+            snprintf(key, sizeof(key), "SourceP%d", q + 1);
+            src = game_config_int("[Controller]", key, q == 0 ? 1 : 0);
+            snprintf(key, sizeof(key), "GuidP%d", q + 1);
+            guid[0] = '\0';
+            (void)game_config_str("[Controller]", key, guid, sizeof(guid));
+
+            /* A saved gamepad source is only honoured with a GUID to name it;
+             * "source 2, device unknown" would leave the player pointed at
+             * whatever pad happened to enumerate first. */
+            if (src == 2 && guid[0]) {
+                ls.player_src[q] = 2;
+                snprintf(ls.player_gamepad_guid[q],
+                         sizeof(ls.player_gamepad_guid[q]), "%s", guid);
+            } else if (src == 1) {
+                ls.player_src[q] = 1;
+            }
+
+            /* 10% by default. A pad resting slightly off-centre otherwise
+             * reads as held: it walks menus on its own, and during a capture
+             * it commits the drift as the binding before the player has
+             * touched anything. */
+            snprintf(key, sizeof(key), "DeadzoneP%d", q + 1);
+            dz = game_config_int("[Controller]", key, 10);
+            if (dz < 0)   dz = 0;
+            if (dz > 100) dz = 100;
+            ls.deadzone[q] = dz;
+
+            /* Say what was restored. The launcher can and does adjust these
+             * afterwards, so a value on screen that differs from the file is
+             * not necessarily a failed read -- without this line the two are
+             * indistinguishable. */
+            if (ls.player_src[q] != 0 || guid[0])
+                fprintf(stderr,
+                        "controller: slot %d restored src=%d deadzone=%d%%%s%s\n",
+                        q + 1, ls.player_src[q], ls.deadzone[q],
+                        guid[0] ? " guid=" : "", guid[0] ? guid : "");
+        }
+    }
     /* Seed the Display checkboxes from their persisted home so the boxes
      * show the current state rather than resetting every boot. VSync uses
      * the ABI's 1-based encoding (0 would mean "unset" and be reseeded On,
@@ -1060,6 +1170,48 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
         if (vs_new != vs_seed)
             launcher_ini_kv_write("config.ini", "Video", "Vsync",
                                   vs_new ? "1" : "0");
+    }
+    /* Persist the controller slots so the next run comes up configured.
+     * Written unconditionally on launch (unlike the Display boxes, which only
+     * write on change): the whole point is that the selection survives, and a
+     * player who never reopens the panel still expects their pad next time. */
+    if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH) {
+        int q;
+        for (q = 0; q < RECOMP_LAUNCHER_MAX_PLAYERS; ++q) {
+            char key[32];
+            char val[64];
+
+            /* An untouched slot writes nothing: a two-player title should not
+             * leave six empty triples in the file. A slot that has ever been
+             * configured keeps being written, including back to "none", so
+             * clearing one is remembered too. */
+            if (ls.player_src[q] == 0 && !ls.player_gamepad_guid[q][0]) {
+                snprintf(key, sizeof(key), "SourceP%d", q + 1);
+                if (game_config_int("[Controller]", key, -1) < 0)
+                    continue;
+            }
+
+            snprintf(key, sizeof(key), "SourceP%d", q + 1);
+            snprintf(val, sizeof(val), "%d", ls.player_src[q]);
+            launcher_ini_kv_write("config.ini", "Controller", key, val);
+
+            snprintf(key, sizeof(key), "GuidP%d", q + 1);
+            launcher_ini_kv_write("config.ini", "Controller", key,
+                                  ls.player_gamepad_guid[q]);
+
+            snprintf(key, sizeof(key), "DeadzoneP%d", q + 1);
+            snprintf(val, sizeof(val), "%d", ls.deadzone[q]);
+            launcher_ini_kv_write("config.ini", "Controller", key, val);
+
+            /* Says what actually went to disk. Paired with the "restored" line
+             * above, a single log tells whether a slot that came back wrong
+             * was saved wrong or read wrong -- without it the two are
+             * indistinguishable from the outside. */
+            fprintf(stderr, "controller: slot %d saved src=%d deadzone=%d%%%s%s\n",
+                    q + 1, ls.player_src[q], ls.deadzone[q],
+                    ls.player_gamepad_guid[q][0] ? " guid=" : "",
+                    ls.player_gamepad_guid[q]);
+        }
     }
     if (lr == RECOMP_LAUNCHER_RESULT_QUIT)
         return -1;
