@@ -1308,7 +1308,29 @@ static void gwed_publish_identity(void)
         return;
     }
     build_fp = gwed_fnv1a(GWED_BUILD_ID);
-    content_fp = gwed_fnv1a(content);
+
+    /* Fingerprint what the mods DID, not only what was selected.
+     *
+     * The selection above says "localization language=en" on both peers as
+     * soon as both have the package enabled. It says nothing about whether the
+     * translation table was actually found and loaded -- and a peer shipped
+     * without translations/ enables the mod, fails to open the table, and runs
+     * the game untranslated while reporting an identical set. Both sides then
+     * agreed on an identity that described only one of them, the match started,
+     * and the peers diverged in guest memory a few seconds in.
+     *
+     * The xlate identity is "off" unless a table is loaded, so that case now
+     * produces different fingerprints and the match is refused with a reason
+     * instead of desyncing. Kept OUT of the modset text: that text is parsed
+     * by check_set as a selection, and this is an outcome, not a selection. */
+    {
+        char ident[2048 + 64];
+        char xlate[32];
+        snes_text_xlate_identity_c(xlate, (int)sizeof(xlate));
+        snprintf(ident, sizeof(ident), "%sxlate=%s\n", content, xlate);
+        content_fp = gwed_fnv1a(ident);
+        fprintf(stderr, "game: active translation: %s\n", xlate);
+    }
 
     fprintf(stderr, "game: build %s (fp=%08x)\n",
             GWED_BUILD_ID, (unsigned)build_fp);
