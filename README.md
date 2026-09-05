@@ -144,8 +144,7 @@ The scaffold stops where the game-specific work starts. In rough order:
 
 Two players, one controller per port.
 
-Netplay is built with rollback available (`SNES_NET_MODE=rollback`); delay-sync
-remains the default. See `snesrecomp/docs/ROLLBACK.md`.
+Netplay is built with rollback available (`SNES_NET_MODE=rollback`); See `snesrecomp/docs/ROLLBACK.md`.
 
 ## License
 
