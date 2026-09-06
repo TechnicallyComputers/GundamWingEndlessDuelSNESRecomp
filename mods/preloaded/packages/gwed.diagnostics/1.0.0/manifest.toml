@@ -1,0 +1,69 @@
+format_version = 1
+id = "gwed.diagnostics"
+version = "1.0.0"
+name = "Gundam Wing Endless Duel Performance Log"
+author = "mstan"
+description = "Writes a performance diagnostic log beside the game executable (gwed_diagnostics.log) so a stutter can be reported as a measurement instead of a description. Records how long each emulated frame actually took, one summary line per second, and a line for every frame that overran the budget -- with the machine, the video and audio backend, the vsync and frame-blend settings, and whether netplay was running, because those are the first things anyone asks. Reads the clock and writes text: it never touches the guest CPU, WRAM, OAM or save states, so a session with this on is bit-identical to one without and two netplay peers stay in sync whether or not either of them enabled it."
+license = "MIT"
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "gwed-jp"
+rom_sha256 = "dd94308d822636c6ddf73c5e2644c84f2eb8fb4d9201150fc5f37d44d6f423f1"
+
+[[feature]]
+id = "perf_log"
+name = "Performance log"
+description = "Write gwed_diagnostics.log beside the game while you play. Costs a few microseconds a frame; turn it off when you are done."
+group = "Diagnostics"
+# Off unless someone asks for it, like every other package here. This one
+# writes a file into the game folder and names the machine it ran on, which is
+# not something to start doing to a player who never opened the Mods page.
+default_enabled = false
+
+[[option]]
+feature = "perf_log"
+id = "spike_ms"
+label = "Log a frame as a spike over"
+description = "A frame that takes longer than this is written out individually. 33 ms is one dropped frame at 60 Hz."
+group = "Diagnostics"
+type = "choice"
+default = "33"
+
+[[option.choice]]
+value = "25"
+label = "25 ms (sensitive)"
+
+[[option.choice]]
+value = "33"
+label = "33 ms (one dropped frame)"
+
+[[option.choice]]
+value = "50"
+label = "50 ms (visible hitch)"
+
+[[option.choice]]
+value = "100"
+label = "100 ms (only bad stalls)"
+
+[[option]]
+feature = "perf_log"
+id = "every_frame"
+label = "Record every frame"
+description = "Adds one line per frame. Precise, and about 3 MB per minute -- for reproducing a specific stutter, not for a long session."
+group = "Diagnostics"
+type = "choice"
+default = "off"
+
+[[option.choice]]
+value = "off"
+label = "Off (summaries and spikes)"
+
+[[option.choice]]
+value = "on"
+label = "On (one line per frame)"
+
+[[plugin]]
+feature = "perf_log"
+id = "gwed.diagnostics.perflog"
