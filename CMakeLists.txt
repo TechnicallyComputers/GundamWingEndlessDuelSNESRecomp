@@ -226,8 +226,12 @@ target_include_directories(GundamWingEndlessDuelSNESRecomp PRIVATE
 # the launcher's Generate & rebuild builds `--target GundamWingEndlessDuelSNESRecomp`
 # and a sibling target is skipped, which shipped a rebuilt game with an empty
 # Mods page while the setup host beside the pack root had the catalog.
-snesrecomp_target_stage_dir(GundamWingEndlessDuelSNESRecomp
-    "${CMAKE_SOURCE_DIR}/mods" mods)
+# The catalog destination is the framework's to name (runner.cmake, "The mod
+# catalog"), so this says only where the packages come from. It used to stage
+# ${CMAKE_SOURCE_DIR}/mods by hand, which is the per-title spelling that left
+# three other SNES ports shipping no catalog at all.
+snesrecomp_target_mod_catalog(GundamWingEndlessDuelSNESRecomp
+    "${CMAKE_SOURCE_DIR}/mods/preloaded")
 snesrecomp_target_stage_dir(GundamWingEndlessDuelSNESRecomp
     "${CMAKE_SOURCE_DIR}/translations" translations)
 # The translation table also goes INSIDE the localization package, because
