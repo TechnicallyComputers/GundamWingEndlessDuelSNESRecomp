@@ -53,3 +53,4 @@ tools/validation_states/stagehunt_log.json
 # Captures written by scripts/validate_from_state.ps1.
 /analysis/state_validation/
 translations/dialogue_cjk_previews/
+netplay_lan_lobby.txt
