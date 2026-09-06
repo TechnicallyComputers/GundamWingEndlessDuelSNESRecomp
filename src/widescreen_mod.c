@@ -42,6 +42,16 @@ static void gwed_widescreen_activate(void)
     GwedDisplay_SetWidescreenEnabled(true);
 }
 
+/* The selection, not the activation. gwed_widescreen_activate runs only in a
+ * session's plugin pass, which is AFTER the lobby has published its match
+ * caps; the lobby needs the answer the pass is going to give, and the mod
+ * runtime knows it from the moment the Mods page toggles the package. */
+bool GwedDisplay_IsWidescreenSelected(void)
+{
+    return snes_mod_runtime_feature_enabled_c(GWED_WIDESCREEN_PACKAGE,
+                                              GWED_WIDESCREEN_FEATURE) != 0;
+}
+
 SNES_MOD_CONSTRUCTOR(gwed_widescreen_register)
 {
     snes_mod_register_reset_callback(gwed_widescreen_reset);

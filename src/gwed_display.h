@@ -54,6 +54,13 @@ typedef enum GwedWsScreen {
 /* ── Activation (called by the Mods plugin, never by config-file code) ───── */
 void GwedDisplay_SetWidescreenEnabled(bool enabled);
 bool GwedDisplay_IsWidescreenEnabled(void);
+/* Whether the Mods-page selection will turn widescreen on for the NEXT
+ * session. Read straight from the mod runtime (src/widescreen_mod.c), so it is
+ * already right in the netplay lobby, before the activation pass that sets
+ * IsWidescreenEnabled has run. The published match caps must use this one:
+ * publishing IsWidescreenEnabled there reported 0 for every fresh launch and
+ * left the P8 sprite-bounds patch disarmed on both peers. */
+bool GwedDisplay_IsWidescreenSelected(void);
 /* True once a session has been pinned wide (i.e. g_ws_extra != 0). */
 bool GwedDisplay_IsWidescreenActive(void);
 

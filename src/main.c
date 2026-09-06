@@ -140,9 +140,17 @@ static void GwedFillMatchCaps(void *ctx, const void *settings_v,
     /* The width is pinned per session (GwedDisplay_BeginSession); before the
      * first session it is 256, so derive from what the Mods package asked for
      * and the same SNESRECOMP_WS_EXTRA override the session will use. That
-     * makes the room's published caps and the booted session agree. */
+     * makes the room's published caps and the booted session agree.
+     *
+     * "Asked for" is the mod runtime's SELECTION, not
+     * GwedDisplay_IsWidescreenEnabled: that flag is set by the plugin
+     * activation pass, which runs after SnesInit, i.e. after this callback has
+     * already published. Reading it here reported ws_extra=0 from every fresh
+     * launch with the package on, so the guest saw "ours 43, negotiated 0",
+     * both peers kept native sprite bounds, and fighters vanished at the 4:3
+     * edge of a wide frame (game_log: "[ws-patch] netplay caps disagree"). */
     ws_extra = (GwedDisplay_ComputeFrameWidth(
-                    GwedDisplay_IsWidescreenEnabled()) - 256) / 2;
+                    GwedDisplay_IsWidescreenSelected()) - 256) / 2;
     out->valid = 1;
     out->widescreen = ws_extra > 0;
     /* The HUD anchoring rides the same presentation policy as the margins;
