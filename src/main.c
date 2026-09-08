@@ -1432,10 +1432,12 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
     snesrecomp_sdl_render_texture(renderer, texture, NULL, &dst);
     game_draw_overlay(renderer, &dst);
     /* Host chrome, drawn last so nothing composites over it, and in window
-     * space rather than the aspect-corrected game rect. Measures
-     * present-to-present, so it is the number a player means by "fps" — not
-     * emulation cost, which under vsync this cannot see. */
-    snes_osd_note_frame();
+     * space rather than the aspect-corrected game rect.
+     *
+     * The FPS counter is deliberately NOT ticked here. Presents happen once
+     * per iteration even when a fast-forward ran several guest frames inside
+     * it, so counting them reported 60 no matter how fast the game was
+     * actually running. It is ticked per RtlRunFrame instead. */
     snes_osd_draw_sdl(renderer);
     SDL_RenderPresent(renderer);
 }
@@ -2073,6 +2075,7 @@ session_reboot:
                     inputs = snes_netplay_published_inputs() |
                              snes_netplay_active_mask();
                     RtlRunFrame(inputs);
+                    snes_osd_note_frame();   /* one EMULATED frame */
                     snes_netplay_finish_frame();
                     /* Catch-up: extra sim ticks when the peer is ahead, so a
                      * hitch on one side doesn't grow into permanent lag. */
@@ -2164,8 +2167,13 @@ session_reboot:
             int ffi;
 
             RtlAudioSetFastForward(fast_forward != 0);
-            for (ffi = 0; ffi < frames_this_iter; ffi++)
+            /* Tell the overlay, so the readout is labelled with why it is
+             * reading several hundred rather than sixty. */
+            snes_osd_set_turbo(fast_forward != 0);
+            for (ffi = 0; ffi < frames_this_iter; ffi++) {
                 RtlRunFrame(inputs);
+                snes_osd_note_frame();   /* one EMULATED frame */
+            }
         }
         game_present(renderer, &texture, 1);
         if (!g_vsync)
