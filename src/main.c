@@ -1274,6 +1274,34 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
 
 static SDL_Texture *g_overlay_tex;
 
+/*
+ * Has the player bound the save-state menu to any key?
+ *
+ * The keymap is a forward hash (key -> command) with no reverse lookup, so
+ * this sweeps the keycodes a hotkey can plausibly use and asks each one.
+ * Done once and cached: the answer cannot change without a config reload.
+ */
+static int game_savestate_menu_is_bound(void)
+{
+    static int cached = -1;
+    if (cached >= 0)
+        return cached;
+    cached = 0;
+    for (SDL_Keycode k = SDLK_SPACE; k <= SDLK_z; ++k) {
+        if (FindCmdForSdlKey(k, (SDL_Keymod)0) == kKeys_SaveStateMenu) {
+            cached = 1;
+            return cached;
+        }
+    }
+    for (int i = 0; i < 12; ++i) {
+        if (FindCmdForSdlKey(SDLK_F1 + i, (SDL_Keymod)0) == kKeys_SaveStateMenu) {
+            cached = 1;
+            return cached;
+        }
+    }
+    return cached;
+}
+
 static void game_draw_overlay(SDL_Renderer *renderer, const SDL_Rect *dst)
 {
     const uint32_t *px = NULL;
@@ -1988,9 +2016,23 @@ session_reboot:
                     snes_osd_toggle_fps();
                     break;
                 default:
-                    /* Every other [KeyMap] command is a real command this
-                     * port has not implemented yet (turbo, reset, window
-                     * scaling). Silently ignored rather than guessed at. */
+                    /* Back-compat, and it is load-bearing: config.ini is not
+                     * tracked and nothing generates one, so a fresh clone runs
+                     * on the framework's built-in defaults — where
+                     * SaveStateMenu is UNBOUND (F1..F10 are its ten LoadState
+                     * slots) and F7 would resolve to LoadState slot 7, a
+                     * command this port does not implement. Without this
+                     * branch, adding [KeyMap] support would have SILENTLY
+                     * BROKEN the F7 this port has always opened the menu with.
+                     *
+                     * So: F7 still opens the menu unless the player has bound
+                     * SaveStateMenu somewhere else, in which case their
+                     * binding is the only one that works and this does not
+                     * fight it. */
+                    if (SNESRECOMP_SDL_EVENT_KEY(event) == SDLK_F7 &&
+                        FindCmdForSdlKey(SDLK_F7, (SDL_Keymod)0) != kKeys_SaveStateMenu &&
+                        !game_savestate_menu_is_bound())
+                        savestate_menu_hotkey = 1;
                     break;
                 }
             }
