@@ -37,7 +37,9 @@
 #include "snes/snes.h"       /* snes_free on session reboot */
 #include "debug_server.h"
 #include "framedump.h"       /* --framedump: per-frame WRAM + crc32 sidecars */
-#include "snes_savestate_menu.h" /* Select+R / F7 save-state overlay */
+#include "snes_savestate_menu.h" /* Select+R / [KeyMap] save-state overlay */
+#include "snes_osd.h"            /* FPS readout / turbo / slot toasts */
+#include "config.h"              /* FindCmdForSdlKey + [KeyMap] parsing */
 #include "cpu_trace.h"
 #include "desktop/sdl_compat.h"
 #include "host_paths.h"
@@ -1401,6 +1403,12 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
     SDL_RenderClear(renderer);
     snesrecomp_sdl_render_texture(renderer, texture, NULL, &dst);
     game_draw_overlay(renderer, &dst);
+    /* Host chrome, drawn last so nothing composites over it, and in window
+     * space rather than the aspect-corrected game rect. Measures
+     * present-to-present, so it is the number a player means by "fps" — not
+     * emulation cost, which under vsync this cannot see. */
+    snes_osd_note_frame();
+    snes_osd_draw_sdl(renderer);
     SDL_RenderPresent(renderer);
 }
 
@@ -1826,6 +1834,21 @@ session_reboot:
      * is P16 by construction rather than by discipline. */
     GwedWsPatch_Arm(g_ws_extra);
 
+    /* Host hotkeys. This port reads only the [KeyMap] half of what
+     * ParseConfigFile populates — its display, audio and pad settings are
+     * decided in gwed_display.c and the [Controller] readers above, and
+     * g_config's equivalents are deliberately left unread so there is exactly
+     * one authority for each. Called before SDL_Init only because the keymap
+     * has to exist before the first key event, not because it needs SDL.
+     *
+     * The same two paths game_config_str() uses, so a build run from the
+     * repo root and one run from its build dir both find the file. */
+    {
+        FILE *probe = fopen("config.ini", "rb");
+        if (probe) { fclose(probe); ParseConfigFile("config.ini"); }
+        else        ParseConfigFile("../config.ini");
+    }
+
     /* snesrecomp_sdl_* wrap the SDL2/SDL3 API differences, so this host
      * builds against either backend (-DSNESRECOMP_SDL_BACKEND=SDL2|SDL3). */
     if (!snesrecomp_sdl_init(SDL_INIT_VIDEO | SDL_INIT_AUDIO |
@@ -1948,10 +1971,28 @@ session_reboot:
 #endif
                 running = 0;
             }
-            if (event.type == SDL_KEYDOWN &&
-                !event.key.repeat &&
-                SNESRECOMP_SDL_EVENT_KEY(event) == SDLK_F7) {
-                savestate_menu_hotkey = 1;
+            /* Host hotkeys come from config.ini [KeyMap] now, not from a
+             * hardcoded keycode. F7 stays the save-state menu only because
+             * this port's config.ini says so — the framework leaves
+             * SaveStateMenu unbound, since F1..F10 are its ten LoadState
+             * slots and a built-in default would collide with them. */
+            if (event.type == SDL_KEYDOWN && !event.key.repeat) {
+                const int cmd = FindCmdForSdlKey(
+                    (SDL_Keycode)SNESRECOMP_SDL_EVENT_KEY(event),
+                    (SDL_Keymod)SNESRECOMP_SDL_EVENT_MOD(event));
+                switch (cmd) {
+                case kKeys_SaveStateMenu:
+                    savestate_menu_hotkey = 1;
+                    break;
+                case kKeys_DisplayPerf:
+                    snes_osd_toggle_fps();
+                    break;
+                default:
+                    /* Every other [KeyMap] command is a real command this
+                     * port has not implemented yet (turbo, reset, window
+                     * scaling). Silently ignored rather than guessed at. */
+                    break;
+                }
             }
             /* Hotplug: a pad connected after launch must still work, and one
              * unplugged mid-game must not leave a dangling handle. */

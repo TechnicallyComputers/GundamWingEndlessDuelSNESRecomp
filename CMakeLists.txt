@@ -158,6 +158,15 @@ target_include_directories(GundamWingEndlessDuelSNESRecomp PRIVATE
     ${CMAKE_SOURCE_DIR}/recomp
 )
 target_link_libraries(GundamWingEndlessDuelSNESRecomp PRIVATE ${SNESRECOMP_RUNNER_LIBRARIES})
+# The framework's shared config/[KeyMap] implementation. Until now this port
+# included desktop/config.h for the type contract but linked no implementation,
+# so config.ini had no [KeyMap] section and every host key was a hardcoded
+# SDL keycode in main.c (Escape, and F7 for the save-state menu).
+#
+# Deliberately NOT a second authority over display: this port decides
+# widescreen and aspect in gwed_display.c and does not read g_config's video
+# fields. What it takes from here is FindCmdForSdlKey() and nothing else.
+snesrecomp_target_mmx_config(GundamWingEndlessDuelSNESRecomp)
 # Build identity. Two peers that are not running the same build will diverge,
 # and until now neither the log nor the wire carried anything that could say
 # so: a real match desynced mid-fight and establishing "same build?" took
