@@ -871,6 +871,48 @@ static int game_fast_forward_frames(void)
     return frames;
 }
 
+/*
+ * Which physical key means turbo, from config.ini [KeyMap] Turbo.
+ *
+ * Turbo is a HELD key, so it cannot go through the KEYDOWN dispatch the other
+ * hotkeys use -- it has to be sampled from the keyboard state every frame,
+ * which needs a scancode rather than the keycode the keymap stores. Resolved
+ * once and cached; the keymap does not change after ParseConfigFile.
+ *
+ * Previously this was a hardcoded SDL_SCANCODE_TAB while config.ini carried
+ * `Turbo = Tab` and recomp-ui drew a "Fast-forward" row for it. The row was
+ * decorative: rebinding it changed nothing, because nothing read the binding.
+ * That is the same double-authority the save-state menu had with F7.
+ */
+static SDL_Scancode game_turbo_scancode(void)
+{
+    static int inited;
+    static SDL_Scancode sc = SDL_SCANCODE_TAB;
+    if (!inited) {
+        int k;
+        inited = 1;
+        /* No reverse index in the keymap, so sweep the keycodes a hotkey can
+         * plausibly carry and ask which one is bound to Turbo. */
+        for (k = SDLK_SPACE; k <= SDLK_z; ++k) {
+            if (FindCmdForSdlKey((SDL_Keycode)k, (SDL_Keymod)0) == kKeys_Turbo) {
+                sc = snesrecomp_sdl_scancode_from_key((SDL_Keycode)k);
+                return sc;
+            }
+        }
+        for (k = 0; k < 12; ++k) {
+            if (FindCmdForSdlKey((SDL_Keycode)(SDLK_F1 + k), (SDL_Keymod)0) == kKeys_Turbo) {
+                sc = snesrecomp_sdl_scancode_from_key((SDL_Keycode)(SDLK_F1 + k));
+                return sc;
+            }
+        }
+        if (FindCmdForSdlKey(SDLK_TAB, (SDL_Keymod)0) == kKeys_Turbo)
+            sc = SDL_SCANCODE_TAB;
+        /* Unbound: keep Tab, which is what this port has always used and what
+         * the framework's own default table says. */
+    }
+    return sc;
+}
+
 static int game_fast_forward_active(void)
 {
     const uint8_t *keys = snesrecomp_sdl_get_keyboard_state();
@@ -881,7 +923,7 @@ static int game_fast_forward_active(void)
         env_enabled = game_env_flag("SNESRECOMP_TURBO");
         env_inited = 1;
     }
-    return env_enabled || (keys && keys[SDL_SCANCODE_TAB]);
+    return env_enabled || (keys && keys[game_turbo_scancode()]);
 }
 
 #if defined(SNES_HAS_LOBBY_CLIENT)
