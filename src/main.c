@@ -39,6 +39,7 @@
 #include "framedump.h"       /* --framedump: per-frame WRAM + crc32 sidecars */
 #include "snes_savestate_menu.h" /* Select+R / [KeyMap] save-state overlay */
 #include "snes_osd.h"            /* FPS readout / turbo / slot toasts */
+#include "snes_rewind.h"         /* rewind ring + filmstrip */
 #include "config.h"              /* FindCmdForSdlKey + [KeyMap] parsing */
 #include "cpu_trace.h"
 #include "desktop/sdl_compat.h"
@@ -913,6 +914,33 @@ static SDL_Scancode game_turbo_scancode(void)
     return sc;
 }
 
+/*
+ * Rewind's controller gesture: SELECT + right bumper, or a right-stick click.
+ *
+ * SELECT+R goes through the 12-bit SNES mask read_gamepad() already builds
+ * (bit 9 Select, bit 0 R). R3 cannot: the SNES pad has no stick buttons, so
+ * that mask has nowhere to put one and it has to be asked of SDL directly.
+ * Two ways in because R3 is one thumb on a modern pad while SELECT+R works on
+ * anything with shoulders, including the SNES-shaped pads people use here.
+ */
+static int game_rewind_gesture(void)
+{
+    const uint16_t pad = read_gamepad(0);
+    const uint16_t want = (uint16_t)((1u << 9) | (1u << 0));   /* Select + R */
+    if ((pad & want) == want)
+        return 1;
+    if (g_pads[0]) {
+#if SNESRECOMP_SDL3
+        if (SDL_GetGamepadButton(g_pads[0], SDL_GAMEPAD_BUTTON_RIGHT_STICK))
+            return 1;
+#else
+        if (SDL_GameControllerGetButton(g_pads[0], SDL_CONTROLLER_BUTTON_RIGHTSTICK))
+            return 1;
+#endif
+    }
+    return 0;
+}
+
 static int game_fast_forward_active(void)
 {
     const uint8_t *keys = snesrecomp_sdl_get_keyboard_state();
@@ -1315,6 +1343,7 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
  * duration, as it would for any paused game. */
 
 static SDL_Texture *g_overlay_tex;
+static void game_draw_rewind(SDL_Renderer *renderer, const SDL_Rect *dst);
 
 /*
  * Has the player bound the save-state menu to any key?
@@ -1323,6 +1352,27 @@ static SDL_Texture *g_overlay_tex;
  * this sweeps the keycodes a hotkey can plausibly use and asks each one.
  * Done once and cached: the answer cannot change without a config reload.
  */
+static int game_rewind_is_bound(void)
+{
+    static int cached = -1;
+    if (cached >= 0)
+        return cached;
+    cached = 0;
+    for (SDL_Keycode k = SDLK_SPACE; k <= SDLK_z; ++k) {
+        if (FindCmdForSdlKey(k, (SDL_Keymod)0) == kKeys_Rewind) {
+            cached = 1;
+            return cached;
+        }
+    }
+    for (int i = 0; i < 12; ++i) {
+        if (FindCmdForSdlKey(SDLK_F1 + i, (SDL_Keymod)0) == kKeys_Rewind) {
+            cached = 1;
+            return cached;
+        }
+    }
+    return cached;
+}
+
 static int game_savestate_menu_is_bound(void)
 {
     static int cached = -1;
@@ -1464,15 +1514,20 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
         }
         /* Offer the composited frame as the next save's thumbnail. Must come
          * after RtlDrawPpuFrame — that is the call that fills renderBuffer. */
-        if (g_ppu && g_ppu->renderBuffer)
+        if (g_ppu && g_ppu->renderBuffer) {
             snes_savestate_menu_note_frame((const uint32_t *)g_ppu->renderBuffer,
                                            GwedDisplay_GetCurrentFrameWidth(),
                                            GAME_HEIGHT);
+            snes_rewind_note_framebuffer((const uint32_t *)g_ppu->renderBuffer,
+                                         GwedDisplay_GetCurrentFrameWidth(),
+                                         GAME_HEIGHT);
+        }
     }
     game_compute_present_rect(renderer, &dst);
     SDL_RenderClear(renderer);
     snesrecomp_sdl_render_texture(renderer, texture, NULL, &dst);
     game_draw_overlay(renderer, &dst);
+    game_draw_rewind(renderer, &dst);
     /* Host chrome, drawn last so nothing composites over it, and in window
      * space rather than the aspect-corrected game rect.
      *
@@ -1482,6 +1537,88 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
      * actually running. It is ticked per RtlRunFrame instead. */
     snes_osd_draw_sdl(renderer);
     SDL_RenderPresent(renderer);
+}
+
+static SDL_Texture *g_rewind_tex;
+
+/* The filmstrip, over the game rect. Same shape as game_draw_overlay: the
+ * framework hands over pixels, the host puts them on the screen. */
+static void game_draw_rewind(SDL_Renderer *renderer, const SDL_Rect *dst)
+{
+    const uint32_t *px = NULL;
+    int w = 0, h = 0;
+    SDL_Rect strip;
+
+    if (!snes_rewind_overlay_image(&px, &w, &h) || !px)
+        return;
+    if (!g_rewind_tex) {
+        g_rewind_tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+                                         SDL_TEXTUREACCESS_STREAMING, w, h);
+        if (!g_rewind_tex)
+            return;
+        SDL_SetTextureBlendMode(g_rewind_tex, SDL_BLENDMODE_BLEND);
+    }
+    SDL_UpdateTexture(g_rewind_tex, NULL, px, w * 4);
+    /* Bottom third of the game rect, so it annotates the frame it belongs to
+     * and moves with aspect correction rather than floating in window space
+     * the way the FPS readout deliberately does. */
+    strip.x = dst->x;
+    strip.w = dst->w;
+    strip.h = dst->h / 3;
+    strip.y = dst->y + dst->h - strip.h;
+    snesrecomp_sdl_render_texture(renderer, g_rewind_tex, NULL, &strip);
+}
+
+/*
+ * Rewind's modal pump. The guest is frozen while it is open -- this loop
+ * simply stops calling RtlRunFrame -- which is the same bargain the save-state
+ * menu strikes, and the only way "go back to here" refers to a definite point.
+ */
+static void game_rewind_loop(SDL_Renderer *renderer, SDL_Texture **texture,
+                             int *running)
+{
+    uint32_t prev_pad = 0;
+
+    while (snes_rewind_is_open() && *running) {
+        SDL_Event event;
+        uint32_t pad;
+
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                *running = 0;
+                snes_rewind_close();
+            } else if (event.type == SDL_KEYDOWN) {
+                switch (SNESRECOMP_SDL_EVENT_KEY(event)) {
+                case SDLK_LEFT:   snes_rewind_step(-1); break;
+                case SDLK_RIGHT:  snes_rewind_step(+1); break;
+                case SDLK_RETURN:
+                case SDLK_SPACE:  snes_rewind_commit(); break;
+                case SDLK_ESCAPE: snes_rewind_close();  break;
+                default: break;
+                }
+            } else if (event.type == SDL_CONTROLLERDEVICEADDED) {
+                game_open_pads();
+            } else if (event.type == SDL_CONTROLLERDEVICEREMOVED) {
+                game_close_pads();
+                game_open_pads();
+            }
+        }
+
+        /* Pad nav, edge-triggered: holding Left must not sprint through the
+         * whole ring in one frame. */
+        pad = read_gamepad(0);
+        {
+            const uint32_t pressed = pad & ~prev_pad;
+            if (pressed & (1u << 5)) snes_rewind_step(-1);   /* Left  */
+            if (pressed & (1u << 4)) snes_rewind_step(+1);   /* Right */
+            if (pressed & (1u << 3)) snes_rewind_commit();   /* A     */
+            if (pressed & (1u << 11)) snes_rewind_close();   /* B     */
+            prev_pad = pad;
+        }
+
+        game_present(renderer, texture, 0);
+        SDL_Delay(16);
+    }
 }
 
 /* Modal pump: runs until the menu closes or the window does. */
@@ -1851,6 +1988,10 @@ session_reboot:
      */
     (void)snesrecomp_execution_policy();
 
+    /* Rewind ring. Allocates lazily on the first capture (it measures a real
+     * snapshot first), so this only reads the env and reserves slot headers. */
+    snes_rewind_configure();
+
     start_debug_server();
 #if defined(SNES_HAS_LOBBY_CLIENT)
     /* Re-resolved every session: a rematch that comes back offline must not
@@ -2003,6 +2144,7 @@ session_reboot:
         SDL_Event event;
         uint32 inputs;
         int savestate_menu_hotkey = 0;
+        int rewind_hotkey = 0;
 
         /* --exit-at-frame: leave through the normal shutdown path (audio
          * device, guest machine, SDL) with status 0, after the frame that
@@ -2059,6 +2201,9 @@ session_reboot:
                 case kKeys_DisplayPerf:
                     snes_osd_toggle_fps();
                     break;
+                case kKeys_Rewind:
+                    rewind_hotkey = 1;
+                    break;
                 default:
                     /* Back-compat, and it is load-bearing: config.ini is not
                      * tracked and nothing generates one, so a fresh clone runs
@@ -2077,6 +2222,14 @@ session_reboot:
                         FindCmdForSdlKey(SDLK_F7, (SDL_Keymod)0) != kKeys_SaveStateMenu &&
                         !game_savestate_menu_is_bound())
                         savestate_menu_hotkey = 1;
+                    /* F8 for rewind, on the same terms: the framework leaves
+                     * Rewind unbound because F8 is LoadState slot 8, so
+                     * without this the documented key would do nothing on a
+                     * tree with no config.ini. */
+                    if (SNESRECOMP_SDL_EVENT_KEY(event) == SDLK_F8 &&
+                        FindCmdForSdlKey(SDLK_F8, (SDL_Keymod)0) != kKeys_Rewind &&
+                        !game_rewind_is_bound())
+                        rewind_hotkey = 1;
                     break;
                 }
             }
@@ -2152,6 +2305,15 @@ session_reboot:
         inputs = snes_savestate_menu_filter_guest_input(inputs);
         if (savestate_menu_hotkey && !snes_savestate_menu_is_open())
             (void)snes_savestate_menu_poll_open(GAME_SAVESTATE_MENU_GESTURE);
+        /* Rewind: F8 / [KeyMap] Rewind, or SELECT+R / R3 on a pad. Refused
+         * during netplay by snes_rewind_open() itself -- one machine cannot
+         * move its own clock backwards while a peer is watching. */
+        if ((rewind_hotkey || game_rewind_gesture()) && !snes_rewind_is_open() &&
+            !snes_savestate_menu_is_open()) {
+            if (snes_rewind_open())
+                game_rewind_loop(renderer, &texture, &running);
+        }
+        rewind_hotkey = 0;
         if (snes_savestate_menu_poll_open(inputs) ||
             snes_savestate_menu_is_open()) {
             game_savestate_menu_loop(renderer, &texture, &running);
@@ -2214,7 +2376,8 @@ session_reboot:
             snes_osd_set_turbo(fast_forward != 0);
             for (ffi = 0; ffi < frames_this_iter; ffi++) {
                 RtlRunFrame(inputs);
-                snes_osd_note_frame();   /* one EMULATED frame */
+                snes_osd_note_frame();     /* one EMULATED frame */
+                snes_rewind_note_frame();  /* ...which rewind also counts */
             }
         }
         game_present(renderer, &texture, 1);
