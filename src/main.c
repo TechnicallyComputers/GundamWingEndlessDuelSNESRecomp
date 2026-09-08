@@ -30,6 +30,7 @@
 #include "common_cpu_infra.h"
 #include "widescreen.h"
 #include "game_rtl.h"
+#include "execution_mode.h"
 #include "gwed_display.h"
 #include "gwed_ws_patch.h"   /* P8 guarded in-memory ROM patch (sprite bounds) */
 #include "snes/ppu.h"
@@ -1751,6 +1752,25 @@ session_reboot:
      * the frame's policy) every frame. */
     GwedDisplay_BeginSession((uint8_t *)g_render_pixels, sizeof(g_render_pixels),
                              kPpuRenderFlags_NewRenderer);
+    /* Resolve and announce the execution policy before the first guest frame.
+     *
+     * OPTIMIZATION.md §2 requires the effective policy to be printed at
+     * startup, and PRINCIPLES.md requires the faithful floor to stay forceable
+     * in the shipped binary — so this is a runtime policy, not a compile-time
+     * split. The build only supplies the default
+     * (-DSNESRECOMP_EXECUTION_DEFAULT); SNESRECOMP_EXECUTION_MODE overrides it
+     * and SNESRECOMP_FORCE_FLOOR=1 beats both.
+     *
+     * Gundam Wing registers no optimized replacements yet: the AOT tier covers
+     * 908 instructions and everything else runs the interpreter floor, so the
+     * banner will say "no optimized replacements are registered" for every
+     * policy. That is the honest report, and it is why this call is here now —
+     * the switch has to exist and tell the truth before anything is promoted
+     * to sit behind it. Register replacements above this line as they land:
+     *   snesrecomp_execution_register_optimization("subsystem.name");
+     */
+    (void)snesrecomp_execution_policy();
+
     start_debug_server();
 #if defined(SNES_HAS_LOBBY_CLIENT)
     /* Re-resolved every session: a rematch that comes back offline must not
