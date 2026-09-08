@@ -40,6 +40,7 @@
 #include "snes_savestate_menu.h" /* Select+R / [KeyMap] save-state overlay */
 #include "snes_osd.h"            /* FPS readout / turbo / slot toasts */
 #include "snes_rewind.h"         /* rewind ring + filmstrip */
+#include "diagnostics_mod.h"     /* perf log: video facts + present cost */
 #include "config.h"              /* FindCmdForSdlKey + [KeyMap] parsing */
 #include "cpu_trace.h"
 #include "desktop/sdl_compat.h"
@@ -1524,6 +1525,13 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
         }
     }
     game_compute_present_rect(renderer, &dst);
+    {
+        /* Everything from here to SDL_RenderPresent returning is "put it on
+         * the screen": clear, blit, overlays, and whatever the compositor
+         * makes us wait for. Measured so the log can separate that from the
+         * emulation it is currently lumped in with. */
+        const Uint64 present_t0 = SDL_GetPerformanceCounter();
+        const Uint64 present_freq = SDL_GetPerformanceFrequency();
     SDL_RenderClear(renderer);
     snesrecomp_sdl_render_texture(renderer, texture, NULL, &dst);
     game_draw_overlay(renderer, &dst);
@@ -1537,6 +1545,11 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
      * actually running. It is ticked per RtlRunFrame instead. */
     snes_osd_draw_sdl(renderer);
     SDL_RenderPresent(renderer);
+        if (present_freq)
+            GwedDiag_NotePresentMs((double)(SDL_GetPerformanceCounter() -
+                                            present_t0) * 1000.0 /
+                                   (double)present_freq);
+    }
 }
 
 static SDL_Texture *g_rewind_tex;
@@ -2096,6 +2109,10 @@ session_reboot:
                       : NULL;
     fprintf(stderr, "[video] vsync %s (config.ini [Video] Vsync)\n",
             g_vsync ? "on" : "off — pacing on the 60.0988 Hz SNES clock");
+    /* Hand the perf log what it cannot see for itself. The drawable/window
+     * ratio is the DPI scale this process actually got, which decides whether
+     * a slow frame is emulation or the output surface. */
+    GwedDiag_NoteVideo(window, renderer, g_vsync);
     /* Launcher Display checkbox lands here via the [Video] FrameBlend
      * write-back in run_gui_launcher, so this read is the single source of
      * truth for both the GUI and text-mode boot paths. */

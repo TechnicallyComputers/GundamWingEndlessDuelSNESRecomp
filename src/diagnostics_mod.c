@@ -79,6 +79,17 @@ static const char *const kBucketLabel[kBucketCount] = {
 static FILE *s_log;
 static int   s_active;
 static int   s_every_frame;
+
+/* Present cost, published by the host (diagnostics_mod.h). Consumed by the
+ * next frame line, so a value is reported once and never twice. */
+static double s_present_ms = -1.0;
+static double s_present_max_ms;
+static double s_present_sum_ms;
+static int    s_present_count;
+
+/* Video facts, stashed until the log is open. Printed once. */
+static int  s_video_known;
+static char s_video_line[320];
 static double s_spike_ms = 33.0;
 
 static Uint64 s_perf_freq;
@@ -176,6 +187,72 @@ static int diag_open_log(char *path, size_t cap)
 
 static const char *diag_yes_no(int v) { return v ? "yes" : "no"; }
 
+void GwedDiag_NoteVideo(struct SDL_Window *window_in,
+                        struct SDL_Renderer *renderer_in, int vsync_on)
+{
+    SDL_Window *window = (SDL_Window *)window_in;
+    SDL_Renderer *renderer = (SDL_Renderer *)renderer_in;
+    int win_w = 0, win_h = 0, draw_w = 0, draw_h = 0;
+    const char *backend = "unknown";
+    double scale = 0.0;
+    int fullscreen = 0;
+    double hz = 0.0;
+
+    if (!window)
+        return;
+
+    SDL_GetWindowSize(window, &win_w, &win_h);
+#if SNESRECOMP_SDL3
+    SDL_GetWindowSizeInPixels(window, &draw_w, &draw_h);
+    fullscreen = (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN) != 0;
+    {
+        const SDL_DisplayMode *m =
+            SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window));
+        if (m) hz = m->refresh_rate;
+    }
+#else
+    SDL_GL_GetDrawableSize(window, &draw_w, &draw_h);
+    if (draw_w <= 0) { draw_w = win_w; draw_h = win_h; }
+    fullscreen = (SDL_GetWindowFlags(window) &
+                  (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP)) != 0;
+    {
+        SDL_DisplayMode m;
+        int idx = SDL_GetWindowDisplayIndex(window);
+        if (idx >= 0 && SDL_GetCurrentDisplayMode(idx, &m) == 0)
+            hz = (double)m.refresh_rate;
+    }
+#endif
+    if (renderer && snesrecomp_sdl_renderer_name(renderer))
+        backend = snesrecomp_sdl_renderer_name(renderer);
+    if (win_w > 0) scale = (double)draw_w / (double)win_w;
+
+    /* The ratio is the finding, not the sizes. A process that is DPI-aware
+     * fills physical pixels itself; one that is not gets bitmap-scaled by the
+     * compositor. Either way the cost lands inside the measured interval, and
+     * only the measurement can say which happened on this machine. */
+    snprintf(s_video_line, sizeof(s_video_line),
+             "# video   renderer=%s window=%dx%d drawable=%dx%d scale=%.2fx "
+             "fullscreen=%s vsync=%s display=%.3fHz  (drawable/window is the "
+             "DPI scale this process actually got)",
+             backend, win_w, win_h, draw_w, draw_h, scale,
+             diag_yes_no(fullscreen), diag_yes_no(vsync_on), hz);
+    s_video_known = 1;
+    /* Already logging: the header has been and gone, so print it now rather
+     * than lose it. */
+    if (s_log)
+        diag_line("%s", s_video_line);
+}
+
+void GwedDiag_NotePresentMs(double ms)
+{
+    if (!s_active)
+        return;
+    s_present_ms = ms;
+    if (ms > s_present_max_ms) s_present_max_ms = ms;
+    s_present_sum_ms += ms;
+    s_present_count++;
+}
+
 static void diag_write_header(const char *path)
 {
     time_t now = time(NULL);
@@ -211,6 +288,11 @@ static void diag_write_header(const char *path)
     diag_line("# display widescreen=%s frame_width=%d",
               diag_yes_no(GwedDisplay_IsWidescreenActive()),
               GwedDisplay_GetCurrentFrameWidth());
+    if (s_video_known)
+        diag_line("%s", s_video_line);
+    else
+        diag_line("# video   not published yet — the window did not exist when "
+                  "logging began");
 #if defined(SNES_HAS_LOBBY_CLIENT)
     diag_line("# netplay %s at start", diag_yes_no(snes_netplay_active()));
 #else
@@ -227,8 +309,30 @@ static void diag_write_header(const char *path)
               "wait, event pump,");
     diag_line("# all of it. It is what the player feels. It is not a "
               "breakdown of where the");
-    diag_line("# time went inside that trip; a mod is given one callback and "
-              "no more.");
+    diag_line("# time went inside that trip. The host now also reports its "
+              "PRESENT cost");
+    diag_line("# (first draw call to SDL_RenderPresent returning) as "
+              "'present=' on a frame");
+    diag_line("# line, which splits that trip into roughly emulate-and-wait "
+              "versus put-it");
+    diag_line("# on the screen. A present belongs to a host ITERATION: under "
+              "fast-forward one");
+    diag_line("# present covers several emulated frames, so it is reported on "
+              "the frame it");
+    diag_line("# landed on rather than divided between them.");
+    diag_line("#");
+    diag_line("# READ present= WITH THE VSYNC FIELD ABOVE. With vsync ON, the "
+              "wait for the");
+    diag_line("# display is INSIDE the present, so present ~= the frame "
+              "budget is normal and");
+    diag_line("# healthy -- it is the game arriving early and waiting. What "
+              "matters is present");
+    diag_line("# consistently ABOVE budget, or a spike whose time is mostly "
+              "present: that is");
+    diag_line("# the cost of putting pixels on the screen, not of emulating "
+              "the machine.");
+    diag_line("# With vsync OFF the present is nearly all real work, so any "
+              "large value is.");
     diag_line("#");
     if (s_every_frame)
         diag_line("# every_frame=on: one 'frame' line per frame, plus the "
@@ -264,6 +368,16 @@ static void diag_write_stats(const char *prefix, const DiagStats *s,
               elapsed_s > 0.0 ? (double)s->frames / elapsed_s : 0.0,
               s->sum_ms / (double)s->frames, s->min_ms, s->max_ms, s->spikes,
               hist);
+    /* The one number that decides where to look next. If avg present is most
+     * of avg frame, the cost is putting pixels on the screen -- output
+     * surface, compositor, DPI scaling -- and not the emulation. */
+    if (s_present_count > 0)
+        diag_line("%s present avg=%.2fms max=%.2fms over %d present(s)",
+                  prefix, s_present_sum_ms / (double)s_present_count,
+                  s_present_max_ms, s_present_count);
+    s_present_sum_ms = 0.0;
+    s_present_max_ms = 0.0;
+    s_present_count = 0;
 }
 
 /* One emulated frame has just finished. */
@@ -311,22 +425,34 @@ static void gwed_diag_frame(void)
         s_worst_frame = snes_frame_counter;
     }
 
-    if (s_every_frame)
-        diag_line("[%8.2fs] frame %d %.2fms", seconds_since_start(now),
-                  snes_frame_counter, ms);
+    if (s_every_frame) {
+        if (s_present_ms >= 0.0)
+            diag_line("[%8.2fs] frame %d %.2fms present=%.2fms",
+                      seconds_since_start(now), snes_frame_counter, ms,
+                      s_present_ms);
+        else
+            diag_line("[%8.2fs] frame %d %.2fms", seconds_since_start(now),
+                      snes_frame_counter, ms);
+    }
 
     if (ms >= s_spike_ms) {
         s_window.spikes++;
         s_session.spikes++;
-        diag_line("[%8.2fs] SPIKE frame %d %.2fms (%.2fx budget)%s",
+        diag_line("[%8.2fs] SPIKE frame %d %.2fms (%.2fx budget) "
+                  "present=%.2fms%s",
                   seconds_since_start(now), snes_frame_counter, ms,
                   ms / GWED_DIAG_BUDGET_MS,
+                  s_present_ms >= 0.0 ? s_present_ms : 0.0,
 #if defined(SNES_HAS_LOBBY_CLIENT)
                   snes_netplay_active() ? " netplay" : "");
 #else
                   "");
 #endif
     }
+    /* One sample, one report. Clearing here means a frame that ran without a
+     * present of its own (a fast-forward burst) shows no present= rather than
+     * repeating the previous iteration's number as if it were its own. */
+    s_present_ms = -1.0;
 
     /* One summary per second of wall clock, so a quiet session stays short
      * and a bad one is dense where it went bad. */
