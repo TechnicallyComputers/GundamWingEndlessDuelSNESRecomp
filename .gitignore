@@ -54,3 +54,10 @@ tools/validation_states/stagehunt_log.json
 /analysis/state_validation/
 translations/dialogue_cjk_previews/
 netplay_lan_lobby.txt
+
+# Account sign-in credential, written beside the executable by
+# recomp-net's rnet_auth.c (secret_path -> "netplay_secret"). It is the
+# long-lived key that redeems a session without re-doing OAuth, so it is a
+# credential, not a setting. It was untracked but NOT ignored, which is one
+# `git add -A` away from being published in a public repo.
+netplay_secret
