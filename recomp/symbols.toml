@@ -18,3 +18,61 @@ addr = "838c"
 bank = 0
 emit = false
 note = "Native NMI vector ($FFEA)"
+
+# ── Discovered during the forced-blank hunt (2026-09-09) ──────────────────
+# All emit=false: these NAME addresses with recorded provenance; none is a
+# codegen change. Promotion (emit=true) stays a separate, human-triaged,
+# oracle-verified decision. See recomp/bank07.cfg and the session notes.
+
+[[func]]
+name = "SpcUploadDriver"
+addr = "8004"
+bank = 7
+emit = false
+note = "SPC700 upload; PHP entry wrapping unbounded $2140 CMP/BNE spins. Held on the interpreter by force_lle 078004 (bank07.cfg). Naming only."
+
+[[func]]
+name = "Dispatch_JmlE0_8021"
+addr = "8021"
+bank = 5
+emit = false
+note = "Indirect dispatcher: JML [$00E0] (opcode DC E0 00). Same idiom as $03:B40A (JMP ($00E0), resolved in bank03.cfg via indirect_dispatch). Undeclared here, so it tier-downs every call. Observed landings 04D1E3/04E4DD/0582BF... in tier2 capture. Candidate for an indirect_dispatch directive."
+
+[[func]]
+name = "Dispatch_JmlE0_883B"
+addr = "883b"
+bank = 5
+emit = false
+note = "Second JML [$00E0] indirect dispatcher (opcode DC E0 00), sibling of Dispatch_JmlE0_8021. Observed landings 04D1E3/04E443/04D744/04D95E... Candidate for an indirect_dispatch directive."
+
+[[func]]
+name = "DispatchLanding_D1E3"
+addr = "d1e3"
+bank = 4
+emit = false
+note = "Most frequent common landing of the two bank-05 JML [$00E0] dispatchers (tier2 capture). Bank-04 handler region reached only once decode passes the SPC-upload boundary."
+
+# ── Bug #2 investigation — the f3305 blocker (2026-09-09) ─────────────────
+# The second interp↔AOT boundary bug behind force_lle 078004, distinct from
+# the $8654 truncation stub (fixed in snesrecomp c1a17d9). All emit=false.
+
+[[func]]
+name = "DataBankWrap_A6EB"
+addr = "a6eb"
+bank = 0
+emit = false
+note = "CONFIRMED culprit of the f3305 wild-stack/black-screen (bug #2). PHB/PHK/PLB data-bank routine looping JSR $A729, closing PLA/PLB/RTL at $A713. Its AOT body returns the stack ~6 bytes low on a path-specific call at f3305 ([ibr]: JSL bounce sp_pre=0FE0 -> sp_post=0FDD, want 0FE3); the misalignment returns into WRAM $05:0000 which recurses $050002->$050000 until SP wraps wild -> PB=$F6. Forcing this one function to the interpreter (SNESRECOMP_LLE_INTERP_TARGET_FILE) makes the game track the control past f3305. Note: the corrected stack auditor does NOT flag A6EB cumulatively, so the leak is a specific branch / RTL-exit path, not the main path (which balances). Exact leaking branch not yet pinned."
+
+[[func]]
+name = "sub_A729"
+addr = "a729"
+bank = 0
+emit = false
+note = "Loop callee of DataBankWrap_A6EB (JSR $A729). Balanced on its own (measured +2 host-return at f3191). Kept as a boundary/naming aid for the bug #2 drill."
+
+[[func]]
+name = "Dispatch_JmpE0_82BF"
+addr = "82bf"
+bank = 5
+emit = false
+note = "JMP ($00E0) table dispatcher (table at $82CE, indexed off $1082,X); $05:82CA is the RTL the bad return unwinds through. Reached via the $05:8021 JML [$00E0] tier-down, which bails once at f3305 — but that bail is a RED HERRING: forcing DataBankWrap_A6EB to interp clears f3305 while this bail remains. Not the bug #2 cause."

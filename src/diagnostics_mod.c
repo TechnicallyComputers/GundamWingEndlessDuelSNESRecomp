@@ -321,18 +321,30 @@ static void diag_write_header(const char *path)
               "the frame it");
     diag_line("# landed on rather than divided between them.");
     diag_line("#");
-    diag_line("# READ present= WITH THE VSYNC FIELD ABOVE. With vsync ON, the "
-              "wait for the");
-    diag_line("# display is INSIDE the present, so present ~= the frame "
-              "budget is normal and");
-    diag_line("# healthy -- it is the game arriving early and waiting. What "
-              "matters is present");
-    diag_line("# consistently ABOVE budget, or a spike whose time is mostly "
-              "present: that is");
-    diag_line("# the cost of putting pixels on the screen, not of emulating "
-              "the machine.");
-    diag_line("# With vsync OFF the present is nearly all real work, so any "
-              "large value is.");
+    diag_line("# READ present= WITH THE VSYNC FIELD ABOVE -- but do NOT assume "
+              "the vsync wait");
+    diag_line("# is inside it. WHERE the wait lands is a property of the "
+              "backend, not of the");
+    diag_line("# setting. On SDL's Vulkan renderer the FIFO block is taken in "
+              "vkAcquireNextImage");
+    diag_line("# at the START of the next frame -- before the first draw call "
+              "that starts this");
+    diag_line("# timer -- so a healthy vsync-ON run here reads present ~= 1.5 "
+              "ms, not ~= budget.");
+    diag_line("# Measured: vsync on, vulkan, 60.000 Hz panel, present avg 1.46 "
+              "ms over 6134");
+    diag_line("# frames. A backend that blocks inside SDL_RenderPresent "
+              "instead will read");
+    diag_line("# present ~= budget and be equally healthy. Establish which "
+              "shape THIS build");
+    diag_line("# shows when it is behaving, and read departures from that.");
+    diag_line("#");
+    diag_line("# What always means work, on any backend: a SPIKE whose time is "
+              "mostly present.");
+    diag_line("# On a backend that waits elsewhere (the vulkan case above) "
+              "that reading is");
+    diag_line("# unambiguous, because no display wait can be hiding in the "
+              "number at all.");
     diag_line("#");
     if (s_every_frame)
         diag_line("# every_frame=on: one 'frame' line per frame, plus the "

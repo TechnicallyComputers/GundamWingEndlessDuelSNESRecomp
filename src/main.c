@@ -499,9 +499,9 @@ static int game_pad_name_to_button(const char *name)
     return -100;   /* unknown name: leave unbound rather than guess */
 }
 
-/* Parse [GamepadMap] Controls from config.ini beside the executable, then the
- * working directory. Absent or malformed leaves the defaults in place — a
- * missing config must not silently unbind the pad. */
+/* Parse [GamepadMap] Controls from the one config.ini game_config_path()
+ * resolves. Absent or malformed leaves the defaults in place — a missing
+ * config must not silently unbind the pad. */
 /* ── Video pacing ─────────────────────────────────────────────────────────
  *
  * The SNES field rate is 60.0988 Hz, and a desktop display is almost never
@@ -566,19 +566,56 @@ static int g_blend_prev_valid = 0;
  */
 static uint32_t g_frame_stage[GAME_MAX_WIDTH * GAME_HEIGHT];
 
+/* ── Which config.ini ──────────────────────────────────────────────────────
+ *
+ * One file, resolved once, read and written by everything in this process.
+ *
+ * It used to be a per-KEY walk of {"config.ini", "../config.ini"}: each key
+ * was looked up in the first file and, if absent there, in the second. With a
+ * config.ini beside the executable AND one in the tree root, that BLENDS them.
+ * Measured: a build-release/config.ini carrying only Vsync and FrameBlend took
+ * those two from itself and Fullscreen and Renderer from ../config.ini, so the
+ * settings the game actually ran with existed in neither file and changed with
+ * the directory it was launched from. Two runs an hour apart differed in vsync
+ * for no reason but that.
+ *
+ * Worse, the launcher wrote to "config.ini" (the working directory) while a
+ * key missing from that file was still read from the parent — so a setting
+ * could be persisted to one file and read back from the other, and appear not
+ * to take.
+ *
+ * First existing file wins, whole. If neither exists yet, name the working
+ * directory so a fresh install creates it beside the executable rather than in
+ * its parent. This is the rule ParseConfigFile already applied at the SNES-core
+ * end; the rest of the process now agrees with it instead of contradicting it.
+ */
+static const char *game_config_path(void)
+{
+    static const char *resolved;
+    if (!resolved) {
+        FILE *f = fopen("config.ini", "rb");
+        if (f) { fclose(f); resolved = "config.ini"; }
+        else if ((f = fopen("../config.ini", "rb")) != NULL) {
+            fclose(f);
+            resolved = "../config.ini";
+        } else {
+            resolved = "config.ini";   /* none yet: create beside us */
+        }
+    }
+    return resolved;
+}
+
 static int game_config_str(const char *section, const char *key,
                            char *out, size_t cap)
 {
-    static const char *paths[] = {"config.ini", "../config.ini"};
-    size_t p;
     if (!out || !cap) return 0;
     out[0] = '\0';
-    for (p = 0; p < sizeof(paths) / sizeof(paths[0]); ++p) {
-        FILE *f = fopen(paths[p], "rb");
+    {
+        FILE *f = fopen(game_config_path(), "rb");
         char line[512];
         int in_section = 0;
         if (!f)
-            continue;
+            return 0;
         while (fgets(line, sizeof(line), f)) {
             char *s = line, *eq;
             while (*s == ' ' || *s == '\t') s++;
@@ -613,16 +650,15 @@ static int game_config_str(const char *section, const char *key,
     return 0;
 }
 
+
 static int game_config_int(const char *section, const char *key, int fallback)
 {
-    static const char *paths[] = {"config.ini", "../config.ini"};
-    size_t p;
-    for (p = 0; p < sizeof(paths) / sizeof(paths[0]); ++p) {
-        FILE *f = fopen(paths[p], "rb");
+    {
+        FILE *f = fopen(game_config_path(), "rb");
         char line[512];
         int in_section = 0;
         if (!f)
-            continue;
+            return fallback;
         while (fgets(line, sizeof(line), f)) {
             char *s = line, *eq;
             while (*s == ' ' || *s == '\t') s++;
@@ -676,14 +712,12 @@ static void game_frame_limit(void)
 
 static void game_load_pad_map(void)
 {
-    static const char *paths[] = {"config.ini", "../config.ini"};
-    size_t p;
-    for (p = 0; p < sizeof(paths) / sizeof(paths[0]); ++p) {
-        FILE *f = fopen(paths[p], "rb");
+    {
+        FILE *f = fopen(game_config_path(), "rb");
         char line[512];
         int in_section = 0;
         if (!f)
-            continue;
+            goto no_map;
         while (fgets(line, sizeof(line), f)) {
             char *s = line, *eq;
             while (*s == ' ' || *s == '\t') s++;
@@ -722,15 +756,16 @@ static void game_load_pad_map(void)
                     val = comma + 1;
                 }
                 fprintf(stderr, "[input] gamepad map: %d binding(s) from %s\n",
-                        n, paths[p]);
+                        n, game_config_path());
                 fclose(f);
                 return;
             }
         }
         fclose(f);
     }
-    fprintf(stderr, "[input] gamepad map: config.ini has no [GamepadMap]; "
-                    "using built-in defaults\n");
+no_map:
+    fprintf(stderr, "[input] gamepad map: %s has no [GamepadMap]; "
+                    "using built-in defaults\n", game_config_path());
 }
 
 static void game_open_pads(void)
@@ -1507,12 +1542,12 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
      * and unrelated keys survive). Only on change: an untouched launcher
      * run must not invent a [Video] section in a fresh install. */
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && ls.frame_blend != fb_seed)
-        launcher_ini_kv_write("config.ini", "Video", "FrameBlend",
+        launcher_ini_kv_write(game_config_path(), "Video", "FrameBlend",
                               ls.frame_blend ? "1" : "0");
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH) {
         int vs_new = (ls.vsync != RECOMP_LAUNCHER_VSYNC_OFF) ? 1 : 0;
         if (vs_new != vs_seed)
-            launcher_ini_kv_write("config.ini", "Video", "Vsync",
+            launcher_ini_kv_write(game_config_path(), "Video", "Vsync",
                                   vs_new ? "1" : "0");
     }
     /* Only on change, like the Display boxes above: a first run must not
@@ -1521,12 +1556,12 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
         char val[16];
         if (ls.fullscreen != fs_seed) {
             snprintf(val, sizeof(val), "%d", ls.fullscreen);
-            launcher_ini_kv_write("config.ini", "Video", "Fullscreen", val);
+            launcher_ini_kv_write(game_config_path(), "Video", "Fullscreen", val);
         }
         if (ls.renderer != rend_seed) {
             const char *id = (ls.renderer > 0) ? game_renderer_driver(ls.renderer)
                                                : "auto";
-            launcher_ini_kv_write("config.ini", "Video", "Renderer",
+            launcher_ini_kv_write(game_config_path(), "Video", "Renderer",
                                   id ? id : "auto");
         }
     }
@@ -1552,15 +1587,15 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
 
             snprintf(key, sizeof(key), "SourceP%d", q + 1);
             snprintf(val, sizeof(val), "%d", ls.player_src[q]);
-            launcher_ini_kv_write("config.ini", "Controller", key, val);
+            launcher_ini_kv_write(game_config_path(), "Controller", key, val);
 
             snprintf(key, sizeof(key), "GuidP%d", q + 1);
-            launcher_ini_kv_write("config.ini", "Controller", key,
+            launcher_ini_kv_write(game_config_path(), "Controller", key,
                                   ls.player_gamepad_guid[q]);
 
             snprintf(key, sizeof(key), "DeadzoneP%d", q + 1);
             snprintf(val, sizeof(val), "%d", ls.deadzone[q]);
-            launcher_ini_kv_write("config.ini", "Controller", key, val);
+            launcher_ini_kv_write(game_config_path(), "Controller", key, val);
 
             /* Says what actually went to disk. Paired with the "restored" line
              * above, a single log tells whether a slot that came back wrong
@@ -2346,13 +2381,10 @@ session_reboot:
      * one authority for each. Called before SDL_Init only because the keymap
      * has to exist before the first key event, not because it needs SDL.
      *
-     * The same two paths game_config_str() uses, so a build run from the
-     * repo root and one run from its build dir both find the file. */
-    {
-        FILE *probe = fopen("config.ini", "rb");
-        if (probe) { fclose(probe); ParseConfigFile("config.ini"); }
-        else        ParseConfigFile("../config.ini");
-    }
+     * The same file game_config_str() reads, so a build run from the repo root
+     * and one run from its build dir both find it — and, unlike before, both
+     * take every key from that one file. */
+    ParseConfigFile(game_config_path());
 
     /* snesrecomp_sdl_* wrap the SDL2/SDL3 API differences, so this host
      * builds against either backend (-DSNESRECOMP_SDL_BACKEND=SDL2|SDL3). */
