@@ -520,6 +520,8 @@ static int game_pad_name_to_button(const char *name)
 #define GAME_FPS 60.0988
 
 static int g_vsync = 1;
+/* 0 off, 1 borderless, 2 exclusive — [Video] Fullscreen. */
+static int g_fullscreen_mode;
 
 /* ── Frame blending ───────────────────────────────────────────────────────
  *
@@ -860,6 +862,136 @@ static uint16_t read_keyboard(void)
 #define GAME_FAST_FORWARD_MAX_FRAMES 30
 #define GAME_SAVESTATE_MENU_GESTURE ((1u << 2) | (1u << 11))
 
+/*
+ * Renderer pick, [Video] Renderer, index into this table.
+ *
+ * SDL is asked for -1/NULL and picks for itself, and on Windows it has been
+ * observed picking "direct3d" -- which is the D3D9 renderer, not D3D11.
+ * D3D9 presents a windowed swapchain through the BitBlt model and DWM
+ * redirection; D3D11 can use the flip model and skip the redirection copy
+ * entirely. On a 4K desktop with display scaling that difference is paid by
+ * the compositor on every present, whatever size the game window is, so it is
+ * worth being able to choose rather than inherit.
+ *
+ * Index 0 is Auto and sets no hint at all, which is exactly today's
+ * behaviour -- so a player who never touches this gets what they already had.
+ */
+static const char *const kGameRendererLabels[] = {
+    "Auto", "Direct3D 11", "Direct3D 9", "OpenGL", "Software",
+};
+static const char *const kGameRendererDrivers[] = {
+    NULL, "direct3d11", "direct3d", "opengl", "software",
+};
+enum { kGameRendererCount =
+           (int)(sizeof(kGameRendererLabels) / sizeof(kGameRendererLabels[0])) };
+
+static int game_renderer_choice(void)
+{
+    int v = game_config_int("[Video]", "Renderer", 0);
+    if (v < 0 || v >= kGameRendererCount)
+        v = 0;
+    return v;
+}
+
+/* Applied by hint rather than by driver index: the index order is not stable
+ * across SDL builds, and a name that this SDL does not have simply fails to
+ * match, leaving SDL to choose as before. */
+static void game_apply_renderer_choice(int choice)
+{
+    const char *driver = (choice > 0 && choice < kGameRendererCount)
+                             ? kGameRendererDrivers[choice] : NULL;
+    if (!driver)
+        return;
+#if SNESRECOMP_SDL3
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, driver);
+#else
+    SDL_SetHint(SDL_HINT_RENDER_DRIVER, driver);
+#endif
+    fprintf(stderr, "[video] renderer request: %s ([Video] Renderer=%d)\n",
+            driver, choice);
+}
+
+/*
+ * Window flags from [Video] Fullscreen: 0 off, 1 borderless, 2 exclusive --
+ * the same three the launcher's Off/Borderless/Exclusive cycle produces.
+ *
+ * RESIZABLE is unconditional. The window was created with flags 0, so it
+ * could not be resized at all, and the fullscreen setting the launcher has
+ * always offered reached nothing. game_compute_present_rect() already
+ * recomputes the destination from the renderer's output size every frame, so
+ * the frame follows a resize without any additional plumbing.
+ */
+/*
+ * Fullscreen, applied to a live window rather than requested at creation.
+ *
+ * Passing SDL_WINDOW_FULLSCREEN to SDL_CreateWindow was tried first and did
+ * not take -- the window came up 896x672 windowed and SDL_GetWindowFlags
+ * agreed it was not fullscreen. Setting it after the window exists is the
+ * path that works, and it also means creation and the Alt+Return toggle go
+ * through the same code instead of two that can disagree.
+ *
+ * SDL3 split the two kinds: SDL_SetWindowFullscreen is a bool, and BORDERLESS
+ * vs EXCLUSIVE is chosen by the fullscreen MODE -- NULL means "use the
+ * desktop", a real mode means change the display. SDL2 encodes both in the
+ * flag. Hence the split rather than one call.
+ */
+static void game_apply_fullscreen(SDL_Window *window, int mode)
+{
+    if (!window)
+        return;
+#if SNESRECOMP_SDL3
+    if (mode == 2) {
+        /* Exclusive: closest mode to the window's current size. NULL would
+         * mean borderless-desktop, which is the other option here. */
+        SDL_DisplayID disp = SDL_GetDisplayForWindow(window);
+        int w = 0, h = 0;
+        SDL_DisplayMode want;
+        SDL_GetWindowSize(window, &w, &h);
+        if (SDL_GetClosestFullscreenDisplayMode(disp, w, h, 0.0f, false, &want))
+            SDL_SetWindowFullscreenMode(window, &want);
+        else
+            SDL_SetWindowFullscreenMode(window, NULL);
+    } else {
+        SDL_SetWindowFullscreenMode(window, NULL);   /* borderless desktop */
+    }
+    SDL_SetWindowFullscreen(window, mode != 0);
+    SDL_SyncWindow(window);
+#else
+    SDL_SetWindowFullscreen(
+        window, mode == 2 ? SDL_WINDOW_FULLSCREEN
+                          : (mode == 1 ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
+#endif
+    /* Report what the WINDOW says, not what we asked for. Requesting
+     * fullscreen and getting it are different events -- a window manager may
+     * refuse, defer, or answer after the sync times out -- and a log that only
+     * echoed the request is how "fullscreen has no effect" stays invisible.
+     * On this X11 WM exclusive takes and borderless does not; the line below
+     * is what will say whether that is also true on the player's machine. */
+    {
+        const Uint32 flags = SDL_GetWindowFlags(window);
+#if SNESRECOMP_SDL3
+        const int got = (flags & SDL_WINDOW_FULLSCREEN) != 0;
+#else
+        const int got = (flags & (SDL_WINDOW_FULLSCREEN |
+                                  SDL_WINDOW_FULLSCREEN_DESKTOP)) != 0;
+#endif
+        fprintf(stderr, "[video] fullscreen: requested %s, window reports %s\n",
+                mode == 2 ? "exclusive" : (mode == 1 ? "borderless" : "off"),
+                got ? "fullscreen" : "windowed");
+    }
+}
+
+static SDL_WindowFlags game_window_flags(void)
+{
+    /* RESIZABLE only. The window was created with flags 0, so it could not be
+     * resized at all; game_compute_present_rect() already recomputes the
+     * destination from the renderer's output size every frame, so the frame
+     * follows a resize with no further plumbing. Fullscreen is applied after
+     * creation (game_apply_fullscreen) because requesting it here does not
+     * reliably take. */
+    return (SDL_WindowFlags)SDL_WINDOW_RESIZABLE;
+}
+
 static int game_env_flag(const char *name)
 {
     const char *value = getenv(name);
@@ -1114,6 +1246,7 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     char assets_dir[1024];
     int lr;
     int fb_seed;
+    int fs_seed, rend_seed;
     int vs_seed;
 
     /* recomp-ui resolves its staged assets (assets/fonts, assets/img) relative
@@ -1124,6 +1257,13 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     memset(&ls, 0, sizeof(ls));
     ls.output_method = 2;      /* OpenGL */
     ls.window_scale  = 3;      /* matches the game window opened below */
+    /* Fullscreen and renderer: the launcher has always drawn the fullscreen
+     * cycle, and the game ignored it -- the window was created with flags 0
+     * and nothing ever read [Video] Fullscreen. Seeding here and writing back
+     * below closes that loop. */
+    ls.fullscreen    = game_config_int("[Video]", "Fullscreen", 0);
+    if (ls.fullscreen < 0 || ls.fullscreen > 2) ls.fullscreen = 0;
+    ls.renderer      = game_renderer_choice();
     ls.enable_audio  = 1;
     ls.audio_freq    = 32000;
     ls.volume        = 100;
@@ -1192,6 +1332,9 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
      * the ABI's 1-based encoding (0 would mean "unset" and be reseeded On,
      * silently flipping this title's ships-off default). */
     fb_seed = game_config_int("[Video]", "FrameBlend", GWED_FRAME_BLEND_DEFAULT) ? 1 : 0;
+    fs_seed = game_config_int("[Video]", "Fullscreen", 0);
+    if (fs_seed < 0 || fs_seed > 2) fs_seed = 0;
+    rend_seed = game_renderer_choice();
     ls.frame_blend   = fb_seed;
     vs_seed = game_config_int("[Video]", "Vsync", 0) ? 1 : 0;
     ls.vsync         = vs_seed ? RECOMP_LAUNCHER_VSYNC_ON
@@ -1211,6 +1354,11 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     /* Display → VSync checkbox (the legacy surface draws it as On/Off; this
      * host's renderer flag is boolean, so Adaptive is never offered). */
     gi.has_vsync = 1;
+    /* Per-GAME, not per-profile: enabling this in snes_profile.h would give
+     * every SNES port a control it has not wired to anything. */
+    gi.has_renderer     = 1;
+    gi.renderer_labels  = kGameRendererLabels;
+    gi.num_renderers    = kGameRendererCount;
     /* The shared SNES profile turns on the launcher's legacy 16:9 Display
      * toggle. This title deliberately does not use it: widescreen is a Mods
      * package (mods/preloaded/packages/gwed.enhancement.widescreen), which is
@@ -1284,6 +1432,19 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
         if (vs_new != vs_seed)
             launcher_ini_kv_write("config.ini", "Video", "Vsync",
                                   vs_new ? "1" : "0");
+    }
+    /* Only on change, like the Display boxes above: a first run must not
+     * invent a [Video] section in a fresh install. */
+    if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH) {
+        char val[16];
+        if (ls.fullscreen != fs_seed) {
+            snprintf(val, sizeof(val), "%d", ls.fullscreen);
+            launcher_ini_kv_write("config.ini", "Video", "Fullscreen", val);
+        }
+        if (ls.renderer != rend_seed) {
+            snprintf(val, sizeof(val), "%d", ls.renderer);
+            launcher_ini_kv_write("config.ini", "Video", "Renderer", val);
+        }
     }
     /* Persist the controller slots so the next run comes up configured.
      * Written unconditionally on launch (unlike the Display boxes, which only
@@ -2130,17 +2291,35 @@ session_reboot:
     {
         int frame_w = GwedDisplay_GetCurrentFrameWidth();
         int win_h = GAME_HEIGHT * 3;
+        g_fullscreen_mode = game_config_int("[Video]", "Fullscreen", 0);
+        if (g_fullscreen_mode < 0 || g_fullscreen_mode > 2)
+            g_fullscreen_mode = 0;
         window = snesrecomp_sdl_create_window(
             "Gundam Wing Endless Duel",
-            GwedDisplay_GetWindowBaseWidth(frame_w, win_h), win_h, 0);
+            GwedDisplay_GetWindowBaseWidth(frame_w, win_h), win_h,
+            game_window_flags());
+        if (g_fullscreen_mode)
+            game_apply_fullscreen(window, g_fullscreen_mode);
     }
     /* Default OFF for this title. config.ini is generated at runtime by the
      * launcher and is not shipped, so a fresh install falls back to whatever
      * this default says -- and with vsync on, a 60.00 Hz panel duplicates a
      * frame every 10 s (measured). Set [Video] Vsync = 1 to opt back in. */
     g_vsync = game_config_int("[Video]", "Vsync", 0) != 0;
+    /* Before the renderer exists: the hint is read at creation. */
+    game_apply_renderer_choice(game_renderer_choice());
     renderer = window ? snesrecomp_sdl_create_renderer(window, false, g_vsync)
                       : NULL;
+    if (renderer)
+        fprintf(stderr, "[video] renderer in use: %s\n",
+                snesrecomp_sdl_renderer_name(renderer));
+    /* Say what the window actually became. A setting that silently does
+     * nothing is how [Video] Fullscreen went unnoticed for this long. */
+    fprintf(stderr, "[video] window: %s, resizable ([Video] Fullscreen=%d)\n",
+            g_fullscreen_mode == 2 ? "exclusive fullscreen"
+                                   : (g_fullscreen_mode == 1 ? "borderless fullscreen"
+                                                             : "windowed"),
+            g_fullscreen_mode);
     fprintf(stderr, "[video] vsync %s (config.ini [Video] Vsync)\n",
             g_vsync ? "on" : "off — pacing on the 60.0988 Hz SNES clock");
     /* Hand the perf log what it cannot see for itself. The drawable/window
@@ -2254,6 +2433,14 @@ session_reboot:
                     break;
                 case kKeys_Rewind:
                     rewind_hotkey = 1;
+                    break;
+                case kKeys_Fullscreen:
+                    /* Cycles the same three states the launcher offers, so the
+                     * key and the settings panel cannot disagree about what
+                     * "fullscreen" means. Alt+Return is the framework default
+                     * for this bind and was previously dead. */
+                    g_fullscreen_mode = (g_fullscreen_mode + 1) % 3;
+                    game_apply_fullscreen(window, g_fullscreen_mode);
                     break;
                 default:
                     /* Back-compat, and it is load-bearing: config.ini is not
