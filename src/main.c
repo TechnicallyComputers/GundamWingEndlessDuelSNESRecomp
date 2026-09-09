@@ -545,6 +545,24 @@ static int g_vsync = 1;
 static int g_frame_blend = GWED_FRAME_BLEND_DEFAULT;
 static uint32_t g_blend_prev[GAME_MAX_WIDTH * GAME_HEIGHT];
 static int g_blend_prev_valid = 0;
+/*
+ * Staging frame for the blended path. Sized like g_blend_prev beside it, so
+ * neither can be outgrown by a widescreen width change.
+ *
+ * It exists because the blend is a read-modify-write, and it used to do that
+ * read against the LOCKED TEXTURE. SDL_LockTexture on a streaming texture
+ * hands back driver memory that is frequently write-combined and uncached:
+ * excellent for sequential writes, pathological to read -- there is no read
+ * caching, so each of the 57,344 loads is an uncached fetch. Writes were
+ * never the problem; the read-back was.
+ *
+ * The cost of that is invisible on one machine and severe on another, because
+ * whether the mapping is cached system memory or write-combined depends on
+ * the backend and the driver -- which is exactly the shape of a bug that is
+ * fine for the developer and ruins it for one player. Blending in ordinary
+ * cached memory and uploading once removes the variable entirely.
+ */
+static uint32_t g_frame_stage[GAME_MAX_WIDTH * GAME_HEIGHT];
 
 static int game_config_str(const char *section, const char *key,
                            char *out, size_t cap)
@@ -1488,29 +1506,45 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
     if (redraw_game) {
         void *pixels = NULL;
         int pitch = 0;
-        if (snesrecomp_sdl_lock_texture(texture, NULL, &pixels, &pitch)) {
-            RtlDrawPpuFrame((uint8 *)pixels, (size_t)pitch, 0);
-            /* Frame blending (see g_frame_blend above). The texture gets the
-             * average of this frame and the last; g_blend_prev keeps the
-             * unblended frame so the mix never feeds back on itself. The
-             * PPU's own renderBuffer stays pure for thumbnails/captures. */
-            if (g_frame_blend) {
-                int width = GwedDisplay_GetCurrentFrameWidth();
-                int y, x;
-                for (y = 0; y < GAME_HEIGHT; ++y) {
-                    uint32_t *row =
-                        (uint32_t *)((uint8 *)pixels + (size_t)y * pitch);
-                    uint32_t *prev = g_blend_prev + (size_t)y * width;
-                    for (x = 0; x < width; ++x) {
-                        uint32_t cur = row[x];
-                        if (g_blend_prev_valid)
-                            row[x] = (cur & prev[x]) +
-                                     (((cur ^ prev[x]) >> 1) & 0x7F7F7F7Fu);
-                        prev[x] = cur;
-                    }
+        const int width = GwedDisplay_GetCurrentFrameWidth();
+
+        if (g_frame_blend) {
+            /* Blended path: draw and mix in ORDINARY MEMORY, then upload once.
+             *
+             * The mix is a read-modify-write and it used to read back out of
+             * the locked texture -- see g_frame_stage. Everything here touches
+             * cached memory; the only contact with the mapping is the linear,
+             * write-only copy at the end, which is the access pattern
+             * write-combined memory is actually good at.
+             *
+             * g_blend_prev still keeps the UNBLENDED frame, so the mix never
+             * feeds back on itself, and the PPU's own renderBuffer stays pure
+             * for thumbnails and captures. Same arithmetic as before. */
+            int y, x;
+            RtlDrawPpuFrame((uint8 *)g_frame_stage, (size_t)width * 4u, 0);
+            for (y = 0; y < GAME_HEIGHT; ++y) {
+                uint32_t *row = g_frame_stage + (size_t)y * width;
+                uint32_t *prev = g_blend_prev + (size_t)y * width;
+                for (x = 0; x < width; ++x) {
+                    uint32_t cur = row[x];
+                    if (g_blend_prev_valid)
+                        row[x] = (cur & prev[x]) +
+                                 (((cur ^ prev[x]) >> 1) & 0x7F7F7F7Fu);
+                    prev[x] = cur;
                 }
-                g_blend_prev_valid = 1;
             }
+            g_blend_prev_valid = 1;
+            if (snesrecomp_sdl_lock_texture(texture, NULL, &pixels, &pitch)) {
+                for (y = 0; y < GAME_HEIGHT; ++y)
+                    memcpy((uint8 *)pixels + (size_t)y * pitch,
+                           g_frame_stage + (size_t)y * width,
+                           (size_t)width * 4u);
+                SDL_UnlockTexture(texture);
+            }
+        } else if (snesrecomp_sdl_lock_texture(texture, NULL, &pixels, &pitch)) {
+            /* Unblended: nothing reads the mapping, so the staging copy would
+             * be pure overhead. RtlWidescreenPresent writes it linearly. */
+            RtlDrawPpuFrame((uint8 *)pixels, (size_t)pitch, 0);
             SDL_UnlockTexture(texture);
         }
         /* Offer the composited frame as the next save's thumbnail. Must come
