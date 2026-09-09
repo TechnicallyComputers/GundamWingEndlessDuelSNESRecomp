@@ -863,64 +863,123 @@ static uint16_t read_keyboard(void)
 #define GAME_SAVESTATE_MENU_GESTURE ((1u << 2) | (1u << 11))
 
 /*
- * Renderer pick, [Video] Renderer, index into this table.
+ * Renderer pick, [Video] Renderer.
  *
- * SDL is asked for -1/NULL and picks for itself, and on Windows it has been
- * observed picking "direct3d" -- which is the D3D9 renderer, not D3D11.
+ * Built at startup from what THIS SDL build actually reports, not from a
+ * hardcoded platform matrix. Linux offers opengl / opengles2 / vulkan / gpu /
+ * software and no Direct3D at all; Windows offers the Direct3D family and not
+ * Metal. A fixed list would advertise renderers that cannot exist on the
+ * machine reading it, and would go stale the next time SDL adds a backend.
+ *
+ * Why it is worth choosing at all: SDL is asked for NULL and picks, and on the
+ * reporting player's Windows machine it picked "direct3d" -- the D3D9 one.
  * D3D9 presents a windowed swapchain through the BitBlt model and DWM
- * redirection; D3D11 can use the flip model and skip the redirection copy
- * entirely. On a 4K desktop with display scaling that difference is paid by
- * the compositor on every present, whatever size the game window is, so it is
- * worth being able to choose rather than inherit.
+ * redirection, where D3D11 can use the flip model and skip the redirection
+ * copy. On a 4K desktop that difference is paid by the compositor on every
+ * present, whatever size the game window is.
  *
- * Index 0 is Auto and sets no hint at all, which is exactly today's
- * behaviour -- so a player who never touches this gets what they already had.
+ * Stored by NAME, not index. An index means different renderers on different
+ * machines -- "2" is D3D9 on Windows and vulkan here -- so a config file
+ * copied between them, or a settings.ini carried in a save sync, would
+ * silently select something else. A name either matches or does not.
  */
-static const char *const kGameRendererLabels[] = {
-    "Auto", "Direct3D 11", "Direct3D 9", "OpenGL", "Software",
+enum { kGameRendererMax = 16, kGameRendererNameMax = 32 };
+static char  g_renderer_id[kGameRendererMax][kGameRendererNameMax];
+static char  g_renderer_label[kGameRendererMax][kGameRendererNameMax];
+static const char *g_renderer_label_ptr[kGameRendererMax];
+static int   g_renderer_count;
+
+/* SDL's own names are lowercase identifiers; these are what a player reads. */
+static const char *game_renderer_pretty(const char *id)
+{
+    if (!strcmp(id, "direct3d"))   return "Direct3D 9";
+    if (!strcmp(id, "direct3d11")) return "Direct3D 11";
+    if (!strcmp(id, "direct3d12")) return "Direct3D 12";
+    if (!strcmp(id, "opengl"))     return "OpenGL";
+    if (!strcmp(id, "opengles2"))  return "OpenGL ES 2";
+    if (!strcmp(id, "vulkan"))     return "Vulkan";
+    if (!strcmp(id, "metal"))      return "Metal";
+    if (!strcmp(id, "software"))   return "Software";
+    return id;
+}
+
+/* Index 0 is always Auto: it sets no hint, which is exactly the behaviour of
+ * a build that never had this control. */
+static void game_renderer_enumerate(void)
+{
+    int n, i;
+    if (g_renderer_count)
+        return;
+    snprintf(g_renderer_id[0], kGameRendererNameMax, "auto");
+    snprintf(g_renderer_label[0], kGameRendererNameMax, "Auto");
+    g_renderer_count = 1;
+
+    n = snesrecomp_sdl_num_render_drivers();
+    for (i = 0; i < n && g_renderer_count < kGameRendererMax; ++i) {
+        /* Copied, not aliased: the SDL2 path returns a pointer into a static
+         * struct that the next call overwrites. */
+        const char *id = snesrecomp_sdl_render_driver_name(i);
+        if (!id || !id[0])
+            continue;
+        snprintf(g_renderer_id[g_renderer_count], kGameRendererNameMax, "%s", id);
+        snprintf(g_renderer_label[g_renderer_count], kGameRendererNameMax, "%s",
+                 game_renderer_pretty(g_renderer_id[g_renderer_count]));
+        g_renderer_count++;
+    }
+    for (i = 0; i < g_renderer_count; ++i)
+        g_renderer_label_ptr[i] = g_renderer_label[i];
+}
+
+/* Legacy order from the first version of this setting, which stored an index.
+ * Committed but never released; mapped rather than ignored so a config left
+ * over from testing does not silently become Auto. */
+static const char *const kGameRendererLegacy[] = {
+    "auto", "direct3d11", "direct3d", "opengl", "software",
 };
-static const char *const kGameRendererDrivers[] = {
-    NULL, "direct3d11", "direct3d", "opengl", "software",
-};
-enum { kGameRendererCount =
-           (int)(sizeof(kGameRendererLabels) / sizeof(kGameRendererLabels[0])) };
 
 static int game_renderer_choice(void)
 {
-    int v = game_config_int("[Video]", "Renderer", 0);
-    if (v < 0 || v >= kGameRendererCount)
-        v = 0;
-    return v;
+    char val[64];
+    int i;
+    game_renderer_enumerate();
+    if (!game_config_str("[Video]", "Renderer", val, sizeof(val)) || !val[0])
+        return 0;
+    /* A bare number is the legacy form. */
+    if (val[0] >= '0' && val[0] <= '9') {
+        int idx = atoi(val);
+        const char *want = (idx >= 0 && idx < (int)(sizeof(kGameRendererLegacy) /
+                                                   sizeof(kGameRendererLegacy[0])))
+                               ? kGameRendererLegacy[idx] : "auto";
+        fprintf(stderr, "[video] [Video] Renderer=%s is the old numeric form; "
+                        "reading it as '%s'\n", val, want);
+        snprintf(val, sizeof(val), "%s", want);
+    }
+    for (i = 0; i < g_renderer_count; ++i)
+        if (!strcmp(val, g_renderer_id[i]))
+            return i;
+    fprintf(stderr, "[video] [Video] Renderer='%s' is not offered by this SDL "
+                    "build; using Auto\n", val);
+    return 0;
 }
 
-/* Applied by hint rather than by driver index: the index order is not stable
- * across SDL builds, and a name that this SDL does not have simply fails to
- * match, leaving SDL to choose as before. */
+static const char *game_renderer_driver(int choice)
+{
+    game_renderer_enumerate();
+    if (choice <= 0 || choice >= g_renderer_count)
+        return NULL;
+    return g_renderer_id[choice];
+}
+
 static void game_apply_renderer_choice(int choice)
 {
-    const char *driver = (choice > 0 && choice < kGameRendererCount)
-                             ? kGameRendererDrivers[choice] : NULL;
+    const char *driver = game_renderer_driver(choice);
     if (!driver)
         return;
-#if SNESRECOMP_SDL3
     SDL_SetHint(SDL_HINT_RENDER_DRIVER, driver);
-#else
-    SDL_SetHint(SDL_HINT_RENDER_DRIVER, driver);
-#endif
-    fprintf(stderr, "[video] renderer request: %s ([Video] Renderer=%d)\n",
-            driver, choice);
+    fprintf(stderr, "[video] renderer request: %s ([Video] Renderer)\n", driver);
 }
 
-/*
- * Window flags from [Video] Fullscreen: 0 off, 1 borderless, 2 exclusive --
- * the same three the launcher's Off/Borderless/Exclusive cycle produces.
- *
- * RESIZABLE is unconditional. The window was created with flags 0, so it
- * could not be resized at all, and the fullscreen setting the launcher has
- * always offered reached nothing. game_compute_present_rect() already
- * recomputes the destination from the renderer's output size every frame, so
- * the frame follows a resize without any additional plumbing.
- */
+
 /*
  * Fullscreen, applied to a live window rather than requested at creation.
  *
@@ -1357,8 +1416,9 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     /* Per-GAME, not per-profile: enabling this in snes_profile.h would give
      * every SNES port a control it has not wired to anything. */
     gi.has_renderer     = 1;
-    gi.renderer_labels  = kGameRendererLabels;
-    gi.num_renderers    = kGameRendererCount;
+    game_renderer_enumerate();
+    gi.renderer_labels  = g_renderer_label_ptr;
+    gi.num_renderers    = g_renderer_count;
     /* The shared SNES profile turns on the launcher's legacy 16:9 Display
      * toggle. This title deliberately does not use it: widescreen is a Mods
      * package (mods/preloaded/packages/gwed.enhancement.widescreen), which is
@@ -1442,8 +1502,10 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
             launcher_ini_kv_write("config.ini", "Video", "Fullscreen", val);
         }
         if (ls.renderer != rend_seed) {
-            snprintf(val, sizeof(val), "%d", ls.renderer);
-            launcher_ini_kv_write("config.ini", "Video", "Renderer", val);
+            const char *id = (ls.renderer > 0) ? game_renderer_driver(ls.renderer)
+                                               : "auto";
+            launcher_ini_kv_write("config.ini", "Video", "Renderer",
+                                  id ? id : "auto");
         }
     }
     /* Persist the controller slots so the next run comes up configured.
@@ -2307,9 +2369,23 @@ session_reboot:
      * frame every 10 s (measured). Set [Video] Vsync = 1 to opt back in. */
     g_vsync = game_config_int("[Video]", "Vsync", 0) != 0;
     /* Before the renderer exists: the hint is read at creation. */
-    game_apply_renderer_choice(game_renderer_choice());
-    renderer = window ? snesrecomp_sdl_create_renderer(window, false, g_vsync)
-                      : NULL;
+    {
+        const int pick = game_renderer_choice();
+        game_apply_renderer_choice(pick);
+        renderer = window ? snesrecomp_sdl_create_renderer(window, false, g_vsync)
+                          : NULL;
+        /* A driver SDL lists is not a driver that can always start -- vulkan
+         * with no usable ICD is the obvious one. Falling back beats leaving
+         * the player with no renderer and a black window because of a setting
+         * they can no longer reach the menu to change. */
+        if (!renderer && window && pick > 0) {
+            fprintf(stderr, "[video] %s could not create a renderer (%s); "
+                            "falling back to Auto\n",
+                    game_renderer_driver(pick), SDL_GetError());
+            SDL_SetHint(SDL_HINT_RENDER_DRIVER, "");
+            renderer = snesrecomp_sdl_create_renderer(window, false, g_vsync);
+        }
+    }
     if (renderer)
         fprintf(stderr, "[video] renderer in use: %s\n",
                 snesrecomp_sdl_renderer_name(renderer));
