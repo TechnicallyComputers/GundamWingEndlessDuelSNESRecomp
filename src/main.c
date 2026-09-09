@@ -896,11 +896,27 @@ static const char *game_renderer_pretty(const char *id)
     if (!strcmp(id, "direct3d11")) return "Direct3D 11";
     if (!strcmp(id, "direct3d12")) return "Direct3D 12";
     if (!strcmp(id, "opengl"))     return "OpenGL";
-    if (!strcmp(id, "opengles2"))  return "OpenGL ES 2";
     if (!strcmp(id, "vulkan"))     return "Vulkan";
     if (!strcmp(id, "metal"))      return "Metal";
+    /* SDL3's renderer built on the SDL_GPU abstraction (Vulkan / D3D12 /
+     * Metal underneath). Named for what it is: "gpu" on its own reads like a
+     * category rather than a backend, next to entries that are all GPU. */
+    if (!strcmp(id, "gpu"))        return "SDL3_GPU";
     if (!strcmp(id, "software"))   return "Software";
     return id;
+}
+
+/*
+ * Backends SDL lists that this game does not offer.
+ *
+ * opengles2 targets mobile and embedded; on a desktop it reaches the same
+ * hardware as the desktop OpenGL entry through a strictly smaller API, so it
+ * is a second way to spell a worse option. Filtered at enumeration, so it is
+ * absent from the dropdown rather than present and discouraged.
+ */
+static int game_renderer_hidden(const char *id)
+{
+    return !strcmp(id, "opengles2");
 }
 
 /* Index 0 is always Auto: it sets no hint, which is exactly the behaviour of
@@ -919,7 +935,7 @@ static void game_renderer_enumerate(void)
         /* Copied, not aliased: the SDL2 path returns a pointer into a static
          * struct that the next call overwrites. */
         const char *id = snesrecomp_sdl_render_driver_name(i);
-        if (!id || !id[0])
+        if (!id || !id[0] || game_renderer_hidden(id))
             continue;
         snprintf(g_renderer_id[g_renderer_count], kGameRendererNameMax, "%s", id);
         snprintf(g_renderer_label[g_renderer_count], kGameRendererNameMax, "%s",
@@ -957,8 +973,14 @@ static int game_renderer_choice(void)
     for (i = 0; i < g_renderer_count; ++i)
         if (!strcmp(val, g_renderer_id[i]))
             return i;
-    fprintf(stderr, "[video] [Video] Renderer='%s' is not offered by this SDL "
-                    "build; using Auto\n", val);
+    /* Two different reasons, and saying the wrong one sends someone looking
+     * for a driver problem they do not have. */
+    if (game_renderer_hidden(val))
+        fprintf(stderr, "[video] [Video] Renderer='%s' exists but is not "
+                        "offered by this game; using Auto\n", val);
+    else
+        fprintf(stderr, "[video] [Video] Renderer='%s' is not available in "
+                        "this SDL build; using Auto\n", val);
     return 0;
 }
 
