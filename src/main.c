@@ -40,6 +40,7 @@
 #include "snes_savestate_menu.h" /* Select+R / [KeyMap] save-state overlay */
 #include "snes_osd.h"            /* FPS readout / turbo / slot toasts */
 #include "snes_rewind.h"         /* rewind ring + filmstrip */
+#include "snes_runahead.h"       /* offline input-latency reduction */
 #include "snes_overlay_draw.h"   /* SNES_PAD_* input word bits */
 #include <time.h>
 #if defined(_WIN32)
@@ -2975,6 +2976,14 @@ session_reboot:
     /* Launcher Display checkbox lands here via the [Video] FrameBlend
      * write-back in run_gui_launcher, so this read is the single source of
      * truth for both the GUI and text-mode boot paths. */
+    /* Run-ahead. Own section, not [Video]: it changes when the guest runs,
+     * not how the result is drawn. 0 disables; 1 is the useful setting for
+     * most titles and 2 for the few that buffer input harder. Offline only --
+     * snes_runahead_run_frame refuses during netplay regardless of this. */
+    snes_runahead_set_frames(game_config_int("[Emulation]", "RunAhead", 0));
+    /* Env wins, for a one-off comparison without editing the file. */
+    snes_runahead_configure();
+
     g_frame_blend = game_config_int("[Video]", "FrameBlend",
                                     GWED_FRAME_BLEND_DEFAULT) != 0;
     g_blend_prev_valid = 0;   /* never blend across a session reboot */
@@ -3343,7 +3352,16 @@ session_reboot:
             for (ffi = 0; ffi < frames_this_iter; ffi++) {
                 const Uint64 emu_t0 = SDL_GetPerformanceCounter();
                 const double emu_cpu0 = game_thread_cpu_ms();
-                RtlRunFrame(inputs);
+                /* Run-ahead owns the whole frame when it is on: it advances
+                 * the guest once and speculates N further, so calling
+                 * RtlRunFrame as well would double-advance. It declines
+                 * (returns 0) during netplay and whenever the machine cannot
+                 * snapshot, which is why this is a fallback rather than a
+                 * branch. Never during fast-forward: speculating about frames
+                 * that are already being skipped costs work for a picture
+                 * nobody is reading. */
+                if (fast_forward || !snes_runahead_run_frame(inputs))
+                    RtlRunFrame(inputs);
                 g_last_emulate_ms += game_perf_ms_since(emu_t0);
                 if (emu_cpu0 >= 0.0) {
                     const double c1 = game_thread_cpu_ms();
