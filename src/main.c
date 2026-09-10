@@ -719,6 +719,11 @@ static int game_config_int(const char *section, const char *key, int fallback)
  * measurement here is noisy enough that only a replicated, interleaved
  * comparison means anything. */
 static double g_pace_period_ms;      /* 0 = unknown, pacing disabled */
+/* What the pacer asked for vs what it actually got. A pacer that overshoots
+ * manufactures the very hitch it exists to remove, and the two are only
+ * distinguishable if both are recorded. */
+static double g_last_pace_want_ms = -1.0, g_last_pace_slept_ms = -1.0;
+static double game_perf_ms_since(Uint64 t0);   /* defined with the loop timers */
 static int    g_pace_enabled = -1;
 
 static int game_pace_on(void)
@@ -763,14 +768,29 @@ static double game_pace_to_display(void)
     }
     /* Sleep SHORT of the deadline and let vsync take the remainder.
      *
-     * SDL_Delay is a scheduler sleep and can overshoot: one paced run in three
-     * showed a 72 ms frame whose `limiter` was a correct 14.92 ms, i.e. the
-     * sleep itself ran long under load. Overshooting is worse than
-     * undershooting here, because vsync is still downstream and will absorb a
-     * frame that arrives early, while nothing can recover one that arrives
-     * late. So aim 1 ms short and let the display do the final alignment. */
-    if (wait_ms > 1.5)
+     * Overshooting is worse than undershooting: vsync is downstream and
+     * absorbs a frame that arrives early, but nothing recovers one that
+     * arrives late. Measured in fullscreen on the reporter's machine, an
+     * SDL_Delay-based pacer overshot by ~9 ms often enough to produce 11
+     * spikes of 25-27 ms in 163 s -- it removed the 48-66 ms unlock stalls and
+     * replaced them with smaller ones of its own.
+     *
+     * SDL_DelayPrecise is the SDL3 API meant for this and is markedly tighter
+     * than SDL_Delay's millisecond-rounded scheduler sleep. SDL2 has no
+     * equivalent, so that path keeps the coarse sleep and a wider margin. */
+    if (wait_ms > 1.5) {
+        const Uint64 slept_t0 = SDL_GetPerformanceCounter();
+#if SNESRECOMP_SDL3
+        SDL_DelayPrecise((Uint64)((wait_ms - 0.3) * 1000000.0));
+#else
         SDL_Delay((Uint32)(wait_ms - 1.0));
+#endif
+        g_last_pace_slept_ms = game_perf_ms_since(slept_t0);
+        g_last_pace_want_ms = wait_ms;
+    } else {
+        g_last_pace_slept_ms = 0.0;
+        g_last_pace_want_ms = wait_ms;
+    }
     return wait_ms;
 }
 
@@ -3182,8 +3202,10 @@ session_reboot:
             g_last_limit_ms = game_perf_ms_since(lim_t0);
         } else {
             const double paced = game_pace_to_display();
-            if (paced >= 0.0)
+            if (paced >= 0.0) {
                 g_last_limit_ms = paced;   /* reported as `limiter` */
+                GwedDiag_NotePaceMs(g_last_pace_want_ms, g_last_pace_slept_ms);
+            }
         }
         /* Every millisecond of the iteration is now attributed: emulate,
          * upload, the five present phases, and the limiter wait. Whatever the

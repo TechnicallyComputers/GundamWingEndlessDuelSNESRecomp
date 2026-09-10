@@ -132,4 +132,13 @@ void GwedDiag_NoteTextureFillUnlockMs(double fill_ms, double unlock_ms);
  * for cpu where thread CPU time is unavailable. */
 void GwedDiag_NoteIterationMs(double iter_ms, double iter_cpu_ms);
 
+/* What the display pacer asked to sleep, and what it actually slept.
+ *
+ * A pacer that overshoots manufactures the hitch it exists to remove, and the
+ * two are only distinguishable if both are recorded. Also lets the spike
+ * verdict stop naming the deliberate wait: once pacing is on, `limiter` is the
+ * largest bucket in almost every frame, so "largest bucket" would say LIMITER
+ * for every spike whatever the real cause. */
+void GwedDiag_NotePaceMs(double want_ms, double slept_ms);
+
 #endif /* GWED_DIAGNOSTICS_MOD_H */

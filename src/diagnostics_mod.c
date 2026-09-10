@@ -109,6 +109,7 @@ static double s_ph_upload_cpu = -1.0;
 static double s_ph_lock = -1.0;
 static double s_ph_fill = -1.0, s_ph_unlock = -1.0;
 static double s_iter_ms = -1.0, s_iter_cpu = -1.0;
+static double s_pace_want = -1.0, s_pace_slept = -1.0;
 
 /* Why a frame was off-CPU, straight from the kernel's own accounting.
  *
@@ -505,7 +506,13 @@ static const char *diag_spike_verdict(double drawn)
         { "DRAW: our render calls",              drawn        },
         { "SWAP: driver/display/swapchain",      s_ph_swap    },
         { "EVENT PUMP",                          s_lp_pump    },
-        { "LIMITER: deliberate wait",            s_lp_limit   },
+        /* Only a cause when it overshot. With pacing on, the deliberate wait
+         * is the largest bucket in nearly every frame, so treating it as a
+         * candidate would label every spike LIMITER whatever really happened.
+         * An overshoot is real and gets named; an honest wait scores zero. */
+        { "PACER OVERSHOOT: slept longer than asked",
+          (s_pace_slept >= 0.0 && s_pace_want >= 0.0)
+            ? (s_pace_slept - s_pace_want) : -1.0 },
     };
     int i, best = 0;
     for (i = 1; i < (int)(sizeof b / sizeof b[0]); i++)
@@ -559,6 +566,14 @@ void GwedDiag_NoteIterationMs(double iter_ms, double iter_cpu_ms)
         return;
     s_iter_ms = iter_ms;
     s_iter_cpu = iter_cpu_ms;
+}
+
+void GwedDiag_NotePaceMs(double want_ms, double slept_ms)
+{
+    if (!s_active)
+        return;
+    s_pace_want = want_ms;
+    s_pace_slept = slept_ms;
 }
 
 void GwedDiag_NoteEvent(const char *what)
@@ -869,6 +884,11 @@ static void gwed_diag_frame(void)
                           s_lp_emulate, s_lp_pump,
                           s_lp_limit >= 0.0 ? s_lp_limit : 0.0,
                           acct, ms, ms - acct);
+                if (s_pace_want >= 0.0)
+                    diag_line("           pacer   asked=%.2f slept=%.2f "
+                              "overshoot=%.2f",
+                              s_pace_want, s_pace_slept,
+                              s_pace_slept - s_pace_want);
                 if (s_iter_ms >= 0.0)
                     diag_line("           iter    wall=%.2f cpu=%.2f -> the "
                               "missing time is %s",
@@ -947,6 +967,7 @@ static void gwed_diag_frame(void)
     s_ph_lock = -1.0;
     s_ph_fill = s_ph_unlock = -1.0;
     s_iter_ms = s_iter_cpu = -1.0;
+    s_pace_want = s_pace_slept = -1.0;
 
     /* One summary per second of wall clock, so a quiet session stays short
      * and a bad one is dense where it went bad. */
