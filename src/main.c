@@ -1882,6 +1882,13 @@ static double game_thread_cpu_ms(void)
 static double g_last_upload_ms = -1.0;
 static double g_last_upload_cpu_ms = -1.0;
 static double g_last_lock_ms = -1.0;
+/* fill  = writing the frame into the mapped texture (pure CPU stores)
+ * unlock= SDL_UnlockTexture, which on a GPU backend is where the staging
+ *         buffer is actually handed to the GPU. `copy` conflated the two and
+ *         measured 32 ms with only 4-6 ms of CPU, which rules out the stores
+ *         and points at the transfer -- but pointing is not proving. */
+static double g_last_fill_ms = -1.0;
+static double g_last_unlock_ms = -1.0;
 static int    g_last_lock_ok;
 
 /* One present. redraw_game is 0 while the guest is frozen — the texture
@@ -1913,7 +1920,7 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
          * write-combined memory. Lumping them left "upload=34ms" ambiguous
          * between "the GPU held us" (fix: rotate textures) and "the copy is
          * slow" (fix: make the copy cheaper). */
-        Uint64 lock_t0 = 0;
+        Uint64 lock_t0 = 0, unlock_t0 = 0;
 
         if (g_frame_blend) {
             /* Blended path: draw and mix in ORDINARY MEMORY, then upload once.
@@ -1948,7 +1955,10 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
                     memcpy((uint8 *)pixels + (size_t)y * pitch,
                            g_frame_stage + (size_t)y * width,
                            (size_t)width * 4u);
+                g_last_fill_ms = game_perf_ms_since(lock_t0) - g_last_lock_ms;
+                unlock_t0 = SDL_GetPerformanceCounter();
                 SDL_UnlockTexture(texture);
+                g_last_unlock_ms = game_perf_ms_since(unlock_t0);
             }
         } else if ((lock_t0 = SDL_GetPerformanceCounter(),
                     g_last_lock_ok = snesrecomp_sdl_lock_texture(
@@ -1958,7 +1968,10 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
             /* Unblended: nothing reads the mapping, so the staging copy would
              * be pure overhead. RtlWidescreenPresent writes it linearly. */
             RtlDrawPpuFrame((uint8 *)pixels, (size_t)pitch, 0);
+            g_last_fill_ms = game_perf_ms_since(lock_t0) - g_last_lock_ms;
+            unlock_t0 = SDL_GetPerformanceCounter();
             SDL_UnlockTexture(texture);
+            g_last_unlock_ms = game_perf_ms_since(unlock_t0);
         }
         {
             const Uint64 up_freq = SDL_GetPerformanceFrequency();
@@ -2955,6 +2968,9 @@ session_reboot:
         GwedDiag_NoteEmulateCpuMs(g_last_emulate_cpu_ms);
         GwedDiag_NoteUploadCpuMs(g_last_upload_cpu_ms);
         GwedDiag_NoteTextureLockMs(g_last_lock_ms);
+        GwedDiag_NoteTextureFillUnlockMs(g_last_fill_ms, g_last_unlock_ms);
+        g_last_fill_ms = -1.0;
+        g_last_unlock_ms = -1.0;
         g_last_upload_cpu_ms = -1.0;
         g_last_lock_ms = -1.0;
         g_last_emulate_cpu_ms = 0.0;

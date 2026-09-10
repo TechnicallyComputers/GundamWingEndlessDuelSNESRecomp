@@ -117,4 +117,10 @@ void GwedDiag_NoteUploadCpuMs(double cpu_ms);
  * and making the copy cheaper. */
 void GwedDiag_NoteTextureLockMs(double ms);
 
+/* The two halves of what used to be reported as `copy`: writing the pixels
+ * into the mapped texture, and SDL_UnlockTexture -- which on a GPU backend is
+ * where the staging buffer is handed to the GPU and where a transfer can
+ * block. Measured separately because they have different fixes. */
+void GwedDiag_NoteTextureFillUnlockMs(double fill_ms, double unlock_ms);
+
 #endif /* GWED_DIAGNOSTICS_MOD_H */
