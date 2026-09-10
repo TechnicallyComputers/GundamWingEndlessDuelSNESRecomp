@@ -1894,13 +1894,86 @@ static int    g_last_lock_ok;
 /* One present. redraw_game is 0 while the guest is frozen — the texture
  * still holds the last frame, so re-presenting it costs nothing and keeps
  * the window repainting under the overlay. */
+/* Experimental upload paths, selected at runtime by GWED_UPLOAD_MODE.
+ *
+ * MEASURED on 2026-09-10, real Vulkan session: the guest->texture upload
+ * spikes are not the lock (0.26-2.07 ms) and not the pixel stores
+ * (fill 0.06-0.12 ms) -- they are SDL_UnlockTexture, the GPU handover, at
+ * 12-32 ms, often with the following swap elevated too. That says the
+ * transfer contends with the GPU, but not what to do about it, and this
+ * cannot be reproduced on the software path (uploads there are 0.47 ms).
+ *
+ * So rather than guess a fix and ship it, both candidate paths are here and
+ * switchable in one sitting:
+ *   lock    (default) one streaming texture, Lock/Unlock every frame
+ *   rotate  N streaming textures round-robin, so a transfer never lands on a
+ *           texture the GPU may still be reading from the previous frames
+ * The mode is written into the log header so a comparison cannot be made
+ * against the wrong build. */
+#define GAME_TEX_RING 3
+static SDL_Texture *g_tex_ring[GAME_TEX_RING];
+static int g_tex_ring_idx;
+static int g_upload_rotate = -1;   /* -1 = not yet read from the environment */
+
+static int game_upload_rotate(void)
+{
+    if (g_upload_rotate < 0) {
+        const char *m = getenv("GWED_UPLOAD_MODE");
+        g_upload_rotate = (m && strcmp(m, "rotate") == 0) ? 1 : 0;
+        GwedDiag_NoteEvent(g_upload_rotate ? "upload mode: rotate (3 textures)"
+                                           : "upload mode: lock (1 texture)");
+    }
+    return g_upload_rotate;
+}
+
 static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
                          int redraw_game)
 {
-    SDL_Texture *texture = game_ensure_texture(renderer, *texture_slot);
+    SDL_Texture *texture;
+
+    if (game_upload_rotate()) {
+        /* Seed the ring from the texture the caller already owns, then hand
+         * out a different one each frame. Slot 0 IS the caller's texture, so
+         * ownership and teardown are unchanged.
+         *
+         * The ring advances only when there is a new frame to upload. A held
+         * frame (redraw_game == 0, the guest frozen behind a menu or the
+         * rewind UI) must re-present the slot that actually holds the last
+         * picture; advancing would show whatever is three frames stale. */
+        int i;
+        if (!g_tex_ring[0])
+            g_tex_ring[0] = *texture_slot;
+        if (redraw_game)
+            g_tex_ring_idx = (g_tex_ring_idx + 1) % GAME_TEX_RING;
+        i = g_tex_ring_idx;
+        if (!g_tex_ring[i]) {
+            int w = 0, h = 0;
+            if (g_tex_ring[0] &&
+                snesrecomp_sdl_get_texture_size(g_tex_ring[0], &w, &h) &&
+                w > 0 && h > 0) {
+                g_tex_ring[i] = SDL_CreateTexture(
+                    renderer, SDL_PIXELFORMAT_ARGB8888,
+                    SDL_TEXTUREACCESS_STREAMING, w, h);
+                if (g_tex_ring[i])
+                    SDL_SetTextureBlendMode(g_tex_ring[i], SDL_BLENDMODE_NONE);
+            }
+        }
+        if (!g_tex_ring[i]) {          /* allocation failed: stay on slot 0 */
+            g_tex_ring_idx = 0;
+            i = 0;
+        }
+        texture = game_ensure_texture(renderer, g_tex_ring[i]);
+        g_tex_ring[i] = texture;
+        if (i == 0)
+            *texture_slot = texture;
+        goto have_texture;
+    }
+    texture = game_ensure_texture(renderer, *texture_slot);
+have_texture:;
     SDL_Rect dst;
 
-    *texture_slot = texture;
+    if (!game_upload_rotate())
+        *texture_slot = texture;
     if (!texture)
         return;
     if (redraw_game) {
@@ -2981,6 +3054,12 @@ session_reboot:
 
     RtlAudioSetFastForward(0);
     game_close_pads();
+    {
+        int i;
+        for (i = 1; i < GAME_TEX_RING; i++)   /* slot 0 is the caller's */
+            if (g_tex_ring[i]) { SDL_DestroyTexture(g_tex_ring[i]);
+                                 g_tex_ring[i] = NULL; }
+    }
     if (g_overlay_tex) {
         SDL_DestroyTexture(g_overlay_tex);
         g_overlay_tex = NULL;
