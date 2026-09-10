@@ -41,6 +41,21 @@
 #include "snes_osd.h"            /* FPS readout / turbo / slot toasts */
 #include "snes_rewind.h"         /* rewind ring + filmstrip */
 #include <time.h>
+#if defined(_WIN32)
+/* For GetThreadTimes in game_thread_cpu_ms: MinGW defines _WIN32, so that
+ * branch compiles, but nothing here pulls in FILETIME/ULARGE_INTEGER and the
+ * build failed on exactly that. LEAN_AND_MEAN and NOMINMAX because this file
+ * wants a Win32 clock and nothing else; checked first that no identifier in
+ * main.c collides with what windows.h defines (near/far/max/small/IN/OUT all
+ * appear only in prose). */
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <windows.h>
+#endif
 #include "diagnostics_mod.h"     /* perf log: video facts + present cost */
 #include "config.h"              /* FindCmdForSdlKey + [KeyMap] parsing */
 #include "cpu_trace.h"
