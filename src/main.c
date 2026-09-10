@@ -1880,6 +1880,9 @@ static double game_thread_cpu_ms(void)
 /* Guest->texture upload cost for this iteration, handed to the diagnostics
  * module when the present is reported. -1 when no upload ran (frozen guest). */
 static double g_last_upload_ms = -1.0;
+static double g_last_upload_cpu_ms = -1.0;
+static double g_last_lock_ms = -1.0;
+static int    g_last_lock_ok;
 
 /* One present. redraw_game is 0 while the guest is frozen — the texture
  * still holds the last frame, so re-presenting it costs nothing and keeps
@@ -1903,6 +1906,14 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
          * frame's texture, a write-combined mapping behaving badly) used to be
          * charged to emulation and was invisible. */
         const Uint64 up_t0 = SDL_GetPerformanceCounter();
+        const double up_cpu0 = game_thread_cpu_ms();
+        /* The lock is timed on its own. SDL's streaming-texture lock is where
+         * a Vulkan/D3D backend makes you wait for the GPU to finish reading
+         * last frame's copy; the memcpy that follows is pure CPU into
+         * write-combined memory. Lumping them left "upload=34ms" ambiguous
+         * between "the GPU held us" (fix: rotate textures) and "the copy is
+         * slow" (fix: make the copy cheaper). */
+        Uint64 lock_t0 = 0;
 
         if (g_frame_blend) {
             /* Blended path: draw and mix in ORDINARY MEMORY, then upload once.
@@ -1930,14 +1941,20 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
                 }
             }
             g_blend_prev_valid = 1;
+            lock_t0 = SDL_GetPerformanceCounter();
             if (snesrecomp_sdl_lock_texture(texture, NULL, &pixels, &pitch)) {
+                g_last_lock_ms = game_perf_ms_since(lock_t0);
                 for (y = 0; y < GAME_HEIGHT; ++y)
                     memcpy((uint8 *)pixels + (size_t)y * pitch,
                            g_frame_stage + (size_t)y * width,
                            (size_t)width * 4u);
                 SDL_UnlockTexture(texture);
             }
-        } else if (snesrecomp_sdl_lock_texture(texture, NULL, &pixels, &pitch)) {
+        } else if ((lock_t0 = SDL_GetPerformanceCounter(),
+                    g_last_lock_ok = snesrecomp_sdl_lock_texture(
+                        texture, NULL, &pixels, &pitch),
+                    g_last_lock_ms = game_perf_ms_since(lock_t0),
+                    g_last_lock_ok)) {
             /* Unblended: nothing reads the mapping, so the staging copy would
              * be pure overhead. RtlWidescreenPresent writes it linearly. */
             RtlDrawPpuFrame((uint8 *)pixels, (size_t)pitch, 0);
@@ -1949,6 +1966,17 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
                 ? (double)(SDL_GetPerformanceCounter() - up_t0) * 1000.0
                   / (double)up_freq
                 : -1.0;
+            /* Same blocked-vs-spinning question as emulation. A streaming
+             * texture lock that waits for the GPU to finish reading last
+             * frame's copy burns no CPU; a slow memcpy burns all of it. The
+             * two have completely different fixes (rotate the texture vs make
+             * the copy cheaper), so the log has to tell them apart. */
+            if (up_cpu0 >= 0.0) {
+                const double c1 = game_thread_cpu_ms();
+                g_last_upload_cpu_ms = (c1 >= 0.0) ? c1 - up_cpu0 : -1.0;
+            } else {
+                g_last_upload_cpu_ms = -1.0;
+            }
         }
         /* Offer the composited frame as the next save's thumbnail. Must come
          * after RtlDrawPpuFrame — that is the call that fills renderBuffer. */
@@ -2925,6 +2953,10 @@ session_reboot:
         GwedDiag_NoteLoopPhases(g_last_emulate_ms, g_last_pump_ms,
                                 g_last_limit_ms);
         GwedDiag_NoteEmulateCpuMs(g_last_emulate_cpu_ms);
+        GwedDiag_NoteUploadCpuMs(g_last_upload_cpu_ms);
+        GwedDiag_NoteTextureLockMs(g_last_lock_ms);
+        g_last_upload_cpu_ms = -1.0;
+        g_last_lock_ms = -1.0;
         g_last_emulate_cpu_ms = 0.0;
         g_last_emulate_ms = 0.0;
         g_last_pump_ms = 0.0;

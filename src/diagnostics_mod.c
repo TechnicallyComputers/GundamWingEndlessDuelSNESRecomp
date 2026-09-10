@@ -94,6 +94,8 @@ static double s_ph_overlay = -1.0, s_ph_osd = -1.0, s_ph_swap = -1.0;
 static double s_swap_max_ms;
 static double s_lp_emulate = -1.0, s_lp_pump = -1.0, s_lp_limit = -1.0;
 static double s_lp_emulate_cpu = -1.0;
+static double s_ph_upload_cpu = -1.0;
+static double s_ph_lock = -1.0;
 
 /* Why a frame was off-CPU, straight from the kernel's own accounting.
  *
@@ -493,6 +495,20 @@ void GwedDiag_NoteEmulateCpuMs(double cpu_ms)
     s_lp_emulate_cpu = cpu_ms;
 }
 
+void GwedDiag_NoteUploadCpuMs(double cpu_ms)
+{
+    if (!s_active)
+        return;
+    s_ph_upload_cpu = cpu_ms;
+}
+
+void GwedDiag_NoteTextureLockMs(double ms)
+{
+    if (!s_active)
+        return;
+    s_ph_lock = ms;
+}
+
 void GwedDiag_NoteEvent(const char *what)
 {
     if (!s_active || !what || !*what)
@@ -778,6 +794,21 @@ static void gwed_diag_frame(void)
                           s_lp_emulate, s_lp_pump,
                           s_lp_limit >= 0.0 ? s_lp_limit : 0.0,
                           acct, ms, ms - acct);
+                if (s_ph_upload > 5.0)
+                    diag_line("           upload  wall=%.2f cpu=%.2f "
+                              "lock=%.2f copy=%.2f -> %s",
+                              s_ph_upload,
+                              s_ph_upload_cpu >= 0.0 ? s_ph_upload_cpu : 0.0,
+                              s_ph_lock >= 0.0 ? s_ph_lock : 0.0,
+                              s_ph_lock >= 0.0 ? s_ph_upload - s_ph_lock
+                                               : s_ph_upload,
+                              (s_ph_lock >= 0.0 && s_ph_lock > s_ph_upload * 0.5)
+                                ? "LOCK: waiting on the GPU to release the "
+                                  "streaming texture (rotate textures)"
+                                : (s_ph_upload_cpu >= 0.0 &&
+                                   s_ph_upload_cpu < s_ph_upload * 0.5
+                                   ? "BLOCKED somewhere other than the lock"
+                                   : "COPY: on-CPU, the copy itself is slow"));
                 if (s_lp_emulate_cpu >= 0.0)
                     diag_line("           cpu     emulate wall=%.2f cpu=%.2f "
                               "-> %s",
@@ -816,6 +847,8 @@ static void gwed_diag_frame(void)
     s_ph_overlay = s_ph_osd = s_ph_swap = -1.0;
     s_lp_emulate = s_lp_pump = s_lp_limit = -1.0;
     s_lp_emulate_cpu = -1.0;
+    s_ph_upload_cpu = -1.0;
+    s_ph_lock = -1.0;
 
     /* One summary per second of wall clock, so a quiet session stays short
      * and a bad one is dense where it went bad. */

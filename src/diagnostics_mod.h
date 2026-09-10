@@ -106,4 +106,15 @@ void GwedDiag_NoteLoopPhases(double emulate_ms, double pump_ms,
  */
 void GwedDiag_NoteEmulateCpuMs(double cpu_ms);
 
+/* Same discrimination for the guest->texture upload: a streaming-texture lock
+ * that waits on the GPU burns no CPU, a slow copy burns all of it, and they
+ * need different fixes. */
+void GwedDiag_NoteUploadCpuMs(double cpu_ms);
+
+/* SDL_LockTexture alone. On a GPU backend this is where the frame waits for
+ * the GPU to release the streaming texture it is still reading; the copy that
+ * follows is CPU. Splitting them is what decides between rotating the texture
+ * and making the copy cheaper. */
+void GwedDiag_NoteTextureLockMs(double ms);
+
 #endif /* GWED_DIAGNOSTICS_MOD_H */
