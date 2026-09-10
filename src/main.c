@@ -1913,18 +1913,28 @@ static int    g_last_lock_ok;
 #define GAME_TEX_RING 3
 static SDL_Texture *g_tex_ring[GAME_TEX_RING];
 static int g_tex_ring_idx;
-static int g_upload_rotate = -1;   /* -1 = not yet read from the environment */
+/* 0 = lock (default), 1 = rotate, 2 = update */
+static int g_upload_mode = -1;
 
-static int game_upload_rotate(void)
+static int game_upload_mode(void)
 {
-    if (g_upload_rotate < 0) {
+    if (g_upload_mode < 0) {
         const char *m = getenv("GWED_UPLOAD_MODE");
-        g_upload_rotate = (m && strcmp(m, "rotate") == 0) ? 1 : 0;
-        GwedDiag_NoteEvent(g_upload_rotate ? "upload mode: rotate (3 textures)"
-                                           : "upload mode: lock (1 texture)");
+        if (m && strcmp(m, "rotate") == 0) {
+            g_upload_mode = 1;
+            GwedDiag_NoteEvent("upload mode: rotate (3 textures)");
+        } else if (m && strcmp(m, "update") == 0) {
+            g_upload_mode = 2;
+            GwedDiag_NoteEvent("upload mode: update (SDL_UpdateTexture)");
+        } else {
+            g_upload_mode = 0;
+            GwedDiag_NoteEvent("upload mode: lock (1 texture)");
+        }
     }
-    return g_upload_rotate;
+    return g_upload_mode;
 }
+
+static int game_upload_rotate(void) { return game_upload_mode() == 1; }
 
 static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
                          int redraw_game)
@@ -2033,6 +2043,24 @@ have_texture:;
                 SDL_UnlockTexture(texture);
                 g_last_unlock_ms = game_perf_ms_since(unlock_t0);
             }
+        } else if (game_upload_mode() == 2) {
+            /* UpdateTexture path. Lock/Unlock hands the caller a mapping of a
+             * GPU-owned staging buffer, which is precisely the resource the
+             * present queue holds hostage under vsync -- measured as 12-32 ms
+             * inside SDL_UnlockTexture. SDL_UpdateTexture takes ordinary
+             * memory instead and lets the backend choose when to stage it, so
+             * it is a different driver path for the same bytes. Costs one
+             * extra copy through g_frame_stage, which measures 0.06-0.12 ms.
+             * Whether that actually avoids the stall is a question for the
+             * A/B, not for reasoning: the last three mechanisms that survived
+             * reasoning here died on measurement. */
+            RtlDrawPpuFrame((uint8 *)g_frame_stage, (size_t)width * 4u, 0);
+            g_last_fill_ms = game_perf_ms_since(up_t0);
+            unlock_t0 = SDL_GetPerformanceCounter();
+            SDL_UpdateTexture(texture, NULL, g_frame_stage,
+                              (int)((size_t)width * 4u));
+            g_last_unlock_ms = game_perf_ms_since(unlock_t0);
+            g_last_lock_ms = 0.0;
         } else if ((lock_t0 = SDL_GetPerformanceCounter(),
                     g_last_lock_ok = snesrecomp_sdl_lock_texture(
                         texture, NULL, &pixels, &pitch),
