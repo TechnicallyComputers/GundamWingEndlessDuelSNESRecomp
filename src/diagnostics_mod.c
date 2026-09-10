@@ -619,8 +619,15 @@ void GwedDiag_NoteLongIteration(double wall_ms, double cpu_ms)
               "present=%.2f upload=%.2f unlock=%.2f",
               seconds_since_start(SDL_GetPerformanceCounter()),
               snes_frame_counter, wall_ms, cpu_ms,
+#if defined(_WIN32)
+              /* GetThreadTimes is quantised to ~15.625 ms, so at frame scale
+               * it reports only 0 or a multiple of that. Do not pretend to
+               * discriminate. */
+              "cpu-time too coarse on Windows to say",
+#else
               (cpu_ms >= 0.0 && cpu_ms < wall_ms * 0.5) ? "WAITING"
                                                         : "ON-CPU",
+#endif
               s_lp_emulate >= 0.0 ? s_lp_emulate : 0.0,
               s_lp_pump >= 0.0 ? s_lp_pump : 0.0,
               s_head_ms >= 0.0 ? s_head_ms : 0.0,
@@ -1014,10 +1021,14 @@ static void gwed_diag_frame(void)
                     diag_line("           cpu     emulate wall=%.2f cpu=%.2f "
                               "-> %s",
                               s_lp_emulate, s_lp_emulate_cpu,
+#if defined(_WIN32)
+                              "cpu-time too coarse on Windows to say");
+#else
                               (s_lp_emulate > 5.0 &&
                                s_lp_emulate_cpu < s_lp_emulate * 0.5)
                                 ? "BLOCKED off-CPU"
                                 : "on-CPU: host code doing the work");
+#endif
 #if defined(__linux__)
                 diag_line("           kernel  run_delay=%.2fms majflt=%llu "
                           "-> %s",

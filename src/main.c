@@ -1980,6 +1980,12 @@ static double game_perf_ms_since(Uint64 t0)
 static double game_thread_cpu_ms(void)
 {
 #if defined(_WIN32)
+    /* CAVEAT: GetThreadTimes is quantised to the scheduler tick, ~15.625 ms.
+     * Per-frame it only ever returns 0 or a multiple of 15.62, so the
+     * blocked-vs-spinning verdict built on it is meaningless on Windows at
+     * this timescale -- seen as an unbroken run of cpu=0.00 / cpu=15.62 in a
+     * 120 Hz session. The wall-clock numbers are unaffected; only the
+     * WAITING/ON-CPU label is. Flagged where it is printed. */
     FILETIME c, e, k, u;
     if (GetThreadTimes(GetCurrentThread(), &c, &e, &k, &u)) {
         ULARGE_INTEGER ku, uu;
@@ -2901,13 +2907,30 @@ session_reboot:
         if (idx >= 0 && SDL_GetCurrentDisplayMode(idx, &m) == 0)
             hz = (double)m.refresh_rate;
 #endif
-        if (hz > 20.0 && hz < 400.0)
-            g_pace_period_ms = 1000.0 / hz;
+        /* Pace to whichever is SLOWER: the display, or the guest's own frame
+         * rate. Never the raw display period.
+         *
+         * A 120 Hz panel reports 8.333 ms, but the guest produces 60.0988 fps
+         * -- one frame per 16.6 ms. Pacing to 8.333 would put the deadline
+         * behind on every iteration, resync it to now, and sleep zero: the
+         * pacer would silently do nothing on every high-refresh display.
+         * Caught on a 120 Hz Windows machine, where it was invisible because
+         * that user runs vsync off and the 60 Hz limiter was carrying the
+         * pacing instead. Both my test machines are 60 Hz, where the display
+         * period and the frame budget happen to be the same number, so this
+         * could not show up here. */
+        if (hz > 20.0 && hz < 400.0) {
+            const double disp = 1000.0 / hz;
+            const double budget = 1000.0 / GAME_FPS;
+            g_pace_period_ms = (disp > budget) ? disp : budget;
+        }
         if (game_pace_on()) {
             char msg[96];
             snprintf(msg, sizeof(msg),
-                     "pacing to display: %.3f Hz (%.3f ms/frame)",
-                     hz, g_pace_period_ms);
+                     "pacing: %.3f ms/frame (display %.3f Hz = %.3f ms, "
+                     "guest %.4f Hz = %.3f ms; the slower wins)",
+                     g_pace_period_ms, hz, hz > 0.0 ? 1000.0 / hz : 0.0,
+                     GAME_FPS, 1000.0 / GAME_FPS);
             GwedDiag_NoteEvent(msg);
         } else {
             GwedDiag_NoteEvent("pacing: off (GWED_PACE=0, or display rate "
@@ -3002,9 +3025,19 @@ session_reboot:
                  * two being printed. Logging it as it is discovered removes
                  * the off-by-one entirely -- and it fires whether or not any
                  * frame crossed the spike threshold. */
-                if (span > 0.0 && g_pace_period_ms > 0.0 &&
-                    span > g_pace_period_ms + 6.0)
-                    GwedDiag_NoteLongIteration(span, cpu);
+                /* Threshold off the EFFECTIVE period, not the display's.
+                 * Keyed to the raw display period this fired on every single
+                 * frame of a 120 Hz session -- 8.333 + 6 = 14.3 ms against
+                 * 16.6 ms iterations -- and buried the log it was meant to
+                 * clarify under one line per frame. Falls back to the guest
+                 * budget when pacing is off, so the check still works with
+                 * vsync disabled. */
+                {
+                    const double base = (g_pace_period_ms > 0.0)
+                        ? g_pace_period_ms : (1000.0 / GAME_FPS);
+                    if (span > 0.0 && span > base + 6.0)
+                        GwedDiag_NoteLongIteration(span, cpu);
+                }
             }
             g_iter_top_prev = top_now;
             g_iter_cpu_prev = top_cpu;
