@@ -276,6 +276,30 @@ void GwedDiag_NotePresentPhases(double upload_ms, double clear_ms,
     if (swap_ms > s_swap_max_ms) s_swap_max_ms = swap_ms;
 }
 
+/* Name the single largest bucket, across ALL of them.
+ *
+ * The first version of this compared `swap` against the drawing phases only,
+ * and so reported "swap-dominated: driver/display" for a frame whose swap was
+ * 0.14 ms and whose emulation was 66 ms. A verdict that can point at the
+ * display while the emulator is the whole cost is worse than no verdict --
+ * it is exactly the wrong-platform-guess this instrumentation exists to stop.
+ * Compare everything, and say which bucket actually holds the time. */
+static const char *diag_spike_verdict(double drawn)
+{
+    struct { const char *name; double ms; } b[] = {
+        { "EMULATION: guest frame, ours",        s_lp_emulate },
+        { "UPLOAD: guest->texture copy, ours",   s_ph_upload  },
+        { "DRAW: our render calls",              drawn        },
+        { "SWAP: driver/display/swapchain",      s_ph_swap    },
+        { "EVENT PUMP",                          s_lp_pump    },
+        { "LIMITER: deliberate wait",            s_lp_limit   },
+    };
+    int i, best = 0;
+    for (i = 1; i < (int)(sizeof b / sizeof b[0]); i++)
+        if (b[i].ms > b[best].ms) best = i;
+    return b[best].ms > 0.0 ? b[best].name : "unattributed";
+}
+
 void GwedDiag_NoteLoopPhases(double emulate_ms, double pump_ms,
                              double limit_ms)
 {
@@ -529,8 +553,7 @@ static void gwed_diag_frame(void)
                       drawn,
                       ms - s_present_ms
                         - (s_ph_upload >= 0.0 ? s_ph_upload : 0.0),
-                      s_ph_swap > drawn ? "swap-dominated: driver/display"
-                                        : "draw-dominated: ours");
+                      diag_spike_verdict(drawn));
             if (s_lp_emulate >= 0.0) {
                 double acct = s_present_ms
                             + (s_ph_upload >= 0.0 ? s_ph_upload : 0.0)
