@@ -100,6 +100,7 @@ static double s_lp_emulate_cpu = -1.0;
 static double s_ph_upload_cpu = -1.0;
 static double s_ph_lock = -1.0;
 static double s_ph_fill = -1.0, s_ph_unlock = -1.0;
+static double s_iter_ms = -1.0, s_iter_cpu = -1.0;
 
 /* Why a frame was off-CPU, straight from the kernel's own accounting.
  *
@@ -542,6 +543,14 @@ void GwedDiag_NoteTextureFillUnlockMs(double fill_ms, double unlock_ms)
     s_ph_unlock = unlock_ms;
 }
 
+void GwedDiag_NoteIterationMs(double iter_ms, double iter_cpu_ms)
+{
+    if (!s_active)
+        return;
+    s_iter_ms = iter_ms;
+    s_iter_cpu = iter_cpu_ms;
+}
+
 void GwedDiag_NoteEvent(const char *what)
 {
     if (!s_active || !what || !*what)
@@ -847,6 +856,20 @@ static void gwed_diag_frame(void)
                           s_lp_emulate, s_lp_pump,
                           s_lp_limit >= 0.0 ? s_lp_limit : 0.0,
                           acct, ms, ms - acct);
+                if (s_iter_ms >= 0.0)
+                    diag_line("           iter    wall=%.2f cpu=%.2f -> the "
+                              "missing time is %s",
+                              s_iter_ms,
+                              s_iter_cpu >= 0.0 ? s_iter_cpu : 0.0,
+                              (s_iter_ms > ms * 0.6)
+                                ? ((s_iter_cpu >= 0.0 &&
+                                    s_iter_cpu < s_iter_ms * 0.5)
+                                   ? "INSIDE the loop, WAITING (unmeasured "
+                                     "blocking call in the body)"
+                                   : "INSIDE the loop, ON-CPU (unmeasured work "
+                                     "in the body)")
+                                : "BETWEEN iterations (outside the loop body "
+                                  "entirely)");
                 if (s_ph_upload > 5.0)
                     diag_line("           upload  wall=%.2f cpu=%.2f "
                               "lock=%.2f copy=%.2f -> %s",
@@ -910,6 +933,7 @@ static void gwed_diag_frame(void)
     s_ph_upload_cpu = -1.0;
     s_ph_lock = -1.0;
     s_ph_fill = s_ph_unlock = -1.0;
+    s_iter_ms = s_iter_cpu = -1.0;
 
     /* One summary per second of wall clock, so a quiet session stays short
      * and a bad one is dense where it went bad. */

@@ -123,4 +123,13 @@ void GwedDiag_NoteTextureLockMs(double ms);
  * block. Measured separately because they have different fixes. */
 void GwedDiag_NoteTextureFillUnlockMs(double fill_ms, double unlock_ms);
 
+/* Wall and thread-CPU for the whole host loop iteration.
+ *
+ * `other` in the autopsy is a subtraction, so it can only say the time was not
+ * in any measured phase. This bounds it: time missing from a frame is either
+ * inside the loop body (iter_ms covers it) or between iterations (it does
+ * not), and iter_cpu says whether the loop was working or waiting. Pass -1
+ * for cpu where thread CPU time is unavailable. */
+void GwedDiag_NoteIterationMs(double iter_ms, double iter_cpu_ms);
+
 #endif /* GWED_DIAGNOSTICS_MOD_H */

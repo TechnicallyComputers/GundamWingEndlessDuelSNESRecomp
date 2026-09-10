@@ -2764,6 +2764,17 @@ session_reboot:
         uint32 inputs;
         int savestate_menu_hotkey = 0;
         int rewind_hotkey = 0;
+        /* Wall and CPU for the WHOLE iteration.
+         *
+         * The per-phase timers left ~15 ms of every 16.6 ms frame
+         * unattributed, and a 3.1 s stall showed up as `other=3125.15` with
+         * every measured phase near zero. `other` was computed by subtraction,
+         * so it could only ever say "not here" -- it could not say where. With
+         * the iteration bracketed, a gap is either INSIDE the loop body (and
+         * bounded by these two) or between iterations, and the CPU time says
+         * whether the loop was working or waiting. */
+        const Uint64 iter_t0 = SDL_GetPerformanceCounter();
+        const double iter_cpu0 = game_thread_cpu_ms();
 
         /* --exit-at-frame: leave through the normal shutdown path (audio
          * device, guest machine, SDL) with status 0, after the frame that
@@ -3036,6 +3047,15 @@ session_reboot:
          * upload, the five present phases, and the limiter wait. Whatever the
          * frame line still has left over is the event pump and loop overhead,
          * which the autopsy reports as `other`. */
+        {
+            const double iter_ms = game_perf_ms_since(iter_t0);
+            double iter_cpu = -1.0;
+            if (iter_cpu0 >= 0.0) {
+                const double c1 = game_thread_cpu_ms();
+                if (c1 >= 0.0) iter_cpu = c1 - iter_cpu0;
+            }
+            GwedDiag_NoteIterationMs(iter_ms, iter_cpu);
+        }
         GwedDiag_NoteLoopPhases(g_last_emulate_ms, g_last_pump_ms,
                                 g_last_limit_ms);
         GwedDiag_NoteEmulateCpuMs(g_last_emulate_cpu_ms);
