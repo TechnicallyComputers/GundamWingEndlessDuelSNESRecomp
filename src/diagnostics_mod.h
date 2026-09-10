@@ -152,4 +152,10 @@ void GwedDiag_NoteInputHeadMs(double head_ms);
  * always the previous iteration and never the guilty one. */
 void GwedDiag_NoteLongIteration(double wall_ms, double cpu_ms);
 
+/* Interval between consecutive presents -- the cadence the display actually
+ * shows, and the honest answer to "what does the player feel". The frame hook
+ * measures guest frame boundaries, which drift inside the host iteration once
+ * the loop is paced; presents do not. */
+void GwedDiag_NotePresentIntervalMs(double gap_ms);
+
 #endif /* GWED_DIAGNOSTICS_MOD_H */

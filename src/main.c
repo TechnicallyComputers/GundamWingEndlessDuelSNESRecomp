@@ -1987,6 +1987,7 @@ static double game_thread_cpu_ms(void)
 /* Guest->texture upload cost for this iteration, handed to the diagnostics
  * module when the present is reported. -1 when no upload ran (frozen guest). */
 static double g_last_upload_ms = -1.0;
+static Uint64 g_last_present_at;
 static double g_last_upload_cpu_ms = -1.0;
 static double g_last_lock_ms = -1.0;
 /* fill  = writing the frame into the mapped texture (pure CPU stores)
@@ -2247,6 +2248,26 @@ have_texture:;
     SDL_RenderPresent(renderer);
         t_e = SDL_GetPerformanceCounter();
         if (present_freq) {
+            /* Present-to-present: the interval the DISPLAY actually shows.
+             *
+             * The mod frame hook fires when the guest finishes a frame, not
+             * when a frame reaches the screen, and once the loop is paced
+             * those two stop agreeing. The guest runs at 60.0988 Hz against a
+             * 60.000 Hz display, so its frame boundary drifts inside the host
+             * iteration: the hook lands late in one iteration and early in the
+             * next. Measured, that reads as a 26 ms "spike" followed by a 6-7
+             * ms frame whose pair sums to exactly two display periods --
+             * 26.93+6.44, 26.46+7.06, 25.71+7.70 against 2 x 16.67 = 33.34.
+             * Nothing is lost and nothing is late; only the internal timestamp
+             * wobbles. Presents meanwhile leave every 16.67 ms.
+             *
+             * So hook-to-hook is the wrong metric for "what the player feels"
+             * and this is the right one. */
+            if (g_last_present_at) {
+                const double gap = (double)(t_e - g_last_present_at) * to_ms;
+                GwedDiag_NotePresentIntervalMs(gap);
+            }
+            g_last_present_at = t_e;
             GwedDiag_NotePresentMs((double)(t_e - present_t0) * to_ms);
             GwedDiag_NotePresentPhases(
                 g_last_upload_ms,

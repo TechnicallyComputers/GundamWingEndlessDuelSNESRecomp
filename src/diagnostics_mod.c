@@ -111,6 +111,8 @@ static double s_ph_fill = -1.0, s_ph_unlock = -1.0;
 static double s_iter_ms = -1.0, s_iter_cpu = -1.0;
 static double s_pace_want = -1.0, s_pace_slept = -1.0;
 static double s_head_ms = -1.0;
+static double s_pi_max, s_pi_sum; static int s_pi_n;
+static double s_pi_worst_session;
 /* The PREVIOUS iteration, kept because the frame interval straddles two.
  *
  * The mod frame hook fires inside RtlRunFrame, i.e. in the middle of a loop
@@ -628,6 +630,16 @@ void GwedDiag_NoteLongIteration(double wall_ms, double cpu_ms)
               s_ph_unlock >= 0.0 ? s_ph_unlock : 0.0);
 }
 
+void GwedDiag_NotePresentIntervalMs(double gap_ms)
+{
+    if (!s_active || gap_ms <= 0.0)
+        return;
+    if (gap_ms > s_pi_max) s_pi_max = gap_ms;
+    if (gap_ms > s_pi_worst_session) s_pi_worst_session = gap_ms;
+    s_pi_sum += gap_ms;
+    s_pi_n++;
+}
+
 void GwedDiag_NoteEvent(const char *what)
 {
     if (!s_active || !what || !*what)
@@ -788,6 +800,11 @@ static void diag_write_stats(const char *prefix, const DiagStats *s,
      * of avg frame, the cost is putting pixels on the screen -- output
      * surface, compositor, DPI scaling -- and not the emulation. */
     if (s_present_count > 0)
+        if (s_pi_n > 0)
+            diag_line("%s DISPLAY cadence avg=%.2fms max=%.2fms over %d "
+                      "present(s)  <- what the player feels",
+                      prefix, s_pi_sum / (double)s_pi_n, s_pi_max, s_pi_n);
+        s_pi_max = 0.0; s_pi_sum = 0.0; s_pi_n = 0;
         diag_line("%s present avg=%.2fms max=%.2fms swapmax=%.2fms "
                   "uploadmax=%.2fms unlockmax=%.2fms over %d present(s)",
                   prefix, s_present_sum_ms / (double)s_present_count,
