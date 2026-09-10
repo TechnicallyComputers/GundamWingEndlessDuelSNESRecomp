@@ -723,6 +723,9 @@ static double g_pace_period_ms;      /* 0 = unknown, pacing disabled */
  * manufactures the very hitch it exists to remove, and the two are only
  * distinguishable if both are recorded. */
 static double g_last_pace_want_ms = -1.0, g_last_pace_slept_ms = -1.0;
+/* Loop-top timestamps, so an iteration is measured whichever way it exits. */
+static Uint64 g_iter_top_prev;
+static double g_iter_cpu_prev = -1.0;
 static double game_perf_ms_since(Uint64 t0);   /* defined with the loop timers */
 static int    g_pace_enabled = -1;
 
@@ -2922,7 +2925,16 @@ session_reboot:
         uint32 inputs;
         int savestate_menu_hotkey = 0;
         int rewind_hotkey = 0;
-        /* Wall and CPU for the WHOLE iteration.
+        /* Wall and CPU for the whole iteration, measured TOP TO TOP.
+         *
+         * Bracketing top-to-bottom missed any iteration that left through one
+         * of the loop's `continue` paths (the frozen-guest path, and the
+         * netplay admit path) -- those never reached the report, so their time
+         * vanished. That produced the contradiction of a 77 ms frame whose two
+         * reported iterations were both a perfect 16.66 ms and whose frame
+         * counter showed no gap: the missing iterations were simply never
+         * measured. Reporting the PREVIOUS iteration's full span at the top of
+         * this one covers every exit path there is.
          *
          * The per-phase timers left ~15 ms of every 16.6 ms frame
          * unattributed, and a 3.1 s stall showed up as `other=3125.15` with
@@ -2931,8 +2943,20 @@ session_reboot:
          * the iteration bracketed, a gap is either INSIDE the loop body (and
          * bounded by these two) or between iterations, and the CPU time says
          * whether the loop was working or waiting. */
-        const Uint64 iter_t0 = SDL_GetPerformanceCounter();
-        const double iter_cpu0 = game_thread_cpu_ms();
+        {
+            const Uint64 top_now = SDL_GetPerformanceCounter();
+            const double top_cpu = game_thread_cpu_ms();
+            if (g_iter_top_prev) {
+                const Uint64 f = SDL_GetPerformanceFrequency();
+                GwedDiag_NoteIterationMs(
+                    f ? (double)(top_now - g_iter_top_prev) * 1000.0
+                        / (double)f : -1.0,
+                    (top_cpu >= 0.0 && g_iter_cpu_prev >= 0.0)
+                        ? top_cpu - g_iter_cpu_prev : -1.0);
+            }
+            g_iter_top_prev = top_now;
+            g_iter_cpu_prev = top_cpu;
+        }
 
         /* --exit-at-frame: leave through the normal shutdown path (audio
          * device, guest machine, SDL) with status 0, after the frame that
@@ -3211,15 +3235,6 @@ session_reboot:
          * upload, the five present phases, and the limiter wait. Whatever the
          * frame line still has left over is the event pump and loop overhead,
          * which the autopsy reports as `other`. */
-        {
-            const double iter_ms = game_perf_ms_since(iter_t0);
-            double iter_cpu = -1.0;
-            if (iter_cpu0 >= 0.0) {
-                const double c1 = game_thread_cpu_ms();
-                if (c1 >= 0.0) iter_cpu = c1 - iter_cpu0;
-            }
-            GwedDiag_NoteIterationMs(iter_ms, iter_cpu);
-        }
         GwedDiag_NoteLoopPhases(g_last_emulate_ms, g_last_pump_ms,
                                 g_last_limit_ms);
         GwedDiag_NoteEmulateCpuMs(g_last_emulate_cpu_ms);

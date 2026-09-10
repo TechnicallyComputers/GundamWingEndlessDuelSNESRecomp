@@ -110,6 +110,19 @@ static double s_ph_lock = -1.0;
 static double s_ph_fill = -1.0, s_ph_unlock = -1.0;
 static double s_iter_ms = -1.0, s_iter_cpu = -1.0;
 static double s_pace_want = -1.0, s_pace_slept = -1.0;
+/* The PREVIOUS iteration, kept because the frame interval straddles two.
+ *
+ * The mod frame hook fires inside RtlRunFrame, i.e. in the middle of a loop
+ * iteration, so frame_ms = (tail of iteration N-1 after its hook) + (head of
+ * iteration N up to its hook). Reporting only iteration N's wall made a 25 ms
+ * frame show `iter wall=16.66` -- a perfect iteration -- and sent the cost to
+ * `other`, where nothing could name it. With both, a long previous iteration
+ * is visible as exactly that instead of as an unexplained remainder. */
+static double s_iter_prev_ms = -1.0, s_iter_prev_cpu = -1.0;
+/* Shifted from these, NOT from s_iter_ms: the per-frame reset clears s_iter_ms
+ * before the next iteration reports, so shifting from it copied -1 every time
+ * and the line never printed. These are never reset. */
+static double s_iter_last_ms = -1.0, s_iter_last_cpu = -1.0;
 
 /* Why a frame was off-CPU, straight from the kernel's own accounting.
  *
@@ -498,13 +511,19 @@ void GwedDiag_NotePresentPhases(double upload_ms, double clear_ms,
  * display while the emulator is the whole cost is worse than no verdict --
  * it is exactly the wrong-platform-guess this instrumentation exists to stop.
  * Compare everything, and say which bucket actually holds the time. */
-static const char *diag_spike_verdict(double drawn)
+static const char *diag_spike_verdict(double drawn, double other_ms)
 {
     struct { const char *name; double ms; } b[] = {
         { "EMULATION: guest frame, ours",        s_lp_emulate },
         { "UPLOAD: guest->texture copy, ours",   s_ph_upload  },
         { "DRAW: our render calls",              drawn        },
         { "SWAP: driver/display/swapchain",      s_ph_swap    },
+        /* Unattributed time has to be able to win. Without this the verdict
+         * names the largest MEASURED bucket even when every measured bucket is
+         * small and the real cost is outside all of them -- which is how four
+         * 25 ms frames whose emulation was 1.5-2.5 ms came out labelled
+         * EMULATION. */
+        { "UNATTRIBUTED: outside every measured phase", other_ms },
         { "EVENT PUMP",                          s_lp_pump    },
         /* Only a cause when it overshot. With pacing on, the deliberate wait
          * is the largest bucket in nearly every frame, so treating it as a
@@ -564,6 +583,10 @@ void GwedDiag_NoteIterationMs(double iter_ms, double iter_cpu_ms)
 {
     if (!s_active)
         return;
+    s_iter_prev_ms = s_iter_last_ms;
+    s_iter_prev_cpu = s_iter_last_cpu;
+    s_iter_last_ms = iter_ms;
+    s_iter_last_cpu = iter_cpu_ms;
     s_iter_ms = iter_ms;
     s_iter_cpu = iter_cpu_ms;
 }
@@ -851,7 +874,13 @@ static void gwed_diag_frame(void)
                       drawn,
                       ms - s_present_ms
                         - (s_ph_upload >= 0.0 ? s_ph_upload : 0.0),
-                      diag_spike_verdict(drawn));
+                      diag_spike_verdict(drawn, ms - s_present_ms
+                                         - (s_ph_upload >= 0.0
+                                            ? s_ph_upload : 0.0)
+                                         - (s_lp_emulate >= 0.0
+                                            ? s_lp_emulate : 0.0)
+                                         - (s_lp_limit >= 0.0
+                                            ? s_lp_limit : 0.0)));
             {
                 /* THE discriminator for an emulation stall. If the guest
                  * executed a normal number of instructions and the frame still
@@ -889,6 +918,12 @@ static void gwed_diag_frame(void)
                               "overshoot=%.2f",
                               s_pace_want, s_pace_slept,
                               s_pace_slept - s_pace_want);
+                if (s_iter_prev_ms >= 0.0)
+                    diag_line("           iter-1  wall=%.2f cpu=%.2f "
+                              "(the PREVIOUS iteration; the frame interval "
+                              "straddles it and this one)",
+                              s_iter_prev_ms,
+                              s_iter_prev_cpu >= 0.0 ? s_iter_prev_cpu : 0.0);
                 if (s_iter_ms >= 0.0)
                     diag_line("           iter    wall=%.2f cpu=%.2f -> the "
                               "missing time is %s",
