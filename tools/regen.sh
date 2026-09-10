@@ -13,6 +13,14 @@
 #   --no-verify   skip the ROM digest check (for a revision this project has
 #                 not been pinned to yet — expect the generated C to differ)
 #   --cfg-roots   seed analysis from every func declaration in recomp/*.cfg
+#   --profile-manifest <path>
+#                 seed optional AOT roots from a tier-2 coverage manifest
+#                 (repeatable). This is the burn-down loop's promote step:
+#                 capture with SNESRECOMP_TIER2_CAPTURE=1 +
+#                 SNESRECOMP_TIER2_MANIFEST=<path>, triage with
+#                 snesrecomp/tools/tier2_ingest.py, then regen with the
+#                 manifest. Only clean hardware call landings are promoted;
+#                 bailed observations are bug evidence and are excluded.
 #   -h|--help     this message
 set -euo pipefail
 
@@ -25,12 +33,14 @@ EXPECTED_SHA256="${SNESRECOMP_EXPECTED_SHA256:-dd94308d822636c6ddf73c5e2644c84f2
 
 VERIFY=1
 CFG_ROOTS=0
+PROFILES=()
 ROM="${SNESRECOMP_ROM:-}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --rom) ROM=$2; shift 2 ;;
     --no-verify) VERIFY=0; shift ;;
     --cfg-roots) CFG_ROOTS=1; shift ;;
+    --profile-manifest) PROFILES+=("$2"); shift 2 ;;
     -h|--help) sed -n '2,/^set -euo/p' "$0" | sed -n '/^# /p' | sed 's/^# //'; exit 0 ;;
     *) echo "regen.sh: unknown flag: $1 (try --help)" >&2; exit 2 ;;
   esac
@@ -75,6 +85,12 @@ fi
 GEN_ARGS=(--rom "$ROM" --cfg-dir recomp --out-dir src/gen
           --funcs-h recomp/funcs.h --project-root "$ROOT")
 if [ "$CFG_ROOTS" -eq 1 ]; then GEN_ARGS+=(--cfg-roots); fi
+for _p in ${PROFILES+"${PROFILES[@]}"}; do
+  if [ ! -f "$_p" ]; then
+    echo "regen.sh: profile manifest not found: $_p" >&2; exit 2
+  fi
+  GEN_ARGS+=(--profile-manifest "$_p")
+done
 if [ "$VERIFY" -eq 1 ]; then GEN_ARGS+=("${VERIFY_ARGS[@]}"); fi
 
 echo "== Generating src/gen =="
