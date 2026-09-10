@@ -61,14 +61,15 @@ name = "DataBankWrap_A6EB"
 addr = "a6eb"
 bank = 0
 emit = false
-note = "CONFIRMED culprit of the f3305 wild-stack/black-screen (bug #2). PHB/PHK/PLB data-bank routine looping JSR $A729, closing PLA/PLB/RTL at $A713. Its AOT body returns the stack ~6 bytes low on a path-specific call at f3305 ([ibr]: JSL bounce sp_pre=0FE0 -> sp_post=0FDD, want 0FE3); the misalignment returns into WRAM $05:0000 which recurses $050002->$050000 until SP wraps wild -> PB=$F6. Forcing this one function to the interpreter (SNESRECOMP_LLE_INTERP_TARGET_FILE) makes the game track the control past f3305. Note: the corrected stack auditor does NOT flag A6EB cumulatively, so the leak is a specific branch / RTL-exit path, not the main path (which balances). Exact leaking branch not yet pinned."
+note = """RESOLVED 2026-09-09 — and this entry's earlier diagnosis is RETRACTED here rather than in a sibling note. A6EB was the function where the f3305 wild-stack/black-screen became VISIBLE, not the defect. PHB/PHK/PLB data-bank routine looping JSR $A729, closing PLA/PLB/RTL at $A713. What was retracted: the claim that its AOT body was miscompiled, and the open question of whether $A729's SKIP was spurious. It was not — the SKIP was legitimate and its DEPTH was one too many. The frame array measured live at the resolve (SNESRECOMP_TRAP_ANCESTOR) was [5] A7F0 entry_s=$0FD9 (tail-entered) / [4] A765 entry_s=$0FD9 / [3] A729 entry_s=$0FDB (the ret_s match) / [2] A6EB entry_s=$0FE0. cpu_resolve_ancestor_skip counted HOST frames (2) where the SKIP_N contract decrements per GUEST frame; A765->A7F0 is a guest tail call, so only one decrement occurred and A6EB received 1 instead of NORMAL. It then took the SKIP_PROPAGATION exit and skipped the PLA/PLB restoring its prologue pushes (-3; with the unpopped JSL frame, the -6 the bounce measured). Fixed in the framework, not here: cpu_resolve_unwind_depth() in snesrecomp/runner/src/common_cpu_infra.c. A6EB itself is correct as compiled and needs no directive."""
+
 
 [[func]]
 name = "sub_A729"
 addr = "a729"
 bank = 0
 emit = false
-note = "Loop callee of DataBankWrap_A6EB (JSR $A729). Balanced on its own (measured +2 host-return at f3191). Kept as a boundary/naming aid for the bug #2 drill."
+note = "Loop callee of DataBankWrap_A6EB (JSR $A729). ROM body is balanced (PHX/PLX; its own RTS at $A764 never fires on this path). Calls JSR $A765 and is the ancestor frame the f3305 non-local return targets — the RTS that resolves to it is executed several host frames deeper, in $A7F0. See DataBankWrap_A6EB for the resolved mechanism."
 
 [[func]]
 name = "Dispatch_JmpE0_82BF"
@@ -76,3 +77,24 @@ addr = "82bf"
 bank = 5
 emit = false
 note = "JMP ($00E0) table dispatcher (table at $82CE, indexed off $1082,X); $05:82CA is the RTL the bad return unwinds through. Reached via the $05:8021 JML [$00E0] tier-down, which bails once at f3305 — but that bail is a RED HERRING: forcing DataBankWrap_A6EB to interp clears f3305 while this bail remains. Not the bug #2 cause."
+
+[[func]]
+name = "sub_A765"
+addr = "a765"
+bank = 0
+emit = false
+note = "Called by sub_A729. Ends in an indirect dispatch at $A76C (JMP through a 64-entry table at $A76F, index = X/2) whose entries are guest TAIL calls — $A7F0, $A7FE, $A813, ... — so callee and caller share one guest frame. That tail-call shape is what made the f3305 unwind depth wrong; see DataBankWrap_A6EB. Named from the live frame array at the resolve, 2026-09-09."
+
+[[func]]
+name = "sub_A7F0"
+addr = "a7f0"
+bank = 0
+emit = false
+note = "Entry 0 of the $A76F dispatch table, tail-entered from sub_A765 (shares its entry_s; observed $0FD9 at f3305, $0FE6/$0FE8 in the healthy f3297/f3298 chains). Executes the RTS that non-locally returns to sub_A729's frame. Named from the live frame array, 2026-09-09."
+
+[[func]]
+name = "sub_A7FE"
+addr = "a7fe"
+bank = 0
+emit = false
+note = "Entry 1 of the $A76F dispatch table, sibling of sub_A7F0 and reached the same way (observed innermost in the healthy f3300 chain). Named from the live frame array, 2026-09-09."
