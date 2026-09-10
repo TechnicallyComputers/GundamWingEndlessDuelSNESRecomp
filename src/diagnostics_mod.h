@@ -146,4 +146,10 @@ void GwedDiag_NotePaceMs(double want_ms, double slept_ms);
  * iteration total, so it is only visible as a stretched frame interval. */
 void GwedDiag_NoteInputHeadMs(double head_ms);
 
+/* A host loop iteration that ran well over one display period, reported when
+ * it is discovered rather than through the spike autopsy -- an iteration's
+ * span is only known at the top of the NEXT one, so the autopsy's `iter` is
+ * always the previous iteration and never the guilty one. */
+void GwedDiag_NoteLongIteration(double wall_ms, double cpu_ms);
+
 #endif /* GWED_DIAGNOSTICS_MOD_H */

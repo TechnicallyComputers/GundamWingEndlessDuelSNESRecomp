@@ -2950,11 +2950,25 @@ session_reboot:
             const double top_cpu = game_thread_cpu_ms();
             if (g_iter_top_prev) {
                 const Uint64 f = SDL_GetPerformanceFrequency();
-                GwedDiag_NoteIterationMs(
-                    f ? (double)(top_now - g_iter_top_prev) * 1000.0
-                        / (double)f : -1.0,
-                    (top_cpu >= 0.0 && g_iter_cpu_prev >= 0.0)
-                        ? top_cpu - g_iter_cpu_prev : -1.0);
+                const double span = f
+                    ? (double)(top_now - g_iter_top_prev) * 1000.0 / (double)f
+                    : -1.0;
+                const double cpu = (top_cpu >= 0.0 && g_iter_cpu_prev >= 0.0)
+                    ? top_cpu - g_iter_cpu_prev : -1.0;
+                GwedDiag_NoteIterationMs(span, cpu);
+                /* Report a long iteration HERE, not via the spike autopsy.
+                 *
+                 * An iteration's span is only known at the top of the NEXT
+                 * one, so what the autopsy prints as `iter` is really the
+                 * previous iteration and the one containing the spike is never
+                 * measured. That is why seven ~26 ms frames all showed two
+                 * perfect 16.67 ms iterations: the long one was neither of the
+                 * two being printed. Logging it as it is discovered removes
+                 * the off-by-one entirely -- and it fires whether or not any
+                 * frame crossed the spike threshold. */
+                if (span > 0.0 && g_pace_period_ms > 0.0 &&
+                    span > g_pace_period_ms + 6.0)
+                    GwedDiag_NoteLongIteration(span, cpu);
             }
             g_iter_top_prev = top_now;
             g_iter_cpu_prev = top_cpu;

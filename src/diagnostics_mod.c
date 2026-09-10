@@ -608,6 +608,26 @@ void GwedDiag_NoteInputHeadMs(double head_ms)
     s_head_ms = head_ms;
 }
 
+void GwedDiag_NoteLongIteration(double wall_ms, double cpu_ms)
+{
+    if (!s_active)
+        return;
+    diag_line("[%8.2fs] LONGITER frame %d wall=%.2f cpu=%.2f -> %s "
+              "| emulate=%.2f pump=%.2f head=%.2f limiter=%.2f "
+              "present=%.2f upload=%.2f unlock=%.2f",
+              seconds_since_start(SDL_GetPerformanceCounter()),
+              snes_frame_counter, wall_ms, cpu_ms,
+              (cpu_ms >= 0.0 && cpu_ms < wall_ms * 0.5) ? "WAITING"
+                                                        : "ON-CPU",
+              s_lp_emulate >= 0.0 ? s_lp_emulate : 0.0,
+              s_lp_pump >= 0.0 ? s_lp_pump : 0.0,
+              s_head_ms >= 0.0 ? s_head_ms : 0.0,
+              s_lp_limit >= 0.0 ? s_lp_limit : 0.0,
+              s_present_ms >= 0.0 ? s_present_ms : 0.0,
+              s_ph_upload >= 0.0 ? s_ph_upload : 0.0,
+              s_ph_unlock >= 0.0 ? s_ph_unlock : 0.0);
+}
+
 void GwedDiag_NoteEvent(const char *what)
 {
     if (!s_active || !what || !*what)
