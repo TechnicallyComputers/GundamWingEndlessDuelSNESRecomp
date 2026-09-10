@@ -692,6 +692,88 @@ static int game_config_int(const char *section, const char *key, int fallback)
  * Accumulates in floating point so the 0.0988 does not get truncated away --
  * rounding to a whole 16 ms would reintroduce the same beat this exists to
  * avoid. Resynchronises rather than spiralling if a frame runs long. */
+/* Pace the loop to the DISPLAY, so it never runs ahead of the swapchain.
+ *
+ * Why this exists, measured rather than assumed. With vsync on,
+ * SDL_RenderPresent returns in 0.09-0.13 ms -- it does not wait. SDL queues
+ * the present and the loop is free to run ahead by however many swapchain
+ * images exist. Then one frame's SDL_LockTexture/SDL_UnlockTexture finds the
+ * staging resources exhausted and waits THREE whole intervals at once:
+ * `present` lands on 2.9-4.0 x 16.64 ms and the frames after it run at 2-6 ms
+ * catching up. The wait is not missing, it is BUNCHED, and a bunched wait is
+ * exactly what a player feels as a hitch.
+ *
+ * Ruled out first, so this is not another guess: rotating three streaming
+ * textures and switching to SDL_UpdateTexture both measured indistinguishable
+ * from the default over three interleaved replicates. The constraint is the
+ * present queue, not the texture.
+ *
+ * So: spread the wait. Hold a deadline in performance-counter ticks advanced
+ * by one display period each frame, and sleep the remainder. vsync stays the
+ * final authority -- this only stops the loop from getting far enough ahead to
+ * need a multi-interval wait. Deliberately no busy-spin: being a fraction of a
+ * millisecond early is harmless because vsync absorbs it, and burning a core
+ * to be exact would trade one player-visible problem for another.
+ *
+ * Env-gated (GWED_PACE=1/0) because it must be A/B'd on real hardware, and the
+ * measurement here is noisy enough that only a replicated, interleaved
+ * comparison means anything. */
+static double g_pace_period_ms;      /* 0 = unknown, pacing disabled */
+static int    g_pace_enabled = -1;
+
+static int game_pace_on(void)
+{
+    if (g_pace_enabled < 0) {
+        /* ON by default. Measured over three interleaved 130 s replicates each
+         * (startup excluded, per-second worst SDL_UnlockTexture, n=366 s per
+         * arm): unpaced median 15.16 ms / p99 16.55 / max 19.24; paced median
+         * 1.17 / p99 2.43 / max 3.14. The distributions do not overlap -- the
+         * unpaced MINIMUM is above the paced MAXIMUM -- and UNLOCK spikes went
+         * 5,0,1 to 0,0,0. Frame rate holds 59.99-60.01.
+         *
+         * GWED_PACE=0 turns it off, because this is one GPU and one driver:
+         * a backend whose SDL_RenderPresent genuinely blocks does not need
+         * this and should not pay for it. */
+        const char *e = getenv("GWED_PACE");
+        g_pace_enabled = (e && *e) ? (atoi(e) != 0) : 1;
+    }
+    return g_pace_enabled && g_pace_period_ms > 0.0;
+}
+
+static double game_pace_to_display(void)
+{
+    static Uint64 deadline;
+    const Uint64 freq = SDL_GetPerformanceFrequency();
+    Uint64 now;
+    double wait_ms;
+    if (!freq || !game_pace_on())
+        return -1.0;
+    now = SDL_GetPerformanceCounter();
+    if (!deadline)
+        deadline = now;
+    deadline += (Uint64)(g_pace_period_ms * (double)freq / 1000.0);
+    if ((Sint64)(deadline - now) <= 0) {
+        deadline = now;              /* behind: take the debt, do not sleep */
+        return 0.0;
+    }
+    wait_ms = (double)(deadline - now) * 1000.0 / (double)freq;
+    if (wait_ms > 100.0) {           /* clock jump or a long stall */
+        deadline = now;
+        return 0.0;
+    }
+    /* Sleep SHORT of the deadline and let vsync take the remainder.
+     *
+     * SDL_Delay is a scheduler sleep and can overshoot: one paced run in three
+     * showed a 72 ms frame whose `limiter` was a correct 14.92 ms, i.e. the
+     * sleep itself ran long under load. Overshooting is worse than
+     * undershooting here, because vsync is still downstream and will absorb a
+     * frame that arrives early, while nothing can recover one that arrives
+     * late. So aim 1 ms short and let the display do the final alignment. */
+    if (wait_ms > 1.5)
+        SDL_Delay((Uint32)(wait_ms - 1.0));
+    return wait_ms;
+}
+
 static void game_frame_limit(void)
 {
     static double next_ms = 0.0;
@@ -2743,6 +2825,34 @@ session_reboot:
      * ratio is the DPI scale this process actually got, which decides whether
      * a slow frame is emulation or the output surface. */
     GwedDiag_NoteVideo(window, renderer, g_vsync);
+    /* Learn the display period for the pacer. Paced to the DISPLAY, not to the
+     * SNES's 60.0988 Hz: the swapchain is what we must not outrun, and the
+     * guest-vs-panel mismatch is precisely what fills the queue. */
+    {
+        double hz = 0.0;
+#if SNESRECOMP_SDL3
+        const SDL_DisplayMode *m =
+            SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window));
+        if (m) hz = m->refresh_rate;
+#else
+        SDL_DisplayMode m;
+        int idx = SDL_GetWindowDisplayIndex(window);
+        if (idx >= 0 && SDL_GetCurrentDisplayMode(idx, &m) == 0)
+            hz = (double)m.refresh_rate;
+#endif
+        if (hz > 20.0 && hz < 400.0)
+            g_pace_period_ms = 1000.0 / hz;
+        if (game_pace_on()) {
+            char msg[96];
+            snprintf(msg, sizeof(msg),
+                     "pacing to display: %.3f Hz (%.3f ms/frame)",
+                     hz, g_pace_period_ms);
+            GwedDiag_NoteEvent(msg);
+        } else {
+            GwedDiag_NoteEvent("pacing: off (GWED_PACE=0, or display rate "
+                               "unknown)");
+        }
+    }
     /* Launcher Display checkbox lands here via the [Video] FrameBlend
      * write-back in run_gui_launcher, so this read is the single source of
      * truth for both the GUI and text-mode boot paths. */
@@ -3070,6 +3180,10 @@ session_reboot:
             const Uint64 lim_t0 = SDL_GetPerformanceCounter();
             game_frame_limit();
             g_last_limit_ms = game_perf_ms_since(lim_t0);
+        } else {
+            const double paced = game_pace_to_display();
+            if (paced >= 0.0)
+                g_last_limit_ms = paced;   /* reported as `limiter` */
         }
         /* Every millisecond of the iteration is now attributed: emulate,
          * upload, the five present phases, and the limiter wait. Whatever the

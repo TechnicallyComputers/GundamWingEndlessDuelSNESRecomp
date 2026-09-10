@@ -95,6 +95,14 @@ static double s_ph_overlay = -1.0, s_ph_osd = -1.0, s_ph_swap = -1.0;
  * event is echoed on the next spike so cause and effect sit on adjacent
  * lines instead of hundreds of frame lines apart. */
 static double s_swap_max_ms;
+/* Worst upload and worst texture-unlock in the current window.
+ *
+ * Spike COUNT is a bad metric for comparing configurations here: it only
+ * counts frames crossing a fixed threshold, and on a quiet machine the
+ * baseline produces one or two per run, which discriminates nothing. These
+ * are continuous -- every frame updates them whether or not it spikes -- so a
+ * change in the tail shows up even when nothing crosses 25 ms. */
+static double s_upload_max_ms, s_unlock_max_ms;
 static double s_lp_emulate = -1.0, s_lp_pump = -1.0, s_lp_limit = -1.0;
 static double s_lp_emulate_cpu = -1.0;
 static double s_ph_upload_cpu = -1.0;
@@ -476,6 +484,7 @@ void GwedDiag_NotePresentPhases(double upload_ms, double clear_ms,
     if (!s_active)
         return;
     s_ph_upload = upload_ms; s_ph_clear = clear_ms; s_ph_blit = blit_ms;
+    if (upload_ms > s_upload_max_ms) s_upload_max_ms = upload_ms;
     s_ph_overlay = overlay_ms; s_ph_osd = osd_ms; s_ph_swap = swap_ms;
     if (swap_ms > s_swap_max_ms) s_swap_max_ms = swap_ms;
 }
@@ -541,6 +550,7 @@ void GwedDiag_NoteTextureFillUnlockMs(double fill_ms, double unlock_ms)
         return;
     s_ph_fill = fill_ms;
     s_ph_unlock = unlock_ms;
+    if (unlock_ms > s_unlock_max_ms) s_unlock_max_ms = unlock_ms;
 }
 
 void GwedDiag_NoteIterationMs(double iter_ms, double iter_cpu_ms)
@@ -712,13 +722,16 @@ static void diag_write_stats(const char *prefix, const DiagStats *s,
      * surface, compositor, DPI scaling -- and not the emulation. */
     if (s_present_count > 0)
         diag_line("%s present avg=%.2fms max=%.2fms swapmax=%.2fms "
-                  "over %d present(s)",
+                  "uploadmax=%.2fms unlockmax=%.2fms over %d present(s)",
                   prefix, s_present_sum_ms / (double)s_present_count,
-                  s_present_max_ms, s_swap_max_ms, s_present_count);
+                  s_present_max_ms, s_swap_max_ms,
+                  s_upload_max_ms, s_unlock_max_ms, s_present_count);
     s_present_sum_ms = 0.0;
     s_present_max_ms = 0.0;
     s_present_count = 0;
     s_swap_max_ms = 0.0;
+    s_upload_max_ms = 0.0;
+    s_unlock_max_ms = 0.0;
 }
 
 /* One emulated frame has just finished. */
