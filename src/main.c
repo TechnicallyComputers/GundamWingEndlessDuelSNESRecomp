@@ -1760,6 +1760,13 @@ static SDL_Texture *game_ensure_texture(SDL_Renderer *renderer,
     if (snesrecomp_sdl_get_texture_size(texture, &tex_w, &tex_h) &&
         tex_w == want && tex_h == GAME_HEIGHT)
         return texture;
+    {
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+                 "TEXTURE REBUILD %dx%d -> %dx%d", tex_w, tex_h,
+                 want, GAME_HEIGHT);
+        GwedDiag_NoteEvent(msg);
+    }
     SDL_DestroyTexture(texture);
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                                 SDL_TEXTUREACCESS_STREAMING, want, GAME_HEIGHT);
@@ -1770,6 +1777,75 @@ static SDL_Texture *game_ensure_texture(SDL_Renderer *renderer,
                 want, GAME_HEIGHT, SDL_GetError());
     return texture;
 }
+
+/* Name the window events worth correlating against a spike. Deliberately a
+ * small allowlist: a log that reports every mouse-motion event is a log
+ * nobody reads. Returns NULL for anything not worth a line. */
+static const char *game_window_event_name(const SDL_Event *e)
+{
+#if SNESRECOMP_SDL3
+    switch (e->type) {
+    case SDL_EVENT_WINDOW_RESIZED:              return "window resized";
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:   return "window pixel size changed";
+    case SDL_EVENT_WINDOW_DISPLAY_CHANGED:      return "window moved to another display";
+    case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:return "display scale changed";
+    case SDL_EVENT_WINDOW_OCCLUDED:             return "window occluded";
+    case SDL_EVENT_WINDOW_EXPOSED:              return "window exposed";
+    case SDL_EVENT_WINDOW_MINIMIZED:            return "window minimized";
+    case SDL_EVENT_WINDOW_RESTORED:             return "window restored";
+    case SDL_EVENT_WINDOW_FOCUS_LOST:           return "focus lost";
+    case SDL_EVENT_WINDOW_FOCUS_GAINED:         return "focus gained";
+    case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:     return "entered fullscreen";
+    case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:     return "left fullscreen";
+    case SDL_EVENT_DISPLAY_ORIENTATION:         return "display orientation changed";
+    case SDL_EVENT_DISPLAY_ADDED:               return "display added";
+    case SDL_EVENT_DISPLAY_REMOVED:             return "display removed";
+    case SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED:return "desktop display mode changed";
+    case SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED:return "current display mode changed";
+    case SDL_EVENT_RENDER_TARGETS_RESET:        return "RENDER TARGETS RESET";
+    case SDL_EVENT_RENDER_DEVICE_RESET:         return "RENDER DEVICE RESET";
+    default: return NULL;
+    }
+#else
+    if (e->type == SDL_RENDER_TARGETS_RESET) return "RENDER TARGETS RESET";
+    if (e->type == SDL_RENDER_DEVICE_RESET)  return "RENDER DEVICE RESET";
+    if (e->type != SDL_WINDOWEVENT) return NULL;
+    switch (e->window.event) {
+    case SDL_WINDOWEVENT_RESIZED:          return "window resized";
+    case SDL_WINDOWEVENT_SIZE_CHANGED:     return "window size changed";
+    case SDL_WINDOWEVENT_DISPLAY_CHANGED:  return "window moved to another display";
+    case SDL_WINDOWEVENT_EXPOSED:          return "window exposed";
+    case SDL_WINDOWEVENT_MINIMIZED:        return "window minimized";
+    case SDL_WINDOWEVENT_RESTORED:         return "window restored";
+    case SDL_WINDOWEVENT_FOCUS_LOST:       return "focus lost";
+    case SDL_WINDOWEVENT_FOCUS_GAINED:     return "focus gained";
+    default: return NULL;
+    }
+#endif
+}
+
+static void game_diag_note_window_event(const SDL_Event *e)
+{
+    const char *name = game_window_event_name(e);
+    if (name)
+        GwedDiag_NoteEvent(name);
+}
+
+/* Per-iteration cost buckets, handed to the diagnostics module once the
+ * present is reported. Emulation accumulates because a fast-forward iteration
+ * runs several guest frames; the limiter is -1 when vsync paces instead. */
+static double g_last_emulate_ms, g_last_pump_ms, g_last_limit_ms = -1.0;
+
+static double game_perf_ms_since(Uint64 t0)
+{
+    const Uint64 f = SDL_GetPerformanceFrequency();
+    return f ? (double)(SDL_GetPerformanceCounter() - t0) * 1000.0 / (double)f
+             : 0.0;
+}
+
+/* Guest->texture upload cost for this iteration, handed to the diagnostics
+ * module when the present is reported. -1 when no upload ran (frozen guest). */
+static double g_last_upload_ms = -1.0;
 
 /* One present. redraw_game is 0 while the guest is frozen — the texture
  * still holds the last frame, so re-presenting it costs nothing and keeps
@@ -1787,6 +1863,12 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
         void *pixels = NULL;
         int pitch = 0;
         const int width = GwedDisplay_GetCurrentFrameWidth();
+        /* Timed separately: this renders the guest frame and copies it into
+         * the streaming texture. It runs BEFORE the present timer starts, so
+         * a stall here (a lock that waits on the GPU still reading last
+         * frame's texture, a write-combined mapping behaving badly) used to be
+         * charged to emulation and was invisible. */
+        const Uint64 up_t0 = SDL_GetPerformanceCounter();
 
         if (g_frame_blend) {
             /* Blended path: draw and mix in ORDINARY MEMORY, then upload once.
@@ -1827,6 +1909,13 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
             RtlDrawPpuFrame((uint8 *)pixels, (size_t)pitch, 0);
             SDL_UnlockTexture(texture);
         }
+        {
+            const Uint64 up_freq = SDL_GetPerformanceFrequency();
+            g_last_upload_ms = up_freq
+                ? (double)(SDL_GetPerformanceCounter() - up_t0) * 1000.0
+                  / (double)up_freq
+                : -1.0;
+        }
         /* Offer the composited frame as the next save's thumbnail. Must come
          * after RtlDrawPpuFrame — that is the call that fills renderBuffer. */
         if (g_ppu && g_ppu->renderBuffer) {
@@ -1841,15 +1930,28 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
     game_compute_present_rect(renderer, &dst);
     {
         /* Everything from here to SDL_RenderPresent returning is "put it on
-         * the screen": clear, blit, overlays, and whatever the compositor
-         * makes us wait for. Measured so the log can separate that from the
-         * emulation it is currently lumped in with. */
-        const Uint64 present_t0 = SDL_GetPerformanceCounter();
+         * the screen": clear, blit, overlays, and whatever the display
+         * pipeline makes us wait for.
+         *
+         * Each step is timed separately as well as together. One aggregate
+         * number covered six operations, so a spike inside it scoped to
+         * nothing -- and the split that decides where to look is `swap`
+         * (SDL_RenderPresent alone) against the rest: swap-heavy is the
+         * driver, the display pipeline or a swapchain rebuild, everything
+         * else is our drawing. The per-phase numbers are only PRINTED on a
+         * spike, so a healthy log is exactly as small as before. */
         const Uint64 present_freq = SDL_GetPerformanceFrequency();
+        const double to_ms = present_freq
+            ? 1000.0 / (double)present_freq : 0.0;
+        const Uint64 present_t0 = SDL_GetPerformanceCounter();
+        Uint64 t_a, t_b, t_c, t_d, t_e;
     SDL_RenderClear(renderer);
+        t_a = SDL_GetPerformanceCounter();
     snesrecomp_sdl_render_texture(renderer, texture, NULL, &dst);
+        t_b = SDL_GetPerformanceCounter();
     game_draw_overlay(renderer, &dst);
     game_draw_rewind(renderer, &dst);
+        t_c = SDL_GetPerformanceCounter();
     /* Host chrome, drawn last so nothing composites over it, and in window
      * space rather than the aspect-corrected game rect.
      *
@@ -1858,11 +1960,20 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
      * it, so counting them reported 60 no matter how fast the game was
      * actually running. It is ticked per RtlRunFrame instead. */
     snes_osd_draw_sdl(renderer);
+        t_d = SDL_GetPerformanceCounter();
     SDL_RenderPresent(renderer);
-        if (present_freq)
-            GwedDiag_NotePresentMs((double)(SDL_GetPerformanceCounter() -
-                                            present_t0) * 1000.0 /
-                                   (double)present_freq);
+        t_e = SDL_GetPerformanceCounter();
+        if (present_freq) {
+            GwedDiag_NotePresentMs((double)(t_e - present_t0) * to_ms);
+            GwedDiag_NotePresentPhases(
+                g_last_upload_ms,
+                (double)(t_a - present_t0) * to_ms,   /* clear   */
+                (double)(t_b - t_a) * to_ms,          /* blit    */
+                (double)(t_c - t_b) * to_ms,          /* overlay + rewind */
+                (double)(t_d - t_c) * to_ms,          /* osd     */
+                (double)(t_e - t_d) * to_ms);         /* swap    */
+        }
+        g_last_upload_ms = -1.0;
     }
 }
 
@@ -2516,7 +2627,18 @@ session_reboot:
             break;
         }
 
+        Uint64 pump_t0 = SDL_GetPerformanceCounter();
         while (SDL_PollEvent(&event)) {
+            /* Window state changes, logged so a spike can be correlated
+             * against them instead of guessed at. The reason this is here and
+             * not left to platform intuition: a stall inside the swap reads as
+             * "the compositor" on X11 and "the driver" on Windows, and neither
+             * is actionable or checkable. If the same event precedes the spike
+             * on both platforms, it is ours. Occlusion and display changes in
+             * particular are invisible to a player who never left the window.
+             * SDL2 spellings throughout — sdl_compat.h defines
+             * SDL_ENABLE_OLD_NAMES for SDL3. */
+            game_diag_note_window_event(&event);
             /* SDL2 spellings: sdl_compat.h defines SDL_ENABLE_OLD_NAMES for
              * SDL3, so these compile against either backend. The SDL3-only
              * names (SDL_EVENT_QUIT, ...) do not. */
@@ -2610,6 +2732,7 @@ session_reboot:
                 game_open_pads();
             }
         }
+        g_last_pump_ms = game_perf_ms_since(pump_t0);
 
 #if defined(SNES_HAS_LOBBY_CLIENT)
         /* Netplay session: the delay-sync admit pump owns the frame cadence.
@@ -2743,14 +2866,28 @@ session_reboot:
              * reading several hundred rather than sixty. */
             snes_osd_set_turbo(fast_forward != 0);
             for (ffi = 0; ffi < frames_this_iter; ffi++) {
+                const Uint64 emu_t0 = SDL_GetPerformanceCounter();
                 RtlRunFrame(inputs);
+                g_last_emulate_ms += game_perf_ms_since(emu_t0);
                 snes_osd_note_frame();     /* one EMULATED frame */
                 snes_rewind_note_frame();  /* ...which rewind also counts */
             }
         }
         game_present(renderer, &texture, 1);
-        if (!g_vsync)
+        if (!g_vsync) {
+            const Uint64 lim_t0 = SDL_GetPerformanceCounter();
             game_frame_limit();
+            g_last_limit_ms = game_perf_ms_since(lim_t0);
+        }
+        /* Every millisecond of the iteration is now attributed: emulate,
+         * upload, the five present phases, and the limiter wait. Whatever the
+         * frame line still has left over is the event pump and loop overhead,
+         * which the autopsy reports as `other`. */
+        GwedDiag_NoteLoopPhases(g_last_emulate_ms, g_last_pump_ms,
+                                g_last_limit_ms);
+        g_last_emulate_ms = 0.0;
+        g_last_pump_ms = 0.0;
+        g_last_limit_ms = -1.0;
     }
 
     RtlAudioSetFastForward(0);

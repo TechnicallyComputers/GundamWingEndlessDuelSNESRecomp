@@ -44,4 +44,52 @@ void GwedDiag_NoteVideo(struct SDL_Window *window,
  */
 void GwedDiag_NotePresentMs(double ms);
 
+/*
+ * The breakdown inside that present, in milliseconds.
+ *
+ * `present=` alone was one number covering six operations -- clear, blit,
+ * overlay, rewind filmstrip, OSD chrome, and the swap -- plus the guest
+ * texture upload, which happens BEFORE the present timer starts and so was
+ * being charged to emulation. A 50 ms spike in that number scoped to nothing.
+ *
+ * The split that matters is `swap` (SDL_RenderPresent alone) against
+ * everything else: work in swap belongs to the driver, the display pipeline
+ * or a swapchain rebuild, and work outside it is ours. Reported only on a
+ * spike line and in the per-second summary, so a healthy log does not grow.
+ *
+ * Pass -1 for any phase that did not run this iteration.
+ */
+void GwedDiag_NotePresentPhases(double upload_ms, double clear_ms,
+                                double blit_ms, double overlay_ms,
+                                double osd_ms, double swap_ms);
+
+/*
+ * A host-loop event worth correlating against a spike: a window state change
+ * (resize, pixel-size change, display change, occlusion, focus), a texture or
+ * renderer rebuild, a vsync change.
+ *
+ * The reason this exists rather than a platform guess: a spike that lands
+ * inside the swap looks like "the compositor" on X11 and like "the driver" on
+ * Windows, and neither is actionable. If the same event precedes the spike on
+ * both, it is ours. Text is copied, so callers may pass a stack buffer.
+ * Logged immediately with a timestamp, and the most recent one is echoed on
+ * the next spike line so cause and effect sit together.
+ */
+void GwedDiag_NoteEvent(const char *what);
+
+/*
+ * The rest of the host iteration: emulation, the SDL event pump, and the
+ * frame limiter's wait (-1 when vsync paces instead).
+ *
+ * With this and the present phases, every millisecond of a frame is
+ * attributed. The spike autopsy needs that: a stall that is NOT in the swap
+ * and NOT in our drawing was previously an unexplained remainder, and the two
+ * spikes in the 2026-09-10 report were one of each kind.
+ *
+ * Emulation is a SUM, not a single call -- a fast-forward iteration runs
+ * several guest frames inside one present.
+ */
+void GwedDiag_NoteLoopPhases(double emulate_ms, double pump_ms,
+                             double limit_ms);
+
 #endif /* GWED_DIAGNOSTICS_MOD_H */

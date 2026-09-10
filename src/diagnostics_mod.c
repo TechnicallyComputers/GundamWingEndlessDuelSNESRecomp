@@ -83,6 +83,18 @@ static int   s_every_frame;
 /* Present cost, published by the host (diagnostics_mod.h). Consumed by the
  * next frame line, so a value is reported once and never twice. */
 static double s_present_ms = -1.0;
+/* Per-iteration present breakdown; -1 means "did not run this iteration".
+ * Cleared with s_present_ms so a fast-forward burst cannot report another
+ * iteration's phases as its own. */
+static double s_ph_upload = -1.0, s_ph_clear = -1.0, s_ph_blit = -1.0;
+static double s_ph_overlay = -1.0, s_ph_osd = -1.0, s_ph_swap = -1.0;
+/* Worst swap seen in the current window, and the last host-loop event. The
+ * event is echoed on the next spike so cause and effect sit on adjacent
+ * lines instead of hundreds of frame lines apart. */
+static double s_swap_max_ms;
+static double s_lp_emulate = -1.0, s_lp_pump = -1.0, s_lp_limit = -1.0;
+static char s_last_event[160];
+static double s_last_event_at_s = -1.0;
 static double s_present_max_ms;
 static double s_present_sum_ms;
 static int    s_present_count;
@@ -253,6 +265,36 @@ void GwedDiag_NotePresentMs(double ms)
     s_present_count++;
 }
 
+void GwedDiag_NotePresentPhases(double upload_ms, double clear_ms,
+                                double blit_ms, double overlay_ms,
+                                double osd_ms, double swap_ms)
+{
+    if (!s_active)
+        return;
+    s_ph_upload = upload_ms; s_ph_clear = clear_ms; s_ph_blit = blit_ms;
+    s_ph_overlay = overlay_ms; s_ph_osd = osd_ms; s_ph_swap = swap_ms;
+    if (swap_ms > s_swap_max_ms) s_swap_max_ms = swap_ms;
+}
+
+void GwedDiag_NoteLoopPhases(double emulate_ms, double pump_ms,
+                             double limit_ms)
+{
+    if (!s_active)
+        return;
+    s_lp_emulate = emulate_ms;
+    s_lp_pump = pump_ms;
+    s_lp_limit = limit_ms;
+}
+
+void GwedDiag_NoteEvent(const char *what)
+{
+    if (!s_active || !what || !*what)
+        return;
+    snprintf(s_last_event, sizeof(s_last_event), "%s", what);
+    s_last_event_at_s = seconds_since_start(SDL_GetPerformanceCounter());
+    diag_line("[%8.2fs] EVENT %s", s_last_event_at_s, s_last_event);
+}
+
 static void diag_write_header(const char *path)
 {
     time_t now = time(NULL);
@@ -384,12 +426,14 @@ static void diag_write_stats(const char *prefix, const DiagStats *s,
      * of avg frame, the cost is putting pixels on the screen -- output
      * surface, compositor, DPI scaling -- and not the emulation. */
     if (s_present_count > 0)
-        diag_line("%s present avg=%.2fms max=%.2fms over %d present(s)",
+        diag_line("%s present avg=%.2fms max=%.2fms swapmax=%.2fms "
+                  "over %d present(s)",
                   prefix, s_present_sum_ms / (double)s_present_count,
-                  s_present_max_ms, s_present_count);
+                  s_present_max_ms, s_swap_max_ms, s_present_count);
     s_present_sum_ms = 0.0;
     s_present_max_ms = 0.0;
     s_present_count = 0;
+    s_swap_max_ms = 0.0;
 }
 
 /* One emulated frame has just finished. */
@@ -460,11 +504,58 @@ static void gwed_diag_frame(void)
 #else
                   "");
 #endif
+        /* The autopsy. A spike is the only place the breakdown is worth its
+         * line count, and it is the only place it is ever needed: `swap` is
+         * SDL_RenderPresent alone, so swap-heavy means the driver, the display
+         * pipeline or a swapchain rebuild, and everything else is our drawing.
+         * `upload` is the guest->texture copy, which happens before the
+         * present timer starts and used to be charged to emulation, hiding a
+         * whole class of stall. `rest` is the frame time this present does not
+         * account for: emulation, the event pump and any limiter wait. */
+        if (s_present_ms >= 0.0 && s_ph_swap >= 0.0) {
+            double drawn = (s_ph_clear >= 0.0 ? s_ph_clear : 0.0)
+                         + (s_ph_blit >= 0.0 ? s_ph_blit : 0.0)
+                         + (s_ph_overlay >= 0.0 ? s_ph_overlay : 0.0)
+                         + (s_ph_osd >= 0.0 ? s_ph_osd : 0.0);
+            diag_line("           autopsy upload=%.2f clear=%.2f blit=%.2f "
+                      "overlay=%.2f osd=%.2f swap=%.2f | draw=%.2f "
+                      "rest=%.2f (%s)",
+                      s_ph_upload >= 0.0 ? s_ph_upload : 0.0,
+                      s_ph_clear >= 0.0 ? s_ph_clear : 0.0,
+                      s_ph_blit >= 0.0 ? s_ph_blit : 0.0,
+                      s_ph_overlay >= 0.0 ? s_ph_overlay : 0.0,
+                      s_ph_osd >= 0.0 ? s_ph_osd : 0.0,
+                      s_ph_swap,
+                      drawn,
+                      ms - s_present_ms
+                        - (s_ph_upload >= 0.0 ? s_ph_upload : 0.0),
+                      s_ph_swap > drawn ? "swap-dominated: driver/display"
+                                        : "draw-dominated: ours");
+            if (s_lp_emulate >= 0.0) {
+                double acct = s_present_ms
+                            + (s_ph_upload >= 0.0 ? s_ph_upload : 0.0)
+                            + s_lp_emulate + s_lp_pump
+                            + (s_lp_limit >= 0.0 ? s_lp_limit : 0.0);
+                diag_line("           loop    emulate=%.2f pump=%.2f "
+                          "limiter=%.2f | accounted=%.2f of %.2f "
+                          "(other=%.2f)",
+                          s_lp_emulate, s_lp_pump,
+                          s_lp_limit >= 0.0 ? s_lp_limit : 0.0,
+                          acct, ms, ms - acct);
+            }
+        }
+        if (s_last_event_at_s >= 0.0)
+            diag_line("           last event %.2fs ago: %s",
+                      seconds_since_start(now) - s_last_event_at_s,
+                      s_last_event);
     }
     /* One sample, one report. Clearing here means a frame that ran without a
      * present of its own (a fast-forward burst) shows no present= rather than
      * repeating the previous iteration's number as if it were its own. */
     s_present_ms = -1.0;
+    s_ph_upload = s_ph_clear = s_ph_blit = -1.0;
+    s_ph_overlay = s_ph_osd = s_ph_swap = -1.0;
+    s_lp_emulate = s_lp_pump = s_lp_limit = -1.0;
 
     /* One summary per second of wall clock, so a quiet session stays short
      * and a bad one is dense where it went bad. */
