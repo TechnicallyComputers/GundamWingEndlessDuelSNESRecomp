@@ -724,6 +724,8 @@ static double g_pace_period_ms;      /* 0 = unknown, pacing disabled */
  * distinguishable if both are recorded. */
 static double g_last_pace_want_ms = -1.0, g_last_pace_slept_ms = -1.0;
 /* Loop-top timestamps, so an iteration is measured whichever way it exits. */
+static Uint64 g_head_t0;
+static double g_last_head_ms = -1.0;
 static Uint64 g_iter_top_prev;
 static double g_iter_cpu_prev = -1.0;
 static double game_perf_ms_since(Uint64 t0);   /* defined with the loop timers */
@@ -3074,6 +3076,19 @@ session_reboot:
             }
         }
         g_last_pump_ms = game_perf_ms_since(pump_t0);
+        /* Everything from here to RtlRunFrame: input reads, the savestate-menu
+         * and rewind gesture checks. Timed because this is where the last
+         * unexplained spikes must be.
+         *
+         * Both loop iterations around such a spike measure a perfect 16.67 ms
+         * while the frame-hook interval stretches to ~26 ms. That is only
+         * possible if work BEFORE the hook grew by ~9.4 ms: the pacer then
+         * sleeps 9.4 ms less to hold the iteration at one display period, so
+         * the iteration total hides the growth and only the frame interval
+         * shows it. The pump is already measured and is tiny, which leaves
+         * this region -- and read_gamepad() talks to a DualSense on
+         * /dev/hidraw, where a read can block. */
+        g_head_t0 = SDL_GetPerformanceCounter();
 
 #if defined(SNES_HAS_LOBBY_CLIENT)
         /* Netplay session: the delay-sync admit pump owns the frame cadence.
@@ -3202,6 +3217,7 @@ session_reboot:
                 fast_forward ? game_fast_forward_frames() : 1;
             int ffi;
 
+            g_last_head_ms = game_perf_ms_since(g_head_t0);
             RtlAudioSetFastForward(fast_forward != 0);
             /* Tell the overlay, so the readout is labelled with why it is
              * reading several hundred rather than sixty. */
@@ -3237,6 +3253,8 @@ session_reboot:
          * which the autopsy reports as `other`. */
         GwedDiag_NoteLoopPhases(g_last_emulate_ms, g_last_pump_ms,
                                 g_last_limit_ms);
+        GwedDiag_NoteInputHeadMs(g_last_head_ms);
+        g_last_head_ms = -1.0;
         GwedDiag_NoteEmulateCpuMs(g_last_emulate_cpu_ms);
         GwedDiag_NoteUploadCpuMs(g_last_upload_cpu_ms);
         GwedDiag_NoteTextureLockMs(g_last_lock_ms);

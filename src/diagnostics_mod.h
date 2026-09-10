@@ -141,4 +141,9 @@ void GwedDiag_NoteIterationMs(double iter_ms, double iter_cpu_ms);
  * for every spike whatever the real cause. */
 void GwedDiag_NotePaceMs(double want_ms, double slept_ms);
 
+/* Input reads plus the savestate/rewind gesture checks -- everything between
+ * the event pump and RtlRunFrame. The pacer hides growth here inside the
+ * iteration total, so it is only visible as a stretched frame interval. */
+void GwedDiag_NoteInputHeadMs(double head_ms);
+
 #endif /* GWED_DIAGNOSTICS_MOD_H */

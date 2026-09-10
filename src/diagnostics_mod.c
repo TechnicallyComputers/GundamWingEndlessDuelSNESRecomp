@@ -110,6 +110,7 @@ static double s_ph_lock = -1.0;
 static double s_ph_fill = -1.0, s_ph_unlock = -1.0;
 static double s_iter_ms = -1.0, s_iter_cpu = -1.0;
 static double s_pace_want = -1.0, s_pace_slept = -1.0;
+static double s_head_ms = -1.0;
 /* The PREVIOUS iteration, kept because the frame interval straddles two.
  *
  * The mod frame hook fires inside RtlRunFrame, i.e. in the middle of a loop
@@ -523,6 +524,7 @@ static const char *diag_spike_verdict(double drawn, double other_ms)
          * small and the real cost is outside all of them -- which is how four
          * 25 ms frames whose emulation was 1.5-2.5 ms came out labelled
          * EMULATION. */
+        { "INPUT/GESTURE: reads before emulation", s_head_ms },
         { "UNATTRIBUTED: outside every measured phase", other_ms },
         { "EVENT PUMP",                          s_lp_pump    },
         /* Only a cause when it overshot. With pacing on, the deliberate wait
@@ -597,6 +599,13 @@ void GwedDiag_NotePaceMs(double want_ms, double slept_ms)
         return;
     s_pace_want = want_ms;
     s_pace_slept = slept_ms;
+}
+
+void GwedDiag_NoteInputHeadMs(double head_ms)
+{
+    if (!s_active)
+        return;
+    s_head_ms = head_ms;
 }
 
 void GwedDiag_NoteEvent(const char *what)
@@ -913,6 +922,10 @@ static void gwed_diag_frame(void)
                           s_lp_emulate, s_lp_pump,
                           s_lp_limit >= 0.0 ? s_lp_limit : 0.0,
                           acct, ms, ms - acct);
+                if (s_head_ms >= 0.0)
+                    diag_line("           input   head=%.2f (keyboard+gamepad "
+                              "reads and gesture checks, before emulation)",
+                              s_head_ms);
                 if (s_pace_want >= 0.0)
                     diag_line("           pacer   asked=%.2f slept=%.2f "
                               "overshoot=%.2f",
@@ -1003,6 +1016,7 @@ static void gwed_diag_frame(void)
     s_ph_fill = s_ph_unlock = -1.0;
     s_iter_ms = s_iter_cpu = -1.0;
     s_pace_want = s_pace_slept = -1.0;
+    s_head_ms = -1.0;
 
     /* One summary per second of wall clock, so a quiet session stays short
      * and a bad one is dense where it went bad. */
