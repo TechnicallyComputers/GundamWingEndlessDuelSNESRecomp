@@ -572,6 +572,26 @@ static void diag_write_header(const char *path)
 #else
     diag_line("# netplay not built into this binary");
 #endif
+    /* A trace-enabled build is NOT what a player runs. It compiles in the TCP
+     * debug server and the observability rings, and those rings are ~2 GB:
+     * measured 2026-09-10, VmSize 3907 MB / RSS 462 MB / 22093 major page
+     * faults in 25 s, against 57 MB / 11.8 MB / 9 faults for the same code
+     * with -DSNESRECOMP_ENABLE_TRACE=OFF. On a machine with any memory
+     * pressure that difference IS the lag spike, and a perf log from such a
+     * build says nothing about the shipped game. Say so at the top, where it
+     * cannot be missed, rather than leaving it to be rediscovered. */
+#if defined(SNESRECOMP_TRACE) && SNESRECOMP_TRACE
+    diag_line("#");
+    diag_line("# *** TRACE BUILD -- NOT PLAYER-REPRESENTATIVE ***");
+    diag_line("#   Built with SNESRECOMP_ENABLE_TRACE=ON: the TCP debug server");
+    diag_line("#   and the observability rings are compiled in, reserving on the");
+    diag_line("#   order of 2 GB up front. Under memory pressure that pages out");
+    diag_line("#   and the resulting major faults show up here as spikes that a");
+    diag_line("#   shipped build does not have. Rebuild with");
+    diag_line("#   -DSNESRECOMP_ENABLE_TRACE=OFF before drawing any conclusion");
+    diag_line("#   about what a player feels.");
+    diag_line("#");
+#endif
     diag_line("# budget  %.3f ms per frame (%.4f Hz); spike threshold %.0f ms "
               "(%.2fx budget)",
               GWED_DIAG_BUDGET_MS, GWED_DIAG_HZ, s_spike_ms,
