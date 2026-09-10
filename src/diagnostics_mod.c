@@ -51,6 +51,9 @@
 #include "netplay/snes_netplay.h"
 #endif
 
+/* Previous sessions kept beside the live log. */
+#define GWED_DIAG_KEEP_LOGS 5
+
 #ifndef GWED_BUILD_ID
 #define GWED_BUILD_ID "unknown"
 #endif
@@ -365,12 +368,33 @@ static int diag_open_log(char *path, size_t cap)
     if (!snesrecomp_exe_dir_path("gwed_diagnostics.log", path, cap))
         snprintf(path, cap, "gwed_diagnostics.log");
 
-    /* Keep exactly one previous session. A player asked for a log after the
-     * stutter usually restarts the game first, and without this the run that
-     * showed the problem is the run that gets overwritten. */
-    if (snprintf(prev, sizeof(prev), "%s.prev", path) < (int)sizeof(prev)) {
-        remove(prev);
-        rename(path, prev);
+    /* Keep several previous sessions, not one.
+     *
+     * One was not enough. While a spike was being diagnosed against these
+     * logs, two verification runs of the same executable rotated the session
+     * that actually showed the problem out of existence -- the interesting run
+     * became .prev, then became nothing, and it was unrecoverable. A player
+     * asked for a log after a stutter usually restarts the game at least once
+     * before finding the file, so the same thing happens to them.
+     *
+     * Generations: <log>.1 is the previous session, .2 the one before, and so
+     * on. Cheap: these are text and a long session is well under a megabyte. */
+    {
+        int gen;
+        char older[1024], newer[1024];
+        for (gen = GWED_DIAG_KEEP_LOGS - 1; gen >= 1; gen--) {
+            if (snprintf(older, sizeof(older), "%s.%d", path, gen + 1)
+                    >= (int)sizeof(older) ||
+                snprintf(newer, sizeof(newer), "%s.%d", path, gen)
+                    >= (int)sizeof(newer))
+                continue;
+            remove(older);
+            rename(newer, older);
+        }
+        if (snprintf(prev, sizeof(prev), "%s.1", path) < (int)sizeof(prev)) {
+            remove(prev);
+            rename(path, prev);
+        }
     }
     s_log = fopen(path, "w");
     return s_log != NULL;
