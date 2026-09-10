@@ -93,6 +93,71 @@ static double s_ph_overlay = -1.0, s_ph_osd = -1.0, s_ph_swap = -1.0;
  * lines instead of hundreds of frame lines apart. */
 static double s_swap_max_ms;
 static double s_lp_emulate = -1.0, s_lp_pump = -1.0, s_lp_limit = -1.0;
+static double s_lp_emulate_cpu = -1.0;
+
+/* Why a frame was off-CPU, straight from the kernel's own accounting.
+ *
+ * wall >> cpu says the thread was NOT computing; it does not say why. These
+ * two separate the remaining candidates, and they need different fixes:
+ *   run_delay  time this task sat RUNNABLE on a runqueue waiting for a CPU.
+ *              Large means we were PREEMPTED -- host contention, not our bug.
+ *   majflt     major page faults: a read from disk/swap to satisfy a memory
+ *              access. Large means the stall is memory, and it is ours to fix.
+ * If both are near zero the thread slept on something explicit (a lock, a
+ * blocking write) and the next step is a stack, not a counter.
+ *
+ * Linux-only by construction -- /proc. Windows gets the same discrimination
+ * from wall-vs-cpu above; this narrows it further where it is available. */
+static unsigned long long s_prev_run_delay, s_prev_majflt;
+static unsigned long long s_frame_run_delay, s_frame_majflt;
+
+static void diag_sample_sched(void)
+{
+#if defined(__linux__)
+    unsigned long long cpu_ns = 0, delay_ns = 0, slices = 0;
+    FILE *f = fopen("/proc/self/schedstat", "r");
+    if (f) {
+        if (fscanf(f, "%llu %llu %llu", &cpu_ns, &delay_ns, &slices) == 3) {
+            s_frame_run_delay = delay_ns - s_prev_run_delay;
+            s_prev_run_delay = delay_ns;
+        }
+        fclose(f);
+    }
+    f = fopen("/proc/self/stat", "r");
+    if (f) {
+        char buf[1024];
+        if (fgets(buf, sizeof buf, f)) {
+            /* comm can contain spaces and parentheses; parse after the last
+             * ')' so a renamed thread cannot shift the field indices. */
+            char *p2 = strrchr(buf, ')');
+            if (p2) {
+                unsigned long long v[12]; int i, n = 0;
+                char *tok = strtok(p2 + 1, " ");
+                for (i = 0; tok && i < 12; i++) {
+                    v[n++] = strtoull(tok, NULL, 10);
+                    tok = strtok(NULL, " ");
+                }
+                /* after ')': state(0) ppid(1) pgrp(2) session(3) tty(4)
+                 * tpgid(5) flags(6) minflt(7) cminflt(8) majflt(9) */
+                if (n > 9) {
+                    s_frame_majflt = v[9] - s_prev_majflt;
+                    s_prev_majflt = v[9];
+                }
+            }
+        }
+        fclose(f);
+    }
+#endif
+}
+/* Guest work done in this frame, so a slow frame can be told apart from a
+ * frame that merely DID more. Same instruments the debug server's
+ * interp_stats reads, sampled per frame instead of per session. */
+extern uint64_t interp816_insns_total(void);
+extern uint64_t interp816_cycles_total(void);
+static uint64_t s_prev_insns, s_prev_gcycles;
+static uint64_t s_win_insns_sum;      /* window totals, for the comparison */
+static int      s_win_insns_frames;
+static uint64_t s_frame_insns, s_frame_gcycles;   /* this frame's delta */
 static char s_last_event[160];
 static double s_last_event_at_s = -1.0;
 static double s_present_max_ms;
@@ -154,16 +219,127 @@ static void stats_add(DiagStats *s, double ms)
 }
 
 /* Every write goes through here: one line, one flush, no exceptions. */
+/* ---- the log must not stall the thing it measures ---------------------- */
+/*
+ * diag_line() used to vfprintf + fflush straight onto the frame thread. With
+ * every_frame=on that is one write(2) per frame, and MEASURED on 2026-09-10 it
+ * periodically blocked for 62-71 ms when the kernel throttled dirty pages:
+ *
+ *   cpu     emulate wall=72.77 cpu=1.92  -> BLOCKED off-CPU
+ *   kernel  run_delay=0.01ms majflt=0    -> slept on something explicit
+ *   BLOCKED 70.74 ms in syscall 1 (write)  fd=8 -> gwed_diagnostics.log
+ *
+ * The per-frame hook runs inside RtlRunFrame, so that block was charged to
+ * emulation and read as a 4x-budget spike in the guest. The instrument was
+ * manufacturing the stalls it reported, and every log this feature has ever
+ * produced overstates them.
+ *
+ * So the frame thread now only ever appends to memory. A writer thread does
+ * the blocking part. Crash-safety is preserved differently but genuinely: the
+ * writer flushes after every drain, so the tail on disk trails the frame
+ * thread by at most one drain rather than by nothing.
+ *
+ * Overflow is counted and reported rather than silently dropped -- a log that
+ * quietly loses lines is worse than one that admits it.
+ */
+#define DIAG_Q_BYTES (1u << 20)
+static char       *s_q;
+static size_t      s_q_head, s_q_tail;     /* byte ring: head=write, tail=read */
+static SDL_mutex  *s_q_lock;
+static SDL_cond   *s_q_wake;
+static SDL_Thread *s_q_thread;
+static int         s_q_stop;
+static unsigned long long s_q_dropped;
+
+static size_t diag_q_used(void)
+{
+    return (s_q_head >= s_q_tail) ? (s_q_head - s_q_tail)
+                                  : (DIAG_Q_BYTES - s_q_tail + s_q_head);
+}
+
+static int SDLCALL diag_writer(void *unused)
+{
+    (void)unused;
+    for (;;) {
+        char chunk[8192];
+        size_t n = 0;
+        SDL_LockMutex(s_q_lock);
+        while (!s_q_stop && s_q_head == s_q_tail)
+            SDL_CondWait(s_q_wake, s_q_lock);
+        while (n < sizeof chunk && s_q_tail != s_q_head) {
+            chunk[n++] = s_q[s_q_tail];
+            s_q_tail = (s_q_tail + 1) % DIAG_Q_BYTES;
+        }
+        SDL_UnlockMutex(s_q_lock);
+        if (n && s_log) {
+            fwrite(chunk, 1, n, s_log);   /* the blocking part, off the frame */
+            fflush(s_log);
+        }
+        if (!n && s_q_stop)
+            break;
+    }
+    return 0;
+}
+
 static void diag_line(const char *fmt, ...)
 {
+    char line[1024];
     va_list ap;
+    int len;
     if (!s_log)
         return;
     va_start(ap, fmt);
-    vfprintf(s_log, fmt, ap);
+    len = vsnprintf(line, sizeof line - 1, fmt, ap);
     va_end(ap);
-    fputc('\n', s_log);
-    fflush(s_log);
+    if (len < 0)
+        return;
+    if (len > (int)sizeof line - 2)
+        len = (int)sizeof line - 2;
+    line[len++] = '\n';
+
+    if (!s_q_thread) {                 /* before the writer exists: direct */
+        fwrite(line, 1, (size_t)len, s_log);
+        fflush(s_log);
+        return;
+    }
+    SDL_LockMutex(s_q_lock);
+    if (DIAG_Q_BYTES - diag_q_used() > (size_t)len + 1) {
+        int i;
+        for (i = 0; i < len; i++) {
+            s_q[s_q_head] = line[i];
+            s_q_head = (s_q_head + 1) % DIAG_Q_BYTES;
+        }
+    } else {
+        s_q_dropped++;                 /* admitted in the footer */
+    }
+    SDL_CondSignal(s_q_wake);
+    SDL_UnlockMutex(s_q_lock);
+}
+
+static void diag_writer_start(void)
+{
+    if (s_q_thread || !s_log)
+        return;
+    s_q = (char *)malloc(DIAG_Q_BYTES);
+    if (!s_q)
+        return;                        /* stays on the direct path */
+    s_q_lock = SDL_CreateMutex();
+    s_q_wake = SDL_CreateCond();
+    if (!s_q_lock || !s_q_wake)
+        return;
+    s_q_thread = SDL_CreateThread(diag_writer, "gwed-diag-log", NULL);
+}
+
+static void diag_writer_stop(void)
+{
+    if (!s_q_thread)
+        return;
+    SDL_LockMutex(s_q_lock);
+    s_q_stop = 1;
+    SDL_CondSignal(s_q_wake);
+    SDL_UnlockMutex(s_q_lock);
+    SDL_WaitThread(s_q_thread, NULL);
+    s_q_thread = NULL;
 }
 
 static double seconds_since_start(Uint64 now)
@@ -308,6 +484,13 @@ void GwedDiag_NoteLoopPhases(double emulate_ms, double pump_ms,
     s_lp_emulate = emulate_ms;
     s_lp_pump = pump_ms;
     s_lp_limit = limit_ms;
+}
+
+void GwedDiag_NoteEmulateCpuMs(double cpu_ms)
+{
+    if (!s_active)
+        return;
+    s_lp_emulate_cpu = cpu_ms;
 }
 
 void GwedDiag_NoteEvent(const char *what)
@@ -498,6 +681,15 @@ static void gwed_diag_frame(void)
     }
     s_prev_frame_counter = snes_frame_counter;
 
+    diag_sample_sched();
+    {
+        uint64_t ins = interp816_insns_total();
+        uint64_t gcy = interp816_cycles_total();
+        s_frame_insns   = ins - s_prev_insns;
+        s_frame_gcycles = gcy - s_prev_gcycles;
+        s_prev_insns = ins;
+        s_prev_gcycles = gcy;
+    }
     stats_add(&s_window, ms);
     stats_add(&s_session, ms);
     if (ms > s_session.max_ms - 1e-9) {
@@ -554,6 +746,27 @@ static void gwed_diag_frame(void)
                       ms - s_present_ms
                         - (s_ph_upload >= 0.0 ? s_ph_upload : 0.0),
                       diag_spike_verdict(drawn));
+            {
+                /* THE discriminator for an emulation stall. If the guest
+                 * executed a normal number of instructions and the frame still
+                 * took 40x as long, the cost is on the HOST -- an allocation,
+                 * a page fault, a blocking write, a lock. If instruction count
+                 * scales with the time, the guest genuinely did more work and
+                 * the question moves to what it was doing. Without this the
+                 * two are indistinguishable and the hunt has no direction. */
+                double avg = s_win_insns_frames
+                    ? (double)s_win_insns_sum / (double)s_win_insns_frames
+                    : 0.0;
+                diag_line("           guest   insns=%llu cycles=%llu | "
+                          "window avg insns=%.0f -> %.1fx (%s)",
+                          (unsigned long long)s_frame_insns,
+                          (unsigned long long)s_frame_gcycles,
+                          avg,
+                          avg > 0.0 ? (double)s_frame_insns / avg : 0.0,
+                          (avg > 0.0 && (double)s_frame_insns < avg * 2.0)
+                            ? "guest did NORMAL work: the cost is on the HOST"
+                            : "guest genuinely executed more");
+            }
             if (s_lp_emulate >= 0.0) {
                 double acct = s_present_ms
                             + (s_ph_upload >= 0.0 ? s_ph_upload : 0.0)
@@ -565,6 +778,25 @@ static void gwed_diag_frame(void)
                           s_lp_emulate, s_lp_pump,
                           s_lp_limit >= 0.0 ? s_lp_limit : 0.0,
                           acct, ms, ms - acct);
+                if (s_lp_emulate_cpu >= 0.0)
+                    diag_line("           cpu     emulate wall=%.2f cpu=%.2f "
+                              "-> %s",
+                              s_lp_emulate, s_lp_emulate_cpu,
+                              (s_lp_emulate > 5.0 &&
+                               s_lp_emulate_cpu < s_lp_emulate * 0.5)
+                                ? "BLOCKED off-CPU"
+                                : "on-CPU: host code doing the work");
+#if defined(__linux__)
+                diag_line("           kernel  run_delay=%.2fms majflt=%llu "
+                          "-> %s",
+                          (double)s_frame_run_delay / 1e6,
+                          (unsigned long long)s_frame_majflt,
+                          ((double)s_frame_run_delay / 1e6) > s_lp_emulate * 0.5
+                            ? "PREEMPTED: waited for a CPU (host contention)"
+                            : (s_frame_majflt > 0
+                               ? "MAJOR PAGE FAULTS: memory, and ours"
+                               : "slept on something explicit: needs a stack"));
+#endif
             }
         }
         if (s_last_event_at_s >= 0.0)
@@ -575,10 +807,15 @@ static void gwed_diag_frame(void)
     /* One sample, one report. Clearing here means a frame that ran without a
      * present of its own (a fast-forward burst) shows no present= rather than
      * repeating the previous iteration's number as if it were its own. */
+    if (ms < s_spike_ms) {           /* healthy frames define the baseline */
+        s_win_insns_sum += s_frame_insns;
+        s_win_insns_frames++;
+    }
     s_present_ms = -1.0;
     s_ph_upload = s_ph_clear = s_ph_blit = -1.0;
     s_ph_overlay = s_ph_osd = s_ph_swap = -1.0;
     s_lp_emulate = s_lp_pump = s_lp_limit = -1.0;
+    s_lp_emulate_cpu = -1.0;
 
     /* One summary per second of wall clock, so a quiet session stays short
      * and a bad one is dense where it went bad. */
@@ -667,6 +904,9 @@ static void gwed_diag_activate(void)
         s_worst_frame = 0;
         s_counter_gaps = 0;
         diag_write_header(path);
+        /* The header goes down synchronously (the writer is not up yet), then
+         * everything the frame loop produces goes through the queue. */
+        diag_writer_start();
         /* Say it on stderr too: the whole point is that the player can find
          * the file and send it. */
         fprintf(stderr, "[diag] performance log: %s\n", path);
@@ -700,7 +940,14 @@ static void gwed_diag_atexit(void)
     if (s_counter_gaps)
         diag_line("# gaps    %lu interval(s) spanned frames this hook did not "
                   "see and were left out", s_counter_gaps);
+    if (s_q_dropped)
+        diag_line("# dropped %llu line(s): the log queue filled, which means "
+                  "the writer could not keep up. Lines are missing.",
+                  (unsigned long long)s_q_dropped);
     diag_line("# ended   cleanly");
+    /* Drain and join before closing: the writer holds the only path to disk
+     * for everything above, footer included. */
+    diag_writer_stop();
     fclose(s_log);
     s_log = NULL;
 }

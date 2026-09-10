@@ -40,6 +40,7 @@
 #include "snes_savestate_menu.h" /* Select+R / [KeyMap] save-state overlay */
 #include "snes_osd.h"            /* FPS readout / turbo / slot toasts */
 #include "snes_rewind.h"         /* rewind ring + filmstrip */
+#include <time.h>
 #include "diagnostics_mod.h"     /* perf log: video facts + present cost */
 #include "config.h"              /* FindCmdForSdlKey + [KeyMap] parsing */
 #include "cpu_trace.h"
@@ -1835,12 +1836,45 @@ static void game_diag_note_window_event(const SDL_Event *e)
  * present is reported. Emulation accumulates because a fast-forward iteration
  * runs several guest frames; the limiter is -1 when vsync paces instead. */
 static double g_last_emulate_ms, g_last_pump_ms, g_last_limit_ms = -1.0;
+static double g_last_emulate_cpu_ms;
 
 static double game_perf_ms_since(Uint64 t0)
 {
     const Uint64 f = SDL_GetPerformanceFrequency();
     return f ? (double)(SDL_GetPerformanceCounter() - t0) * 1000.0 / (double)f
              : 0.0;
+}
+
+/* This thread's CPU time, in ms. Wall time says a frame took 72 ms; CPU time
+ * says whether those 72 ms were SPENT or WAITED. A stall that burns CPU is
+ * host code doing too much; a stall that burns none is blocked in the kernel
+ * -- a page fault, an allocation that hit mmap, a lock, a blocking write --
+ * and those need completely different hunts. Without this the two are
+ * indistinguishable and every candidate stays open.
+ *
+ * POSIX gets CLOCK_THREAD_CPUTIME_ID; Windows gets GetThreadTimes with the
+ * same meaning, so the number reads identically on both -- which matters
+ * because the bug is reported on both. */
+static double game_thread_cpu_ms(void)
+{
+#if defined(_WIN32)
+    FILETIME c, e, k, u;
+    if (GetThreadTimes(GetCurrentThread(), &c, &e, &k, &u)) {
+        ULARGE_INTEGER ku, uu;
+        ku.LowPart = k.dwLowDateTime;  ku.HighPart = k.dwHighDateTime;
+        uu.LowPart = u.dwLowDateTime;  uu.HighPart = u.dwHighDateTime;
+        /* 100 ns units */
+        return (double)(ku.QuadPart + uu.QuadPart) / 10000.0;
+    }
+    return -1.0;
+#elif defined(CLOCK_THREAD_CPUTIME_ID)
+    struct timespec ts;
+    if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0)
+        return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1000000.0;
+    return -1.0;
+#else
+    return -1.0;
+#endif
 }
 
 /* Guest->texture upload cost for this iteration, handed to the diagnostics
@@ -2867,8 +2901,13 @@ session_reboot:
             snes_osd_set_turbo(fast_forward != 0);
             for (ffi = 0; ffi < frames_this_iter; ffi++) {
                 const Uint64 emu_t0 = SDL_GetPerformanceCounter();
+                const double emu_cpu0 = game_thread_cpu_ms();
                 RtlRunFrame(inputs);
                 g_last_emulate_ms += game_perf_ms_since(emu_t0);
+                if (emu_cpu0 >= 0.0) {
+                    const double c1 = game_thread_cpu_ms();
+                    if (c1 >= 0.0) g_last_emulate_cpu_ms += c1 - emu_cpu0;
+                }
                 snes_osd_note_frame();     /* one EMULATED frame */
                 snes_rewind_note_frame();  /* ...which rewind also counts */
             }
@@ -2885,6 +2924,8 @@ session_reboot:
          * which the autopsy reports as `other`. */
         GwedDiag_NoteLoopPhases(g_last_emulate_ms, g_last_pump_ms,
                                 g_last_limit_ms);
+        GwedDiag_NoteEmulateCpuMs(g_last_emulate_cpu_ms);
+        g_last_emulate_cpu_ms = 0.0;
         g_last_emulate_ms = 0.0;
         g_last_pump_ms = 0.0;
         g_last_limit_ms = -1.0;

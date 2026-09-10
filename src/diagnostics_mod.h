@@ -92,4 +92,18 @@ void GwedDiag_NoteEvent(const char *what);
 void GwedDiag_NoteLoopPhases(double emulate_ms, double pump_ms,
                              double limit_ms);
 
+/*
+ * Thread CPU time burned inside emulation this iteration, against the wall
+ * time already reported by NoteLoopPhases.
+ *
+ * This is the discriminator a stalled frame actually needs. A 72 ms frame
+ * whose emulation burned 72 ms of CPU is host code doing too much work; a
+ * 72 ms frame that burned 2 ms is BLOCKED -- a page fault, an allocation that
+ * reached the kernel, a lock, a blocking write -- and the two need entirely
+ * different hunts. Measured on Linux with CLOCK_THREAD_CPUTIME_ID and on
+ * Windows with GetThreadTimes, so it reads the same on both platforms the
+ * bug is reported on.
+ */
+void GwedDiag_NoteEmulateCpuMs(double cpu_ms);
+
 #endif /* GWED_DIAGNOSTICS_MOD_H */
