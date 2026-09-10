@@ -40,6 +40,7 @@
 #include "snes_savestate_menu.h" /* Select+R / [KeyMap] save-state overlay */
 #include "snes_osd.h"            /* FPS readout / turbo / slot toasts */
 #include "snes_rewind.h"         /* rewind ring + filmstrip */
+#include "snes_overlay_draw.h"   /* SNES_PAD_* input word bits */
 #include <time.h>
 #if defined(_WIN32)
 /* For GetThreadTimes in game_thread_cpu_ms: MinGW defines _WIN32, so that
@@ -2341,6 +2342,11 @@ static void game_rewind_loop(SDL_Renderer *renderer, SDL_Texture **texture,
                              int *running)
 {
     uint32_t prev_pad = 0;
+    /* Held-direction auto-repeat. Edge-triggered alone meant scrubbing back a
+     * couple of seconds was 20-odd separate taps, which is not a usable way to
+     * find a moment. */
+    uint32_t held_dir = 0;
+    Uint32 held_since = 0, last_repeat = 0;
 
     while (snes_rewind_is_open() && *running) {
         SDL_Event event;
@@ -2368,14 +2374,43 @@ static void game_rewind_loop(SDL_Renderer *renderer, SDL_Texture **texture,
         }
 
         /* Pad nav, edge-triggered: holding Left must not sprint through the
-         * whole ring in one frame. */
+         * whole ring in one frame.
+         *
+         * These four were all bound to the WRONG BITS. The comments said
+         * Left/Right/A/B; the constants were 5, 4, 3 and 11, which are
+         * Down, Up, Start and R. The runner's input word is
+         * B=0 Y=1 Select=2 Start=3 Up=4 Down=5 Left=6 Right=7 A=8 X=9 L=10
+         * R=11 (kGameControlBit above, and snes_overlay_draw.h). So the
+         * filmstrip -- which runs horizontally -- scrubbed on Up/Down, and
+         * Select/Back were Start and a shoulder button. Named constants now,
+         * so the next reader can see the binding rather than decode it. */
         pad = read_gamepad(0);
         {
             const uint32_t pressed = pad & ~prev_pad;
-            if (pressed & (1u << 5)) snes_rewind_step(-1);   /* Left  */
-            if (pressed & (1u << 4)) snes_rewind_step(+1);   /* Right */
-            if (pressed & (1u << 3)) snes_rewind_commit();   /* A     */
-            if (pressed & (1u << 11)) snes_rewind_close();   /* B     */
+            const uint32_t dir = pad & (SNES_PAD_LEFT | SNES_PAD_RIGHT);
+            const Uint32 now = SDL_GetTicks();
+
+            if (pressed & SNES_PAD_LEFT)  snes_rewind_step(-1);
+            if (pressed & SNES_PAD_RIGHT) snes_rewind_step(+1);
+            if (pressed & SNES_PAD_A)     snes_rewind_commit();
+            if (pressed & SNES_PAD_B)     snes_rewind_close();
+
+            /* Hold to keep scrubbing. The timer restarts whenever the held
+             * direction changes, so flicking Left->Right does not inherit the
+             * previous direction's repeat phase and run away. */
+            if (dir && dir != (SNES_PAD_LEFT | SNES_PAD_RIGHT)) {
+                if (dir != held_dir) {
+                    held_dir = dir;
+                    held_since = now;
+                    last_repeat = now;
+                } else if (now - held_since >= SNES_OVL_REPEAT_DELAY &&
+                           now - last_repeat >= SNES_OVL_REPEAT_RATE) {
+                    snes_rewind_step((dir & SNES_PAD_LEFT) ? -1 : +1);
+                    last_repeat = now;
+                }
+            } else {
+                held_dir = 0;
+            }
             prev_pad = pad;
         }
 
