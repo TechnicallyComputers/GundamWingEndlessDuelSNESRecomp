@@ -1,0 +1,101 @@
+# Automatch rulesets — Gundam Wing Endless Duel (SNES).
+#
+# Deployment data, not source: the live file is `data/automatch_rulesets.toml`
+# and is gitignored. Copy this in, or point AUTOMATCH_RULESETS_PATH at it.
+# There is no enable flag — automatch is on when at least one usable ruleset
+# loads, and off when none does.
+#
+# `game_name` must match BYTE FOR BYTE what the client announces. The Gundam
+# host builds it from SNES_GAME_TITLE (CMakeLists.txt), and it is visible on
+# the wire in its own log line:
+#     snes_lobby: hello as "…" for game "Gundam Wing Endless Duel"
+# A near-miss here is not an error anywhere — the title simply has no rulesets
+# and automatch_available answers no, which looks exactly like automatch off.
+
+[[ruleset]]
+id        = "standard"
+label     = "Standard"
+game_name = "Gundam Wing Endless Duel"
+max_slots = 2      # v1 refuses anything else at load, loudly
+
+# `game_version` is deliberately OMITTED. Pinning it would restrict the queue
+# to one release; leaving it out still pools only players on the SAME release,
+# because the match key is an equality bucket either way (AUTOMATCH.md §3).
+# Omitting it means a new tagged release starts pooling without a server edit.
+
+[ruleset.match_caps]
+# THE SNES CAPS SHAPE, not the PSX one. These are the keys
+# snesrecomp/runner/src/lobby/snes_lobby_client.c parses out of match_caps;
+# the example file's bios_hle / fast_boot / turbo_loads / auto_skip_fmv are
+# PSX fields and this client ignores them.
+#
+# Every value is written out even where it equals the client-side default,
+# because the server OWNS these caps for an automatch room — a key left out is
+# a decision made by whichever default happens to be in the peer's build.
+widescreen        = false   # vanilla: the wide view is a Mods package, and v1 is vanilla only
+widescreen_hud    = false   # MUST be explicit: this key defaults to TRUE when absent,
+                            # which would pair "HUD anchored wide" with a 4:3 frame
+ws_extra          = 0       # margin in pixels per side; 0 is the "do not patch" signal
+ignore_aspect     = false
+rollback          = true    # the SFU path both peers run online
+input_delay       = 2       # frames; the client clamps to 2..20
+force_turn        = false   # let ICE pick; the relay is already in the path
+force_input_relay = false
+
+# No `mods` key and no `mod_plan`: v1 is vanilla only, and a `mods` key is
+# refused at load rather than at match time.
+
+# ── Cosmetic allowlist ──────────────────────────────────────────────────────
+#
+# The packages a queued player may run UNILATERALLY, without their opponent
+# having the same thing. Everything else must match, exactly as before.
+#
+# This key is the GRANT. A mod declaring `presentation_only = true` in its own
+# manifest is only the mod ASKING, and a manifest is written by whoever wrote
+# the mod — so a cheat that wants to be exempt from the mod comparison writes
+# that line too. Nothing in the client can tell the two apart. Naming them here
+# is how the server decides, and an unlisted claim is treated as an ordinary
+# simulation-affecting mod: the queue is refused, by name.
+#
+# Omitting this key grants NOTHING, which is the correct default and what every
+# ruleset written before it does. Absence must never read as permission.
+#
+# FORM:  <package_id>@<version>#<sha256>   ← use this one
+#        <package_id>@<version>            ← name only; see the warning below
+# ';'-separated for several.
+#
+# The digest is of the package packed by the mod runtime's own deterministic
+# zip (file order is sorted precisely so the bytes are identical on every
+# machine). Get it from a client with the package installed — it is printed at
+# netplay init:
+#     netplay: cosmetic allowlist published when hosting: <id>@<ver>#<sha256>
+#
+# PIN THE DIGEST. A bare `id@version` entry is keyed on a string the client
+# picks for itself, so anyone wanting the exemption names their mod
+# `gwed.accessibility.flashguard` and takes it. With the digest the entry names
+# specific bytes, and a "flash guard" with something else inside it packs
+# differently and is refused on every machine that installs it.
+#
+# WHAT THIS DOES NOT DO, stated plainly so nobody over-trusts it: the client
+# still reports its own mods, so a player who patches their executable can
+# claim anything. Defending against that needs server-side verification of the
+# simulation, which does not exist here. What the allowlist removes is the
+# OMISSION — getting an unapproved mod into a pool now takes deliberate
+# forgery instead of one line in a manifest nobody checks.
+#
+# The digest below is a PLACEHOLDER. Replace it with the one your shipped
+# package prints, or the entry matches nothing and the filter is refused —
+# which fails safe, but fails.
+mod_cosmetic_allow = "gwed.accessibility.flashguard@1.0.0#0000000000000000000000000000000000000000000000000000000000000000"
+
+# Listed because it is an ACCESSIBILITY feature and its whole purpose is to
+# work against a stranger: a photosensitive player does not choose their
+# opponent, and a filter they had to negotiate for would be unavailable in
+# exactly the matches it exists for. It caps how far the presented frame may
+# move between displayed frames and touches no CPU, WRAM, VRAM, OAM, CGRAM,
+# APU or save state — see docs/FLASH_GUARD.md for the measurements.
+#
+# Nothing else of this game's belongs here. Widescreen patches the cart image
+# for sprite bounds and localization patches ROM text; both are simulation
+# state however cosmetic they look, and listing either would pair players
+# running different ROM images.

@@ -40,6 +40,27 @@
 #include "snes_savestate_menu.h" /* Select+R / [KeyMap] save-state overlay */
 #include "snes_osd.h"            /* FPS readout / turbo / slot toasts */
 #include "snes_rewind.h"         /* rewind ring + filmstrip */
+#include "snes_runahead.h"       /* offline input-latency reduction */
+#include "snes_overlay_draw.h"   /* SNES_PAD_* input word bits */
+#include "recomp_frame_blend.h"   /* shared presentation blend (all titles) */
+#include "recomp_flash_guard.h"   /* shared photosensitivity filter (all titles) */
+#include "flashguard_mod.h"       /* this title's Mods-page switch for it */
+#include <time.h>
+#if defined(_WIN32)
+/* For GetThreadTimes in game_thread_cpu_ms: MinGW defines _WIN32, so that
+ * branch compiles, but nothing here pulls in FILETIME/ULARGE_INTEGER and the
+ * build failed on exactly that. LEAN_AND_MEAN and NOMINMAX because this file
+ * wants a Win32 clock and nothing else; checked first that no identifier in
+ * main.c collides with what windows.h defines (near/far/max/small/IN/OUT all
+ * appear only in prose). */
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <windows.h>
+#endif
 #include "diagnostics_mod.h"     /* perf log: video facts + present cost */
 #include "config.h"              /* FindCmdForSdlKey + [KeyMap] parsing */
 #include "cpu_trace.h"
@@ -89,6 +110,10 @@ static int g_netplay_from_lobby; /* admit pump waits for the lobby peer */
  * Only the P8 sprite-bounds ROM patch consults it — the wide presentation
  * itself needs no agreement (see GwedFillMatchCaps). */
 static int g_netplay_caps_ws_extra = -1;
+/* Reopen the launcher on the netplay LIST rather than the dashboard: set when
+ * a match ended in a room we then left (automatch), where the player's next
+ * action is finding another game and not looking at box art. */
+static int g_netplay_return_to_list;
 /* 1 once snes_netplay_start has succeeded for this session. Distinguishes
  * "a peer is simulating alongside us" from "offline", which is the only
  * thing the P8 patch's agreement gate needs to know. */
@@ -169,6 +194,313 @@ static void GwedFillMatchCaps(void *ctx, const void *settings_v,
             out->ignore_aspect);
 }
 
+/*
+ * mods_enabled for an automatch ticket: is a SIM-AFFECTING feature on locally
+ * BEYOND what this ruleset imposes?
+ *
+ * Two of this title's three packages touch the sim:
+ *
+ *   - widescreen, because the P8 sprite-bounds patch writes the cart's ROM
+ *     image (gwed_ws_patch.c). The wide backgrounds and HUD are presentation
+ *     and digest-safe; that one patch is not.
+ *   - localization, because it patches ROM text.
+ *
+ * Widescreen is EXCUSED when the chosen ruleset itself pins a margin: the
+ * server is then instructing both peers to run that patched sim, so it is the
+ * ruleset rather than a divergence. Answering 1 for it would make a widescreen
+ * queue permanently unusable by the very feature it exists to standardize.
+ * A margin the ruleset does NOT ask for is still a divergence, so the check is
+ * ws_extra > 0 and not merely "the ruleset mentions widescreen".
+ *
+ * Localization is never excused: v1 rulesets carry no mod plan, so there is no
+ * way for a ruleset to impose a language, and two peers with different text
+ * patches are running different ROM images.
+ */
+/*
+ * The SIM-AFFECTING part of this build's effective mod set, in the mod
+ * runtime's own canonical form.
+ *
+ * snes_mod_runtime_effective_set_c emits one line per ENABLED feature, sorted,
+ * with resolved option values -- built precisely so two peers can compare
+ * selections byte for byte. But it lists EVERY enabled feature, and not every
+ * feature is simulation state: perf_log writes a log file and touches no guest
+ * memory, so requiring a queue's members to agree about it would refuse
+ * matches over a diagnostic.
+ *
+ * Which of a game's features touch the sim is knowledge only that game has, so
+ * the filter is here rather than in the runtime. This title has exactly two:
+ *
+ *   - gwed.enhancement.widescreen -- the P8 sprite-bounds patch writes the
+ *     cart's ROM image (gwed_ws_patch.c). The wide backgrounds and HUD are
+ *     presentation; that patch is not.
+ *   - gwed.localization -- snes_text_xlate applies ram_patches every frame, so
+ *     the translation is guest memory, not an overlay on top of it.
+ *
+ * A feature added later and left out of this list is a silent desync, which is
+ * why the default is to INCLUDE an unknown package rather than skip it: a new
+ * package blocks queueing until somebody decides it is safe, instead of
+ * pairing players who do not match.
+ */
+/* Compare two canonical mod sets. Both are already sorted, resolved text, so
+ * this is string equality -- with "" and "(none)" treated as the same empty
+ * set, because the runtime writes the latter and a ruleset that simply omits
+ * mod_set gives the former. */
+static int gwed_mod_set_equal(const char *a, const char *b)
+{
+    const char *ea = (!a || !a[0] || !strncmp(a, "(none)", 6)) ? "" : a;
+    const char *eb = (!b || !b[0] || !strncmp(b, "(none)", 6)) ? "" : b;
+    return strcmp(ea, eb) == 0;
+}
+
+/* Which package the two sets disagree about, in words a player can act on.
+ * Reports the FIRST difference rather than all of them: a queue mismatch is
+ * fixed one toggle at a time, and the next attempt names the next one. */
+/* Copy the `package@version/feature` head of a canonical mod-set line.
+ *
+ * Option values are dropped. They are part of what the sets compare, but they
+ * are not what a player acts on: naming a whole line at them ends "...
+ * flash_guard strength=standard is not on this queue's approved list", where
+ * the strength had nothing to do with the refusal. */
+static void gwed_mod_line_copy(const char *line, char *out, size_t cap)
+{
+    const char *nl = strchr(line, '\n');
+    const char *sp = strchr(line, ' ');
+    size_t len = nl ? (size_t)(nl - line) : strlen(line);
+    if (sp && (!nl || sp < nl)) len = (size_t)(sp - line);
+    if (len >= cap) len = cap - 1;
+    memcpy(out, line, len);
+    out[len] = '\0';
+}
+
+/* Is `line`'s package (everything up to the '@') present anywhere in `set`? */
+static int gwed_mod_set_has_package(const char *set, const char *line)
+{
+    char prefix[160];
+    const char *at = strchr(line, '@');
+    size_t len;
+    if (!set || !at) return 0;
+    len = (size_t)(at - line) + 1;          /* keep the '@' so a prefix of a
+                                             * longer id cannot match */
+    if (len >= sizeof(prefix)) return 0;
+    memcpy(prefix, line, len);
+    prefix[len] = '\0';
+    return strstr(set, prefix) != NULL;
+}
+
+/*
+ * Which package the two sets disagree about, in words a player can act on.
+ *
+ * Reports the FIRST difference rather than all of them: a mismatch is fixed
+ * one toggle at a time, and the next attempt names the next one.
+ *
+ * Anything ENABLED HERE that the queue does not run is named by its own
+ * canonical line, whether or not this file has ever heard of it. That matters
+ * for the case this was written for: a package added after this code -- an
+ * accessibility filter, say -- would otherwise fall through to "different mod
+ * settings than yours" and leave the player hunting a Mods page for which of
+ * several toggles the queue objects to. A friendly name is used where one is
+ * known, because "widescreen" reads better than its package id, but never at
+ * the cost of being unable to name something.
+ */
+static void gwed_describe_mod_mismatch(const char *mine, const char *want,
+                                       char *why, size_t why_cap)
+{
+    static const struct { const char *prefix; const char *label; } kNames[] = {
+        { "gwed.enhancement.widescreen@", "widescreen" },
+        { "gwed.localization@",           "the English patch" },
+    };
+    const char *line;
+    size_t i;
+
+    /* Enabled here, not run by the queue. The common case, and the only one
+     * the player can fix from their own Mods page. */
+    for (line = mine ? mine : ""; *line; ) {
+        const char *nl = strchr(line, '\n');
+        if (!gwed_mod_set_has_package(want, line)) {
+            char named[160];
+            for (i = 0; i < sizeof(kNames) / sizeof(kNames[0]); ++i) {
+                if (strncmp(line, kNames[i].prefix, strlen(kNames[i].prefix)))
+                    continue;
+                snprintf(why, why_cap, "This queue needs %s OFF", kNames[i].label);
+                return;
+            }
+            gwed_mod_line_copy(line, named, sizeof(named));
+            snprintf(why, why_cap,
+                     "%s is not on this queue's approved list", named);
+            return;
+        }
+        if (!nl) break;
+        line = nl + 1;
+    }
+
+    /* Run by the queue, missing here. */
+    for (line = want ? want : ""; *line; ) {
+        const char *nl = strchr(line, '\n');
+        if (!gwed_mod_set_has_package(mine, line)) {
+            char named[160];
+            for (i = 0; i < sizeof(kNames) / sizeof(kNames[0]); ++i) {
+                if (strncmp(line, kNames[i].prefix, strlen(kNames[i].prefix)))
+                    continue;
+                snprintf(why, why_cap, "This queue needs %s ON", kNames[i].label);
+                return;
+            }
+            gwed_mod_line_copy(line, named, sizeof(named));
+            snprintf(why, why_cap, "This queue runs %s -- turn it on to join",
+                     named);
+            return;
+        }
+        if (!nl) break;
+        line = nl + 1;
+    }
+
+    /* Same packages on both sides, different option values -- a language,
+     * most likely. */
+    snprintf(why, why_cap,
+             "This queue runs different mod settings than yours");
+}
+
+static void GwedSimAffectingModSet(char *out, size_t cap)
+{
+    char all[2048];
+    const char *line = all;
+    size_t used = 0;
+
+    out[0] = '\0';
+    if (snes_mod_runtime_effective_set_c(all, (uint32_t)sizeof(all)) <= 0)
+        return;
+
+    while (*line) {
+        const char *nl = strchr(line, '\n');
+        size_t len = nl ? (size_t)(nl - line) + 1 : strlen(line);
+        /* Diagnostics is the one package deliberately skipped: it observes,
+         * it does not participate. Everything else counts, known or not. */
+        if (strncmp(line, "gwed.diagnostics@", 17) != 0 &&
+            strncmp(line, "(none)", 6) != 0) {
+            if (used + len < cap) {
+                memcpy(out + used, line, len);
+                used += len;
+                out[used] = '\0';
+            }
+        }
+        if (!nl) break;
+        line = nl + 1;
+    }
+}
+
+/*
+ * mods_enabled for an automatch ticket.
+ *
+ * A ruleset may now PRESCRIBE a mod set (match_caps.mod_set), which is what
+ * lets a queue be a widescreen queue, or an English-patch queue, rather than
+ * vanilla-or-nothing. The rule is equality, not permission: this build's
+ * sim-affecting set must be exactly what the ruleset asks for.
+ *
+ * Equality in both directions matters. A player MISSING something the queue
+ * runs desyncs; so does a player running something extra. "At least" would let
+ * the second through.
+ *
+ * A ruleset with no mod_set means vanilla, and then any sim-affecting feature
+ * is a divergence -- which is the v1 behaviour, unchanged.
+ *
+ * The server cannot verify any of this. It takes this client's word (§5), and
+ * the assertion exists so a modified client is making a deliberate false
+ * statement rather than exploiting an omission.
+ */
+#define GWED_FLASHGUARD_PACKAGE "gwed.accessibility.flashguard"
+#define GWED_FLASHGUARD_VERSION "1.0.0"
+
+/*
+ * The cosmetic allowlist THIS GAME publishes when it hosts a lobby.
+ *
+ * One entry: the flash-reduction filter. It caps how far the presented picture
+ * may move between frames and touches no guest state at all, so a player who
+ * needs it runs the identical simulation as one who does not -- which is
+ * precisely why it can be exempt from the set two peers compare.
+ *
+ * Granting it is not a courtesy. A photosensitive player does not get to
+ * choose their opponent, and an accessibility filter that required the other
+ * side's agreement would be unavailable in exactly the matches it exists for.
+ * The alternative to this line is telling that player to pick between the
+ * filter and playing online.
+ *
+ * PINNED TO THE PACKAGE DIGEST wherever the runtime can compute one, as the
+ * manifest asks: unpinned, the entry is keyed on an id the client picks for
+ * itself, and any package that renames itself to this id inherits the
+ * exemption. Unpinned is still not a hole -- the runtime independently refuses
+ * a claim whose plugins this binary did not classify as presentation-only, or
+ * whose package ships anything but a manifest -- but the digest is what makes
+ * the grant name bytes.
+ *
+ * Nothing else is on this list, and nothing should be added to it that has not
+ * been read and shown to leave the guest alone.
+ */
+static const char *GwedCosmeticAllowList(void)
+{
+    static char entry[160];
+    char digest[80];
+    if (entry[0]) return entry;
+    if (snes_mod_runtime_package_digest_c(GWED_FLASHGUARD_PACKAGE,
+                                          GWED_FLASHGUARD_VERSION,
+                                          digest, (uint32_t)sizeof(digest)))
+        snprintf(entry, sizeof(entry), "%s@%s#%s", GWED_FLASHGUARD_PACKAGE,
+                 GWED_FLASHGUARD_VERSION, digest);
+    else
+        snprintf(entry, sizeof(entry), "%s@%s", GWED_FLASHGUARD_PACKAGE,
+                 GWED_FLASHGUARD_VERSION);
+    return entry;
+}
+
+static int GwedAutomatchModsEnabled(void *ctx, const char *ruleset_id,
+                                    char *why, size_t why_cap)
+{
+    char mine[1024];
+    SnesLobbyRuleset chosen;
+    int i, n, found = 0;
+    (void)ctx;
+
+    n = snes_lobby_automatch_ruleset_count();
+    for (i = 0; i < n; ++i) {
+        SnesLobbyRuleset r;
+        if (!snes_lobby_automatch_ruleset_get(i, &r)) continue;
+        /* NULL/"" selects the first ruleset, matching the client's own rule. */
+        if (ruleset_id && ruleset_id[0] && strcmp(r.id, ruleset_id) != 0)
+            continue;
+        chosen = r;
+        found = 1;
+        break;
+    }
+    if (!found) {
+        snprintf(why, why_cap, "That queue is no longer offered -- reopen "
+                               "netplay to refresh");
+        return 1;
+    }
+
+    /*
+     * The queue's cosmetic grant goes in BEFORE the set is measured.
+     *
+     * A presentation-only package the ruleset allowlists is not a divergence
+     * -- that is the whole meaning of the grant -- and the runtime already
+     * leaves an exempt feature out of the effective set. But the grant is
+     * per-match state, and at queue time nothing had applied it yet, so the
+     * measurement ran against an empty allowlist and refused the player for a
+     * filter the queue explicitly permits. The host applies the same list from
+     * the caps at launch; this is the same answer, one step earlier.
+     *
+     * Setting it from the ruleset we are about to queue for is also the
+     * correct scope: it is exactly the authority the match will run under.
+     */
+    snes_mod_runtime_set_cosmetic_allow_c(chosen.caps.mod_cosmetic_allow);
+
+    GwedSimAffectingModSet(mine, sizeof(mine));
+    if (gwed_mod_set_equal(mine, chosen.caps.mod_set))
+        return 0;
+
+    /* Name the difference. "Your mods do not match" sends a player to a page
+     * of toggles with no idea which one to move. */
+    gwed_describe_mod_mismatch(mine, chosen.caps.mod_set, why, why_cap);
+    return 1;
+}
+
 static void host_lobby_ensure_init(void)
 {
     static int once;
@@ -185,6 +517,37 @@ static void host_lobby_ensure_init(void)
     memset(&opts, 0, sizeof(opts));
     opts.rematch_set_ready = 1;
     opts.fill_match_caps = &GwedFillMatchCaps;
+    opts.mods_enabled = &GwedAutomatchModsEnabled;
+    opts.cosmetic_allow = GwedCosmeticAllowList();
+    /* The ROM this build was recompiled from IS the guest image both peers
+     * run, so it is the right fingerprint for the automatch match key. A join
+     * tolerates an empty one ("legacy host, no check"); a queue does not, and
+     * would be refused with need_disc_fp. */
+    snes_lobby_set_disc_fp(kGameCodegenIdentity.expected_sha256);
+    {
+        /* Say what this build's sim-affecting selection IS, in the exact
+         * canonical form a ruleset's match_caps.mod_set has to equal. Printed
+         * because it is the one string that decides whether a queue accepts
+         * this player, and copying it out of a log is how a ruleset gets
+         * written correctly instead of approximately. */
+        char set[1024];
+        /* Measured under THIS BUILD'S OWN grant, so the two lines printed
+         * below are a coherent pair: a ruleset carrying that allowlist wants
+         * exactly this set, with the exempt package in the allowlist rather
+         * than in the set. It is also what fill_match_caps does when this game
+         * hosts. Self-granting is only meaningful offline -- every netplay
+         * path re-applies the authority's list before it compares anything. */
+        snes_mod_runtime_set_cosmetic_allow_c(GwedCosmeticAllowList());
+        GwedSimAffectingModSet(set, sizeof(set));
+        fprintf(stderr, "netplay: sim-affecting mod set for automatch:\n%s",
+                set[0] ? set : "(none)\n");
+        /* And the grant this build publishes, in the exact form an automatch
+         * ruleset's match_caps.mod_cosmetic_allow has to carry. Printed for
+         * the same reason as the set above: it is copied into a ruleset, and
+         * a digest is not something anyone should be retyping. */
+        fprintf(stderr, "netplay: cosmetic allowlist: %s\n",
+                GwedCosmeticAllowList());
+    }
     if (snes_host_lobby_init(&id, &opts) != 0)
         fprintf(stderr, "netplay: snes_host_lobby_init failed\n");
 }
@@ -499,9 +862,9 @@ static int game_pad_name_to_button(const char *name)
     return -100;   /* unknown name: leave unbound rather than guess */
 }
 
-/* Parse [GamepadMap] Controls from config.ini beside the executable, then the
- * working directory. Absent or malformed leaves the defaults in place — a
- * missing config must not silently unbind the pad. */
+/* Parse [GamepadMap] Controls from the one config.ini game_config_path()
+ * resolves. Absent or malformed leaves the defaults in place — a missing
+ * config must not silently unbind the pad. */
 /* ── Video pacing ─────────────────────────────────────────────────────────
  *
  * The SNES field rate is 60.0988 Hz, and a desktop display is almost never
@@ -525,60 +888,109 @@ static int g_fullscreen_mode;
 
 /* ── Frame blending ───────────────────────────────────────────────────────
  *
- * This game fakes transparency by drawing thrusters, explosions and beam
- * flashes on alternate frames only — a trick that reads as translucency on
- * a CRT's persistence but relies on every guest frame being shown exactly
- * once, whole, in order. A desktop display breaks that both ways: vsync on
- * duplicates a frame every ~10 s (the 60.00 vs 60.0988 beat above), showing
- * the same flicker phase twice; vsync off tears mid-scanout, splitting the
- * on-frame and the off-frame across one visible field.
+ * GAME POLICY ONLY. The blend itself -- what it does, why a desktop display
+ * needs it, and the write-combined-memory hazard that dictates where it runs
+ * -- is a shared capability in recomp-ui (recomp_frame_blend.h), so every
+ * port gets one implementation instead of a copy per game. Read that header
+ * for the mechanism; what is decided HERE is only whether this title turns
+ * it on, and the answer is the single line below.
  *
- * Averaging each presented frame with the previous one makes both phases
- * present in every displayed frame, so the flicker becomes steady 50%
- * translucency and stops caring about pacing at all. Costs half a frame of
- * motion ghosting, so it is a Display-settings checkbox. Persisted as
- * [Video] FrameBlend in config.ini.
+ * The player-facing surface is likewise shared: GameInfo.has_frame_blend
+ * draws the Display checkbox, Settings.frame_blend carries its value. This
+ * host persists that value as [Video] FrameBlend in config.ini.
  *
  * ON by default for this title: Endless Duel leans on 30 Hz flicker for
  * thruster flames, shadows and HUD translucency, so a fresh install without
- * blending shows the artifact the checkbox exists to remove. The default
- * lives in one place so the launcher seed and the boot read cannot drift. */
+ * blending shows the artifact the checkbox exists to remove. That is a
+ * deliberate departure from the doctrine's default-off rule (ENHANCEMENTS.md
+ * Rule 1) and it is a per-game departure: the capability ships inert, and
+ * nothing outside this file makes it a Gundam feature. The default lives in
+ * one place so the launcher seed and the boot read cannot drift. */
 #define GWED_FRAME_BLEND_DEFAULT 1
 static int g_frame_blend = GWED_FRAME_BLEND_DEFAULT;
-static uint32_t g_blend_prev[GAME_MAX_WIDTH * GAME_HEIGHT];
-static int g_blend_prev_valid = 0;
+static RecompFrameBlend *g_blend;
 /*
- * Staging frame for the blended path. Sized like g_blend_prev beside it, so
- * neither can be outgrown by a widescreen width change.
- *
- * It exists because the blend is a read-modify-write, and it used to do that
- * read against the LOCKED TEXTURE. SDL_LockTexture on a streaming texture
- * hands back driver memory that is frequently write-combined and uncached:
- * excellent for sequential writes, pathological to read -- there is no read
- * caching, so each of the 57,344 loads is an uncached fetch. Writes were
- * never the problem; the read-back was.
- *
- * The cost of that is invisible on one machine and severe on another, because
- * whether the mapping is cached system memory or write-combined depends on
- * the backend and the driver -- which is exactly the shape of a bug that is
- * fine for the developer and ruins it for one player. Blending in ordinary
- * cached memory and uploading once removes the variable entirely.
+ * Staging frame for the blended path: the blend must run in ordinary cached
+ * memory rather than in the locked texture (recomp_frame_blend.h explains
+ * why), so the frame is drawn here, blended here, and uploaded with one
+ * linear write-only copy. Sized for the widest widescreen frame so a width
+ * change cannot outgrow it.
  */
 static uint32_t g_frame_stage[GAME_MAX_WIDTH * GAME_HEIGHT];
+
+/* ── Flash reduction (photosensitivity) ───────────────────────────────────
+ *
+ * GAME POLICY ONLY, on the same split as frame blending above: the filter --
+ * what a flash is, the WCAG thresholds it is sized against, why it is not a
+ * frame blend, and the same write-combined-memory hazard -- is a shared
+ * recomp-ui capability (recomp_flash_guard.h). What is decided HERE is only
+ * that this title takes its switch from the Mods page rather than config.ini.
+ *
+ * NO [Video] KEY AND NO DISPLAY CHECKBOX, unlike FrameBlend. The package
+ * gwed.accessibility.flashguard is the single authority, which is the same
+ * ruling widescreen operates under (Beads beads-8wg.1.10): one surface, so a
+ * player cannot end up with a config file saying one thing and the Mods page
+ * another. src/flashguard_mod.c resolves the strength; this file only asks.
+ *
+ * OFF by default -- it is opt-in like every package here. Worth recording
+ * that the argument for defaulting it ON is not frivolous: a player who needs
+ * this is quite likely to have put the game down before ever opening the Mods
+ * page. That is the owner's call to make, and it is a one-line change in the
+ * manifest when they do.
+ */
+static RecompFlashGuard *g_flash_guard;
+static int g_flash_guard_limit;   /* 0 = off; else the per-frame step limit */
+
+/* ── Which config.ini ──────────────────────────────────────────────────────
+ *
+ * One file, resolved once, read and written by everything in this process.
+ *
+ * It used to be a per-KEY walk of {"config.ini", "../config.ini"}: each key
+ * was looked up in the first file and, if absent there, in the second. With a
+ * config.ini beside the executable AND one in the tree root, that BLENDS them.
+ * Measured: a build-release/config.ini carrying only Vsync and FrameBlend took
+ * those two from itself and Fullscreen and Renderer from ../config.ini, so the
+ * settings the game actually ran with existed in neither file and changed with
+ * the directory it was launched from. Two runs an hour apart differed in vsync
+ * for no reason but that.
+ *
+ * Worse, the launcher wrote to "config.ini" (the working directory) while a
+ * key missing from that file was still read from the parent — so a setting
+ * could be persisted to one file and read back from the other, and appear not
+ * to take.
+ *
+ * First existing file wins, whole. If neither exists yet, name the working
+ * directory so a fresh install creates it beside the executable rather than in
+ * its parent. This is the rule ParseConfigFile already applied at the SNES-core
+ * end; the rest of the process now agrees with it instead of contradicting it.
+ */
+static const char *game_config_path(void)
+{
+    static const char *resolved;
+    if (!resolved) {
+        FILE *f = fopen("config.ini", "rb");
+        if (f) { fclose(f); resolved = "config.ini"; }
+        else if ((f = fopen("../config.ini", "rb")) != NULL) {
+            fclose(f);
+            resolved = "../config.ini";
+        } else {
+            resolved = "config.ini";   /* none yet: create beside us */
+        }
+    }
+    return resolved;
+}
 
 static int game_config_str(const char *section, const char *key,
                            char *out, size_t cap)
 {
-    static const char *paths[] = {"config.ini", "../config.ini"};
-    size_t p;
     if (!out || !cap) return 0;
     out[0] = '\0';
-    for (p = 0; p < sizeof(paths) / sizeof(paths[0]); ++p) {
-        FILE *f = fopen(paths[p], "rb");
+    {
+        FILE *f = fopen(game_config_path(), "rb");
         char line[512];
         int in_section = 0;
         if (!f)
-            continue;
+            return 0;
         while (fgets(line, sizeof(line), f)) {
             char *s = line, *eq;
             while (*s == ' ' || *s == '\t') s++;
@@ -613,16 +1025,15 @@ static int game_config_str(const char *section, const char *key,
     return 0;
 }
 
+
 static int game_config_int(const char *section, const char *key, int fallback)
 {
-    static const char *paths[] = {"config.ini", "../config.ini"};
-    size_t p;
-    for (p = 0; p < sizeof(paths) / sizeof(paths[0]); ++p) {
-        FILE *f = fopen(paths[p], "rb");
+    {
+        FILE *f = fopen(game_config_path(), "rb");
         char line[512];
         int in_section = 0;
         if (!f)
-            continue;
+            return fallback;
         while (fgets(line, sizeof(line), f)) {
             char *s = line, *eq;
             while (*s == ' ' || *s == '\t') s++;
@@ -655,6 +1066,113 @@ static int game_config_int(const char *section, const char *key, int fallback)
  * Accumulates in floating point so the 0.0988 does not get truncated away --
  * rounding to a whole 16 ms would reintroduce the same beat this exists to
  * avoid. Resynchronises rather than spiralling if a frame runs long. */
+/* Pace the loop to the DISPLAY, so it never runs ahead of the swapchain.
+ *
+ * Why this exists, measured rather than assumed. With vsync on,
+ * SDL_RenderPresent returns in 0.09-0.13 ms -- it does not wait. SDL queues
+ * the present and the loop is free to run ahead by however many swapchain
+ * images exist. Then one frame's SDL_LockTexture/SDL_UnlockTexture finds the
+ * staging resources exhausted and waits THREE whole intervals at once:
+ * `present` lands on 2.9-4.0 x 16.64 ms and the frames after it run at 2-6 ms
+ * catching up. The wait is not missing, it is BUNCHED, and a bunched wait is
+ * exactly what a player feels as a hitch.
+ *
+ * Ruled out first, so this is not another guess: rotating three streaming
+ * textures and switching to SDL_UpdateTexture both measured indistinguishable
+ * from the default over three interleaved replicates. The constraint is the
+ * present queue, not the texture.
+ *
+ * So: spread the wait. Hold a deadline in performance-counter ticks advanced
+ * by one display period each frame, and sleep the remainder. vsync stays the
+ * final authority -- this only stops the loop from getting far enough ahead to
+ * need a multi-interval wait. Deliberately no busy-spin: being a fraction of a
+ * millisecond early is harmless because vsync absorbs it, and burning a core
+ * to be exact would trade one player-visible problem for another.
+ *
+ * Env-gated (GWED_PACE=1/0) because it must be A/B'd on real hardware, and the
+ * measurement here is noisy enough that only a replicated, interleaved
+ * comparison means anything. */
+static double g_pace_period_ms;      /* 0 = unknown, pacing disabled */
+/* What the pacer asked for vs what it actually got. A pacer that overshoots
+ * manufactures the very hitch it exists to remove, and the two are only
+ * distinguishable if both are recorded. */
+static double g_last_pace_want_ms = -1.0, g_last_pace_slept_ms = -1.0;
+/* Loop-top timestamps, so an iteration is measured whichever way it exits. */
+static Uint64 g_head_t0;
+static double g_last_head_ms = -1.0;
+static Uint64 g_iter_top_prev;
+static double g_iter_cpu_prev = -1.0;
+static double game_perf_ms_since(Uint64 t0);   /* defined with the loop timers */
+static int    g_pace_enabled = -1;
+
+static int game_pace_on(void)
+{
+    if (g_pace_enabled < 0) {
+        /* ON by default. Measured over three interleaved 130 s replicates each
+         * (startup excluded, per-second worst SDL_UnlockTexture, n=366 s per
+         * arm): unpaced median 15.16 ms / p99 16.55 / max 19.24; paced median
+         * 1.17 / p99 2.43 / max 3.14. The distributions do not overlap -- the
+         * unpaced MINIMUM is above the paced MAXIMUM -- and UNLOCK spikes went
+         * 5,0,1 to 0,0,0. Frame rate holds 59.99-60.01.
+         *
+         * GWED_PACE=0 turns it off, because this is one GPU and one driver:
+         * a backend whose SDL_RenderPresent genuinely blocks does not need
+         * this and should not pay for it. */
+        const char *e = getenv("GWED_PACE");
+        g_pace_enabled = (e && *e) ? (atoi(e) != 0) : 1;
+    }
+    return g_pace_enabled && g_pace_period_ms > 0.0;
+}
+
+static double game_pace_to_display(void)
+{
+    static Uint64 deadline;
+    const Uint64 freq = SDL_GetPerformanceFrequency();
+    Uint64 now;
+    double wait_ms;
+    if (!freq || !game_pace_on())
+        return -1.0;
+    now = SDL_GetPerformanceCounter();
+    if (!deadline)
+        deadline = now;
+    deadline += (Uint64)(g_pace_period_ms * (double)freq / 1000.0);
+    if ((Sint64)(deadline - now) <= 0) {
+        deadline = now;              /* behind: take the debt, do not sleep */
+        return 0.0;
+    }
+    wait_ms = (double)(deadline - now) * 1000.0 / (double)freq;
+    if (wait_ms > 100.0) {           /* clock jump or a long stall */
+        deadline = now;
+        return 0.0;
+    }
+    /* Sleep SHORT of the deadline and let vsync take the remainder.
+     *
+     * Overshooting is worse than undershooting: vsync is downstream and
+     * absorbs a frame that arrives early, but nothing recovers one that
+     * arrives late. Measured in fullscreen on the reporter's machine, an
+     * SDL_Delay-based pacer overshot by ~9 ms often enough to produce 11
+     * spikes of 25-27 ms in 163 s -- it removed the 48-66 ms unlock stalls and
+     * replaced them with smaller ones of its own.
+     *
+     * SDL_DelayPrecise is the SDL3 API meant for this and is markedly tighter
+     * than SDL_Delay's millisecond-rounded scheduler sleep. SDL2 has no
+     * equivalent, so that path keeps the coarse sleep and a wider margin. */
+    if (wait_ms > 1.5) {
+        const Uint64 slept_t0 = SDL_GetPerformanceCounter();
+#if SNESRECOMP_SDL3
+        SDL_DelayPrecise((Uint64)((wait_ms - 0.3) * 1000000.0));
+#else
+        SDL_Delay((Uint32)(wait_ms - 1.0));
+#endif
+        g_last_pace_slept_ms = game_perf_ms_since(slept_t0);
+        g_last_pace_want_ms = wait_ms;
+    } else {
+        g_last_pace_slept_ms = 0.0;
+        g_last_pace_want_ms = wait_ms;
+    }
+    return wait_ms;
+}
+
 static void game_frame_limit(void)
 {
     static double next_ms = 0.0;
@@ -676,14 +1194,12 @@ static void game_frame_limit(void)
 
 static void game_load_pad_map(void)
 {
-    static const char *paths[] = {"config.ini", "../config.ini"};
-    size_t p;
-    for (p = 0; p < sizeof(paths) / sizeof(paths[0]); ++p) {
-        FILE *f = fopen(paths[p], "rb");
+    {
+        FILE *f = fopen(game_config_path(), "rb");
         char line[512];
         int in_section = 0;
         if (!f)
-            continue;
+            goto no_map;
         while (fgets(line, sizeof(line), f)) {
             char *s = line, *eq;
             while (*s == ' ' || *s == '\t') s++;
@@ -722,15 +1238,16 @@ static void game_load_pad_map(void)
                     val = comma + 1;
                 }
                 fprintf(stderr, "[input] gamepad map: %d binding(s) from %s\n",
-                        n, paths[p]);
+                        n, game_config_path());
                 fclose(f);
                 return;
             }
         }
         fclose(f);
     }
-    fprintf(stderr, "[input] gamepad map: config.ini has no [GamepadMap]; "
-                    "using built-in defaults\n");
+no_map:
+    fprintf(stderr, "[input] gamepad map: %s has no [GamepadMap]; "
+                    "using built-in defaults\n", game_config_path());
 }
 
 static void game_open_pads(void)
@@ -1327,6 +1844,7 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     char assets_dir[1024];
     int lr;
     int fb_seed;
+    int ra_seed;
     int fs_seed, rend_seed;
     int vs_seed;
 
@@ -1413,6 +1931,17 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
      * the ABI's 1-based encoding (0 would mean "unset" and be reseeded On,
      * silently flipping this title's ships-off default). */
     fb_seed = game_config_int("[Video]", "FrameBlend", GWED_FRAME_BLEND_DEFAULT) ? 1 : 0;
+    /* Run-ahead is an [Emulation] key, not a [Video] one, and it is a DEPTH
+     * rather than a flag: the launcher row cycles Off/1..4 so a player who
+     * put RunAhead=2 in config.ini gets that value back, instead of a
+     * checkbox reading it as "on" and writing 1 the next time it is touched.
+     * Clamped here as well as in the model, because this seed is also what
+     * the untouched-run comparison below is made against. */
+    ra_seed = game_config_int("[Emulation]", "RunAhead", 0);
+    if (ra_seed < 0) ra_seed = 0;
+    if (ra_seed > RECOMP_LAUNCHER_RUN_AHEAD_MAX)
+        ra_seed = RECOMP_LAUNCHER_RUN_AHEAD_MAX;
+    ls.run_ahead = ra_seed;
     fs_seed = game_config_int("[Video]", "Fullscreen", 0);
     if (fs_seed < 0 || fs_seed > 2) fs_seed = 0;
     rend_seed = game_renderer_choice();
@@ -1432,6 +1961,12 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
      * on alternate-frame flicker for its transparency effects (thrusters,
      * beam flashes), which is what the blend exists to steady. */
     gi.has_frame_blend = 1;
+    /* Display → Run-ahead cycle. Offered because this runtime can snapshot
+     * and restore a whole machine in a frame (snes_runahead.c); a host whose
+     * runtime cannot must leave this 0 rather than draw a control that does
+     * nothing. Not a per-profile flag: enabling it in snes_profile.h would
+     * give every SNES port a row it has not wired to anything. */
+    gi.has_run_ahead = 1;
     /* Display → VSync checkbox (the legacy surface draws it as On/Off; this
      * host's renderer flag is boolean, so Adaptive is never offered). */
     gi.has_vsync = 1;
@@ -1466,6 +2001,13 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     gi.netplay_supported = 1;
     host_lobby_ensure_init();
     gi.netplay = snes_host_lobby_callbacks();
+    /* Land on Netplay after a match we left. Not seated any more, so the
+     * launcher draws the lobby list rather than a room. Consumed here so a
+     * later ordinary open is unaffected. */
+    if (g_netplay_return_to_list) {
+        gi.resume_netplay_room = 1;
+        g_netplay_return_to_list = 0;
+    }
 #endif
 
     /* Generate & rebuild: the launcher's first-run wizard takes the player's
@@ -1507,12 +2049,17 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
      * and unrelated keys survive). Only on change: an untouched launcher
      * run must not invent a [Video] section in a fresh install. */
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && ls.frame_blend != fb_seed)
-        launcher_ini_kv_write("config.ini", "Video", "FrameBlend",
+        launcher_ini_kv_write(game_config_path(), "Video", "FrameBlend",
                               ls.frame_blend ? "1" : "0");
+    if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && ls.run_ahead != ra_seed) {
+        char val[16];
+        snprintf(val, sizeof(val), "%d", ls.run_ahead);
+        launcher_ini_kv_write(game_config_path(), "Emulation", "RunAhead", val);
+    }
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH) {
         int vs_new = (ls.vsync != RECOMP_LAUNCHER_VSYNC_OFF) ? 1 : 0;
         if (vs_new != vs_seed)
-            launcher_ini_kv_write("config.ini", "Video", "Vsync",
+            launcher_ini_kv_write(game_config_path(), "Video", "Vsync",
                                   vs_new ? "1" : "0");
     }
     /* Only on change, like the Display boxes above: a first run must not
@@ -1521,12 +2068,12 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
         char val[16];
         if (ls.fullscreen != fs_seed) {
             snprintf(val, sizeof(val), "%d", ls.fullscreen);
-            launcher_ini_kv_write("config.ini", "Video", "Fullscreen", val);
+            launcher_ini_kv_write(game_config_path(), "Video", "Fullscreen", val);
         }
         if (ls.renderer != rend_seed) {
             const char *id = (ls.renderer > 0) ? game_renderer_driver(ls.renderer)
                                                : "auto";
-            launcher_ini_kv_write("config.ini", "Video", "Renderer",
+            launcher_ini_kv_write(game_config_path(), "Video", "Renderer",
                                   id ? id : "auto");
         }
     }
@@ -1552,15 +2099,15 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
 
             snprintf(key, sizeof(key), "SourceP%d", q + 1);
             snprintf(val, sizeof(val), "%d", ls.player_src[q]);
-            launcher_ini_kv_write("config.ini", "Controller", key, val);
+            launcher_ini_kv_write(game_config_path(), "Controller", key, val);
 
             snprintf(key, sizeof(key), "GuidP%d", q + 1);
-            launcher_ini_kv_write("config.ini", "Controller", key,
+            launcher_ini_kv_write(game_config_path(), "Controller", key,
                                   ls.player_gamepad_guid[q]);
 
             snprintf(key, sizeof(key), "DeadzoneP%d", q + 1);
             snprintf(val, sizeof(val), "%d", ls.deadzone[q]);
-            launcher_ini_kv_write("config.ini", "Controller", key, val);
+            launcher_ini_kv_write(game_config_path(), "Controller", key, val);
 
             /* Says what actually went to disk. Paired with the "restored" line
              * above, a single log tells whether a slot that came back wrong
@@ -1725,6 +2272,13 @@ static SDL_Texture *game_ensure_texture(SDL_Renderer *renderer,
     if (snesrecomp_sdl_get_texture_size(texture, &tex_w, &tex_h) &&
         tex_w == want && tex_h == GAME_HEIGHT)
         return texture;
+    {
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+                 "TEXTURE REBUILD %dx%d -> %dx%d", tex_w, tex_h,
+                 want, GAME_HEIGHT);
+        GwedDiag_NoteEvent(msg);
+    }
     SDL_DestroyTexture(texture);
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                                 SDL_TEXTUREACCESS_STREAMING, want, GAME_HEIGHT);
@@ -1736,61 +2290,327 @@ static SDL_Texture *game_ensure_texture(SDL_Renderer *renderer,
     return texture;
 }
 
+/* Name the window events worth correlating against a spike. Deliberately a
+ * small allowlist: a log that reports every mouse-motion event is a log
+ * nobody reads. Returns NULL for anything not worth a line. */
+static const char *game_window_event_name(const SDL_Event *e)
+{
+#if SNESRECOMP_SDL3
+    switch (e->type) {
+    case SDL_EVENT_WINDOW_RESIZED:              return "window resized";
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:   return "window pixel size changed";
+    case SDL_EVENT_WINDOW_DISPLAY_CHANGED:      return "window moved to another display";
+    case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:return "display scale changed";
+    case SDL_EVENT_WINDOW_OCCLUDED:             return "window occluded";
+    case SDL_EVENT_WINDOW_EXPOSED:              return "window exposed";
+    case SDL_EVENT_WINDOW_MINIMIZED:            return "window minimized";
+    case SDL_EVENT_WINDOW_RESTORED:             return "window restored";
+    case SDL_EVENT_WINDOW_FOCUS_LOST:           return "focus lost";
+    case SDL_EVENT_WINDOW_FOCUS_GAINED:         return "focus gained";
+    case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:     return "entered fullscreen";
+    case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:     return "left fullscreen";
+    case SDL_EVENT_DISPLAY_ORIENTATION:         return "display orientation changed";
+    case SDL_EVENT_DISPLAY_ADDED:               return "display added";
+    case SDL_EVENT_DISPLAY_REMOVED:             return "display removed";
+    case SDL_EVENT_DISPLAY_DESKTOP_MODE_CHANGED:return "desktop display mode changed";
+    case SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED:return "current display mode changed";
+    case SDL_EVENT_RENDER_TARGETS_RESET:        return "RENDER TARGETS RESET";
+    case SDL_EVENT_RENDER_DEVICE_RESET:         return "RENDER DEVICE RESET";
+    default: return NULL;
+    }
+#else
+    if (e->type == SDL_RENDER_TARGETS_RESET) return "RENDER TARGETS RESET";
+    if (e->type == SDL_RENDER_DEVICE_RESET)  return "RENDER DEVICE RESET";
+    if (e->type != SDL_WINDOWEVENT) return NULL;
+    switch (e->window.event) {
+    case SDL_WINDOWEVENT_RESIZED:          return "window resized";
+    case SDL_WINDOWEVENT_SIZE_CHANGED:     return "window size changed";
+    case SDL_WINDOWEVENT_DISPLAY_CHANGED:  return "window moved to another display";
+    case SDL_WINDOWEVENT_EXPOSED:          return "window exposed";
+    case SDL_WINDOWEVENT_MINIMIZED:        return "window minimized";
+    case SDL_WINDOWEVENT_RESTORED:         return "window restored";
+    case SDL_WINDOWEVENT_FOCUS_LOST:       return "focus lost";
+    case SDL_WINDOWEVENT_FOCUS_GAINED:     return "focus gained";
+    default: return NULL;
+    }
+#endif
+}
+
+static void game_diag_note_window_event(const SDL_Event *e)
+{
+    const char *name = game_window_event_name(e);
+    if (name)
+        GwedDiag_NoteEvent(name);
+}
+
+/* Per-iteration cost buckets, handed to the diagnostics module once the
+ * present is reported. Emulation accumulates because a fast-forward iteration
+ * runs several guest frames; the limiter is -1 when vsync paces instead. */
+static double g_last_emulate_ms, g_last_pump_ms, g_last_limit_ms = -1.0;
+static double g_last_emulate_cpu_ms;
+
+static double game_perf_ms_since(Uint64 t0)
+{
+    const Uint64 f = SDL_GetPerformanceFrequency();
+    return f ? (double)(SDL_GetPerformanceCounter() - t0) * 1000.0 / (double)f
+             : 0.0;
+}
+
+/* This thread's CPU time, in ms. Wall time says a frame took 72 ms; CPU time
+ * says whether those 72 ms were SPENT or WAITED. A stall that burns CPU is
+ * host code doing too much; a stall that burns none is blocked in the kernel
+ * -- a page fault, an allocation that hit mmap, a lock, a blocking write --
+ * and those need completely different hunts. Without this the two are
+ * indistinguishable and every candidate stays open.
+ *
+ * POSIX gets CLOCK_THREAD_CPUTIME_ID; Windows gets GetThreadTimes with the
+ * same meaning, so the number reads identically on both -- which matters
+ * because the bug is reported on both. */
+static double game_thread_cpu_ms(void)
+{
+#if defined(_WIN32)
+    /* CAVEAT: GetThreadTimes is quantised to the scheduler tick, ~15.625 ms.
+     * Per-frame it only ever returns 0 or a multiple of 15.62, so the
+     * blocked-vs-spinning verdict built on it is meaningless on Windows at
+     * this timescale -- seen as an unbroken run of cpu=0.00 / cpu=15.62 in a
+     * 120 Hz session. The wall-clock numbers are unaffected; only the
+     * WAITING/ON-CPU label is. Flagged where it is printed. */
+    FILETIME c, e, k, u;
+    if (GetThreadTimes(GetCurrentThread(), &c, &e, &k, &u)) {
+        ULARGE_INTEGER ku, uu;
+        ku.LowPart = k.dwLowDateTime;  ku.HighPart = k.dwHighDateTime;
+        uu.LowPart = u.dwLowDateTime;  uu.HighPart = u.dwHighDateTime;
+        /* 100 ns units */
+        return (double)(ku.QuadPart + uu.QuadPart) / 10000.0;
+    }
+    return -1.0;
+#elif defined(CLOCK_THREAD_CPUTIME_ID)
+    struct timespec ts;
+    if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) == 0)
+        return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1000000.0;
+    return -1.0;
+#else
+    return -1.0;
+#endif
+}
+
+/* Guest->texture upload cost for this iteration, handed to the diagnostics
+ * module when the present is reported. -1 when no upload ran (frozen guest). */
+static double g_last_upload_ms = -1.0;
+static Uint64 g_last_present_at;
+static double g_last_upload_cpu_ms = -1.0;
+static double g_last_lock_ms = -1.0;
+/* fill  = writing the frame into the mapped texture (pure CPU stores)
+ * unlock= SDL_UnlockTexture, which on a GPU backend is where the staging
+ *         buffer is actually handed to the GPU. `copy` conflated the two and
+ *         measured 32 ms with only 4-6 ms of CPU, which rules out the stores
+ *         and points at the transfer -- but pointing is not proving. */
+static double g_last_fill_ms = -1.0;
+static double g_last_unlock_ms = -1.0;
+static int    g_last_lock_ok;
+
 /* One present. redraw_game is 0 while the guest is frozen — the texture
  * still holds the last frame, so re-presenting it costs nothing and keeps
  * the window repainting under the overlay. */
+/* Experimental upload paths, selected at runtime by GWED_UPLOAD_MODE.
+ *
+ * MEASURED on 2026-09-10, real Vulkan session: the guest->texture upload
+ * spikes are not the lock (0.26-2.07 ms) and not the pixel stores
+ * (fill 0.06-0.12 ms) -- they are SDL_UnlockTexture, the GPU handover, at
+ * 12-32 ms, often with the following swap elevated too. That says the
+ * transfer contends with the GPU, but not what to do about it, and this
+ * cannot be reproduced on the software path (uploads there are 0.47 ms).
+ *
+ * So rather than guess a fix and ship it, both candidate paths are here and
+ * switchable in one sitting:
+ *   lock    (default) one streaming texture, Lock/Unlock every frame
+ *   rotate  N streaming textures round-robin, so a transfer never lands on a
+ *           texture the GPU may still be reading from the previous frames
+ * The mode is written into the log header so a comparison cannot be made
+ * against the wrong build. */
+#define GAME_TEX_RING 3
+static SDL_Texture *g_tex_ring[GAME_TEX_RING];
+static int g_tex_ring_idx;
+/* 0 = lock (default), 1 = rotate, 2 = update */
+static int g_upload_mode = -1;
+
+static int game_upload_mode(void)
+{
+    if (g_upload_mode < 0) {
+        const char *m = getenv("GWED_UPLOAD_MODE");
+        if (m && strcmp(m, "rotate") == 0) {
+            g_upload_mode = 1;
+            GwedDiag_NoteEvent("upload mode: rotate (3 textures)");
+        } else if (m && strcmp(m, "update") == 0) {
+            g_upload_mode = 2;
+            GwedDiag_NoteEvent("upload mode: update (SDL_UpdateTexture)");
+        } else {
+            g_upload_mode = 0;
+            GwedDiag_NoteEvent("upload mode: lock (1 texture)");
+        }
+    }
+    return g_upload_mode;
+}
+
+static int game_upload_rotate(void) { return game_upload_mode() == 1; }
+
 static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
                          int redraw_game)
 {
-    SDL_Texture *texture = game_ensure_texture(renderer, *texture_slot);
+    SDL_Texture *texture;
+
+    if (game_upload_rotate()) {
+        /* Seed the ring from the texture the caller already owns, then hand
+         * out a different one each frame. Slot 0 IS the caller's texture, so
+         * ownership and teardown are unchanged.
+         *
+         * The ring advances only when there is a new frame to upload. A held
+         * frame (redraw_game == 0, the guest frozen behind a menu or the
+         * rewind UI) must re-present the slot that actually holds the last
+         * picture; advancing would show whatever is three frames stale. */
+        int i;
+        if (!g_tex_ring[0])
+            g_tex_ring[0] = *texture_slot;
+        if (redraw_game)
+            g_tex_ring_idx = (g_tex_ring_idx + 1) % GAME_TEX_RING;
+        i = g_tex_ring_idx;
+        if (!g_tex_ring[i]) {
+            int w = 0, h = 0;
+            if (g_tex_ring[0] &&
+                snesrecomp_sdl_get_texture_size(g_tex_ring[0], &w, &h) &&
+                w > 0 && h > 0) {
+                g_tex_ring[i] = SDL_CreateTexture(
+                    renderer, SDL_PIXELFORMAT_ARGB8888,
+                    SDL_TEXTUREACCESS_STREAMING, w, h);
+                if (g_tex_ring[i])
+                    SDL_SetTextureBlendMode(g_tex_ring[i], SDL_BLENDMODE_NONE);
+            }
+        }
+        if (!g_tex_ring[i]) {          /* allocation failed: stay on slot 0 */
+            g_tex_ring_idx = 0;
+            i = 0;
+        }
+        texture = game_ensure_texture(renderer, g_tex_ring[i]);
+        g_tex_ring[i] = texture;
+        if (i == 0)
+            *texture_slot = texture;
+        goto have_texture;
+    }
+    texture = game_ensure_texture(renderer, *texture_slot);
+have_texture:;
     SDL_Rect dst;
 
-    *texture_slot = texture;
+    if (!game_upload_rotate())
+        *texture_slot = texture;
     if (!texture)
         return;
     if (redraw_game) {
         void *pixels = NULL;
         int pitch = 0;
         const int width = GwedDisplay_GetCurrentFrameWidth();
+        /* Timed separately: this renders the guest frame and copies it into
+         * the streaming texture. It runs BEFORE the present timer starts, so
+         * a stall here (a lock that waits on the GPU still reading last
+         * frame's texture, a write-combined mapping behaving badly) used to be
+         * charged to emulation and was invisible. */
+        const Uint64 up_t0 = SDL_GetPerformanceCounter();
+        const double up_cpu0 = game_thread_cpu_ms();
+        /* The lock is timed on its own. SDL's streaming-texture lock is where
+         * a Vulkan/D3D backend makes you wait for the GPU to finish reading
+         * last frame's copy; the memcpy that follows is pure CPU into
+         * write-combined memory. Lumping them left "upload=34ms" ambiguous
+         * between "the GPU held us" (fix: rotate textures) and "the copy is
+         * slow" (fix: make the copy cheaper). */
+        Uint64 lock_t0 = 0, unlock_t0 = 0;
 
-        if (g_frame_blend) {
-            /* Blended path: draw and mix in ORDINARY MEMORY, then upload once.
-             *
-             * The mix is a read-modify-write and it used to read back out of
-             * the locked texture -- see g_frame_stage. Everything here touches
-             * cached memory; the only contact with the mapping is the linear,
+        if (g_frame_blend || g_flash_guard_limit > 0) {
+            /* Staged path: draw and mix in ORDINARY MEMORY, then upload once.
+             * The only contact with the texture mapping is the linear,
              * write-only copy at the end, which is the access pattern
              * write-combined memory is actually good at.
              *
-             * g_blend_prev still keeps the UNBLENDED frame, so the mix never
+             * The flash guard takes this path for the same measured reason
+             * the blend does -- both are read-modify-writes, and doing one in
+             * a locked streaming texture is fine on one driver and ruinous on
+             * the next. So enabling the guard alone is enough to stage, even
+             * with blending off.
+             *
+             * The shared blend keeps the UNBLENDED frame, so the mix never
              * feeds back on itself, and the PPU's own renderBuffer stays pure
-             * for thumbnails and captures. Same arithmetic as before. */
-            int y, x;
+             * for thumbnails and captures. */
+            int y;
             RtlDrawPpuFrame((uint8 *)g_frame_stage, (size_t)width * 4u, 0);
-            for (y = 0; y < GAME_HEIGHT; ++y) {
-                uint32_t *row = g_frame_stage + (size_t)y * width;
-                uint32_t *prev = g_blend_prev + (size_t)y * width;
-                for (x = 0; x < width; ++x) {
-                    uint32_t cur = row[x];
-                    if (g_blend_prev_valid)
-                        row[x] = (cur & prev[x]) +
-                                 (((cur ^ prev[x]) >> 1) & 0x7F7F7F7Fu);
-                    prev[x] = cur;
-                }
-            }
-            g_blend_prev_valid = 1;
+            if (g_frame_blend)
+                recomp_frame_blend_apply(g_blend, g_frame_stage, width,
+                                         GAME_HEIGHT, (size_t)width * 4u);
+            /* AFTER the blend, deliberately. The guard's contract is a cap on
+             * the step the DISPLAY shows, so it has to be the last thing to
+             * touch the frame -- measuring before the blend would cap a step
+             * that is not the one the player's eyes receive. It is also why
+             * it keeps its own copy of the presented frame rather than
+             * reusing the blend's, which holds the unblended one. */
+            recomp_flash_guard_apply(g_flash_guard, g_frame_stage, width,
+                                     GAME_HEIGHT, (size_t)width * 4u);
+            lock_t0 = SDL_GetPerformanceCounter();
             if (snesrecomp_sdl_lock_texture(texture, NULL, &pixels, &pitch)) {
+                g_last_lock_ms = game_perf_ms_since(lock_t0);
                 for (y = 0; y < GAME_HEIGHT; ++y)
                     memcpy((uint8 *)pixels + (size_t)y * pitch,
                            g_frame_stage + (size_t)y * width,
                            (size_t)width * 4u);
+                g_last_fill_ms = game_perf_ms_since(lock_t0) - g_last_lock_ms;
+                unlock_t0 = SDL_GetPerformanceCounter();
                 SDL_UnlockTexture(texture);
+                g_last_unlock_ms = game_perf_ms_since(unlock_t0);
             }
-        } else if (snesrecomp_sdl_lock_texture(texture, NULL, &pixels, &pitch)) {
+        } else if (game_upload_mode() == 2) {
+            /* UpdateTexture path. Lock/Unlock hands the caller a mapping of a
+             * GPU-owned staging buffer, which is precisely the resource the
+             * present queue holds hostage under vsync -- measured as 12-32 ms
+             * inside SDL_UnlockTexture. SDL_UpdateTexture takes ordinary
+             * memory instead and lets the backend choose when to stage it, so
+             * it is a different driver path for the same bytes. Costs one
+             * extra copy through g_frame_stage, which measures 0.06-0.12 ms.
+             * Whether that actually avoids the stall is a question for the
+             * A/B, not for reasoning: the last three mechanisms that survived
+             * reasoning here died on measurement. */
+            RtlDrawPpuFrame((uint8 *)g_frame_stage, (size_t)width * 4u, 0);
+            g_last_fill_ms = game_perf_ms_since(up_t0);
+            unlock_t0 = SDL_GetPerformanceCounter();
+            SDL_UpdateTexture(texture, NULL, g_frame_stage,
+                              (int)((size_t)width * 4u));
+            g_last_unlock_ms = game_perf_ms_since(unlock_t0);
+            g_last_lock_ms = 0.0;
+        } else if ((lock_t0 = SDL_GetPerformanceCounter(),
+                    g_last_lock_ok = snesrecomp_sdl_lock_texture(
+                        texture, NULL, &pixels, &pitch),
+                    g_last_lock_ms = game_perf_ms_since(lock_t0),
+                    g_last_lock_ok)) {
             /* Unblended: nothing reads the mapping, so the staging copy would
              * be pure overhead. RtlWidescreenPresent writes it linearly. */
             RtlDrawPpuFrame((uint8 *)pixels, (size_t)pitch, 0);
+            g_last_fill_ms = game_perf_ms_since(lock_t0) - g_last_lock_ms;
+            unlock_t0 = SDL_GetPerformanceCounter();
             SDL_UnlockTexture(texture);
+            g_last_unlock_ms = game_perf_ms_since(unlock_t0);
+        }
+        {
+            const Uint64 up_freq = SDL_GetPerformanceFrequency();
+            g_last_upload_ms = up_freq
+                ? (double)(SDL_GetPerformanceCounter() - up_t0) * 1000.0
+                  / (double)up_freq
+                : -1.0;
+            /* Same blocked-vs-spinning question as emulation. A streaming
+             * texture lock that waits for the GPU to finish reading last
+             * frame's copy burns no CPU; a slow memcpy burns all of it. The
+             * two have completely different fixes (rotate the texture vs make
+             * the copy cheaper), so the log has to tell them apart. */
+            if (up_cpu0 >= 0.0) {
+                const double c1 = game_thread_cpu_ms();
+                g_last_upload_cpu_ms = (c1 >= 0.0) ? c1 - up_cpu0 : -1.0;
+            } else {
+                g_last_upload_cpu_ms = -1.0;
+            }
         }
         /* Offer the composited frame as the next save's thumbnail. Must come
          * after RtlDrawPpuFrame — that is the call that fills renderBuffer. */
@@ -1806,15 +2626,28 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
     game_compute_present_rect(renderer, &dst);
     {
         /* Everything from here to SDL_RenderPresent returning is "put it on
-         * the screen": clear, blit, overlays, and whatever the compositor
-         * makes us wait for. Measured so the log can separate that from the
-         * emulation it is currently lumped in with. */
-        const Uint64 present_t0 = SDL_GetPerformanceCounter();
+         * the screen": clear, blit, overlays, and whatever the display
+         * pipeline makes us wait for.
+         *
+         * Each step is timed separately as well as together. One aggregate
+         * number covered six operations, so a spike inside it scoped to
+         * nothing -- and the split that decides where to look is `swap`
+         * (SDL_RenderPresent alone) against the rest: swap-heavy is the
+         * driver, the display pipeline or a swapchain rebuild, everything
+         * else is our drawing. The per-phase numbers are only PRINTED on a
+         * spike, so a healthy log is exactly as small as before. */
         const Uint64 present_freq = SDL_GetPerformanceFrequency();
+        const double to_ms = present_freq
+            ? 1000.0 / (double)present_freq : 0.0;
+        const Uint64 present_t0 = SDL_GetPerformanceCounter();
+        Uint64 t_a, t_b, t_c, t_d, t_e;
     SDL_RenderClear(renderer);
+        t_a = SDL_GetPerformanceCounter();
     snesrecomp_sdl_render_texture(renderer, texture, NULL, &dst);
+        t_b = SDL_GetPerformanceCounter();
     game_draw_overlay(renderer, &dst);
     game_draw_rewind(renderer, &dst);
+        t_c = SDL_GetPerformanceCounter();
     /* Host chrome, drawn last so nothing composites over it, and in window
      * space rather than the aspect-corrected game rect.
      *
@@ -1823,11 +2656,40 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
      * it, so counting them reported 60 no matter how fast the game was
      * actually running. It is ticked per RtlRunFrame instead. */
     snes_osd_draw_sdl(renderer);
+        t_d = SDL_GetPerformanceCounter();
     SDL_RenderPresent(renderer);
-        if (present_freq)
-            GwedDiag_NotePresentMs((double)(SDL_GetPerformanceCounter() -
-                                            present_t0) * 1000.0 /
-                                   (double)present_freq);
+        t_e = SDL_GetPerformanceCounter();
+        if (present_freq) {
+            /* Present-to-present: the interval the DISPLAY actually shows.
+             *
+             * The mod frame hook fires when the guest finishes a frame, not
+             * when a frame reaches the screen, and once the loop is paced
+             * those two stop agreeing. The guest runs at 60.0988 Hz against a
+             * 60.000 Hz display, so its frame boundary drifts inside the host
+             * iteration: the hook lands late in one iteration and early in the
+             * next. Measured, that reads as a 26 ms "spike" followed by a 6-7
+             * ms frame whose pair sums to exactly two display periods --
+             * 26.93+6.44, 26.46+7.06, 25.71+7.70 against 2 x 16.67 = 33.34.
+             * Nothing is lost and nothing is late; only the internal timestamp
+             * wobbles. Presents meanwhile leave every 16.67 ms.
+             *
+             * So hook-to-hook is the wrong metric for "what the player feels"
+             * and this is the right one. */
+            if (g_last_present_at) {
+                const double gap = (double)(t_e - g_last_present_at) * to_ms;
+                GwedDiag_NotePresentIntervalMs(gap);
+            }
+            g_last_present_at = t_e;
+            GwedDiag_NotePresentMs((double)(t_e - present_t0) * to_ms);
+            GwedDiag_NotePresentPhases(
+                g_last_upload_ms,
+                (double)(t_a - present_t0) * to_ms,   /* clear   */
+                (double)(t_b - t_a) * to_ms,          /* blit    */
+                (double)(t_c - t_b) * to_ms,          /* overlay + rewind */
+                (double)(t_d - t_c) * to_ms,          /* osd     */
+                (double)(t_e - t_d) * to_ms);         /* swap    */
+        }
+        g_last_upload_ms = -1.0;
     }
 }
 
@@ -1870,6 +2732,11 @@ static void game_rewind_loop(SDL_Renderer *renderer, SDL_Texture **texture,
                              int *running)
 {
     uint32_t prev_pad = 0;
+    /* Held-direction auto-repeat. Edge-triggered alone meant scrubbing back a
+     * couple of seconds was 20-odd separate taps, which is not a usable way to
+     * find a moment. */
+    uint32_t held_dir = 0;
+    Uint32 held_since = 0, last_repeat = 0;
 
     while (snes_rewind_is_open() && *running) {
         SDL_Event event;
@@ -1897,14 +2764,43 @@ static void game_rewind_loop(SDL_Renderer *renderer, SDL_Texture **texture,
         }
 
         /* Pad nav, edge-triggered: holding Left must not sprint through the
-         * whole ring in one frame. */
+         * whole ring in one frame.
+         *
+         * These four were all bound to the WRONG BITS. The comments said
+         * Left/Right/A/B; the constants were 5, 4, 3 and 11, which are
+         * Down, Up, Start and R. The runner's input word is
+         * B=0 Y=1 Select=2 Start=3 Up=4 Down=5 Left=6 Right=7 A=8 X=9 L=10
+         * R=11 (kGameControlBit above, and snes_overlay_draw.h). So the
+         * filmstrip -- which runs horizontally -- scrubbed on Up/Down, and
+         * Select/Back were Start and a shoulder button. Named constants now,
+         * so the next reader can see the binding rather than decode it. */
         pad = read_gamepad(0);
         {
             const uint32_t pressed = pad & ~prev_pad;
-            if (pressed & (1u << 5)) snes_rewind_step(-1);   /* Left  */
-            if (pressed & (1u << 4)) snes_rewind_step(+1);   /* Right */
-            if (pressed & (1u << 3)) snes_rewind_commit();   /* A     */
-            if (pressed & (1u << 11)) snes_rewind_close();   /* B     */
+            const uint32_t dir = pad & (SNES_PAD_LEFT | SNES_PAD_RIGHT);
+            const Uint32 now = SDL_GetTicks();
+
+            if (pressed & SNES_PAD_LEFT)  snes_rewind_step(-1);
+            if (pressed & SNES_PAD_RIGHT) snes_rewind_step(+1);
+            if (pressed & SNES_PAD_A)     snes_rewind_commit();
+            if (pressed & SNES_PAD_B)     snes_rewind_close();
+
+            /* Hold to keep scrubbing. The timer restarts whenever the held
+             * direction changes, so flicking Left->Right does not inherit the
+             * previous direction's repeat phase and run away. */
+            if (dir && dir != (SNES_PAD_LEFT | SNES_PAD_RIGHT)) {
+                if (dir != held_dir) {
+                    held_dir = dir;
+                    held_since = now;
+                    last_repeat = now;
+                } else if (now - held_since >= SNES_OVL_REPEAT_DELAY &&
+                           now - last_repeat >= SNES_OVL_REPEAT_RATE) {
+                    snes_rewind_step((dir & SNES_PAD_LEFT) ? -1 : +1);
+                    last_repeat = now;
+                }
+            } else {
+                held_dir = 0;
+            }
             prev_pad = pad;
         }
 
@@ -2259,6 +3155,14 @@ session_reboot:
      * at which the width may change. This also issues the PpuBeginDrawing that
      * points the PPU at g_render_pixels; RtlDrawPpuFrame re-issues it (with
      * the frame's policy) every frame. */
+#if defined(SNES_HAS_LOBBY_CLIENT)
+    /* Before BeginSession, because BeginSession is what decides the width and
+     * everything sized from it. The caps arrived with the launch result, long
+     * before the session itself starts further down. */
+    GwedDisplay_SetNetplayWsExtra(
+        (g_netplay_pending || g_netplay_active_session) ? g_netplay_caps_ws_extra
+                                                        : -1);
+#endif
     GwedDisplay_BeginSession((uint8_t *)g_render_pixels, sizeof(g_render_pixels),
                              kPpuRenderFlags_NewRenderer);
     /* Resolve and announce the execution policy before the first guest frame.
@@ -2346,13 +3250,10 @@ session_reboot:
      * one authority for each. Called before SDL_Init only because the keymap
      * has to exist before the first key event, not because it needs SDL.
      *
-     * The same two paths game_config_str() uses, so a build run from the
-     * repo root and one run from its build dir both find the file. */
-    {
-        FILE *probe = fopen("config.ini", "rb");
-        if (probe) { fclose(probe); ParseConfigFile("config.ini"); }
-        else        ParseConfigFile("../config.ini");
-    }
+     * The same file game_config_str() reads, so a build run from the repo root
+     * and one run from its build dir both find it — and, unlike before, both
+     * take every key from that one file. */
+    ParseConfigFile(game_config_path());
 
     /* snesrecomp_sdl_* wrap the SDL2/SDL3 API differences, so this host
      * builds against either backend (-DSNESRECOMP_SDL_BACKEND=SDL2|SDL3). */
@@ -2424,15 +3325,103 @@ session_reboot:
      * ratio is the DPI scale this process actually got, which decides whether
      * a slow frame is emulation or the output surface. */
     GwedDiag_NoteVideo(window, renderer, g_vsync);
+    /* Learn the display period for the pacer. Paced to the DISPLAY, not to the
+     * SNES's 60.0988 Hz: the swapchain is what we must not outrun, and the
+     * guest-vs-panel mismatch is precisely what fills the queue. */
+    {
+        double hz = 0.0;
+#if SNESRECOMP_SDL3
+        const SDL_DisplayMode *m =
+            SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window));
+        if (m) hz = m->refresh_rate;
+#else
+        SDL_DisplayMode m;
+        int idx = SDL_GetWindowDisplayIndex(window);
+        if (idx >= 0 && SDL_GetCurrentDisplayMode(idx, &m) == 0)
+            hz = (double)m.refresh_rate;
+#endif
+        /* Pace to whichever is SLOWER: the display, or the guest's own frame
+         * rate. Never the raw display period.
+         *
+         * A 120 Hz panel reports 8.333 ms, but the guest produces 60.0988 fps
+         * -- one frame per 16.6 ms. Pacing to 8.333 would put the deadline
+         * behind on every iteration, resync it to now, and sleep zero: the
+         * pacer would silently do nothing on every high-refresh display.
+         * Caught on a 120 Hz Windows machine, where it was invisible because
+         * that user runs vsync off and the 60 Hz limiter was carrying the
+         * pacing instead. Both my test machines are 60 Hz, where the display
+         * period and the frame budget happen to be the same number, so this
+         * could not show up here. */
+        if (hz > 20.0 && hz < 400.0) {
+            const double disp = 1000.0 / hz;
+            const double budget = 1000.0 / GAME_FPS;
+            g_pace_period_ms = (disp > budget) ? disp : budget;
+        }
+        if (game_pace_on()) {
+            /* 96 truncated the line: the format alone is 98 characters
+             * before a single number is substituted, so this diagnostic has
+             * been losing its tail -- the "the slower wins" that says which
+             * of the two rates was actually chosen. */
+            char msg[160];
+            snprintf(msg, sizeof(msg),
+                     "pacing: %.3f ms/frame (display %.3f Hz = %.3f ms, "
+                     "guest %.4f Hz = %.3f ms; the slower wins)",
+                     g_pace_period_ms, hz, hz > 0.0 ? 1000.0 / hz : 0.0,
+                     GAME_FPS, 1000.0 / GAME_FPS);
+            GwedDiag_NoteEvent(msg);
+        } else {
+            GwedDiag_NoteEvent("pacing: off (GWED_PACE=0, or display rate "
+                               "unknown)");
+        }
+    }
     /* Launcher Display checkbox lands here via the [Video] FrameBlend
      * write-back in run_gui_launcher, so this read is the single source of
      * truth for both the GUI and text-mode boot paths. */
+    /* Run-ahead. Own section, not [Video]: it changes when the guest runs,
+     * not how the result is drawn. 0 disables; 1 is the useful setting for
+     * most titles and 2 for the few that buffer input harder. Offline only --
+     * snes_runahead_run_frame refuses during netplay regardless of this. */
+    snes_runahead_set_frames(game_config_int("[Emulation]", "RunAhead", 0));
+    /* Env wins, for a one-off comparison without editing the file. */
+    snes_runahead_configure();
+
     g_frame_blend = game_config_int("[Video]", "FrameBlend",
                                     GWED_FRAME_BLEND_DEFAULT) != 0;
-    g_blend_prev_valid = 0;   /* never blend across a session reboot */
+    if (g_frame_blend && !g_blend) g_blend = recomp_frame_blend_create();
+    if (g_frame_blend && !g_blend) {
+        /* Out of memory for one 224-row frame. Say so and present unblended
+         * rather than silently leaving a checkbox on that does nothing. */
+        fprintf(stderr, "[video] frame blending unavailable (out of memory)\n");
+        g_frame_blend = 0;
+    }
+    recomp_frame_blend_reset(g_blend);  /* never blend across a session reboot */
     if (g_frame_blend)
         fprintf(stderr,
                 "[video] frame blending on (config.ini [Video] FrameBlend)\n");
+
+    /* Flash reduction. Read AFTER snes_mod_runtime_activate_plugins_c above,
+     * because the strength is resolved by the package's activation plugin;
+     * reading it earlier reports 0 on every launch, which is the mistake the
+     * widescreen lobby caps made and had to be split into a "selected" query
+     * to fix. A rematch re-enters at session_reboot and re-reads it here, so
+     * a player who changed the setting between matches gets the new one. */
+    g_flash_guard_limit = GwedFlashGuard_Limit();
+    if (g_flash_guard_limit > 0 && !g_flash_guard)
+        g_flash_guard = recomp_flash_guard_create();
+    if (g_flash_guard_limit > 0 && !g_flash_guard) {
+        /* Out of memory for one 224-row frame. Say so loudly rather than
+         * leaving a player who switched this on to discover at the end of a
+         * fight that it never ran. */
+        fprintf(stderr, "[video] flash reduction UNAVAILABLE (out of memory) "
+                        "-- the game will strobe\n");
+        g_flash_guard_limit = 0;
+    }
+    recomp_flash_guard_set_limit(g_flash_guard, g_flash_guard_limit);
+    recomp_flash_guard_reset(g_flash_guard);  /* never mix across a reboot */
+    if (g_flash_guard_limit > 0)
+        fprintf(stderr, "[video] flash reduction on, step limit %d/255 "
+                        "(mod gwed.accessibility.flashguard)\n",
+                g_flash_guard_limit);
     texture = renderer
         ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                             SDL_TEXTUREACCESS_STREAMING,
@@ -2473,6 +3462,62 @@ session_reboot:
         uint32 inputs;
         int savestate_menu_hotkey = 0;
         int rewind_hotkey = 0;
+        /* Wall and CPU for the whole iteration, measured TOP TO TOP.
+         *
+         * Bracketing top-to-bottom missed any iteration that left through one
+         * of the loop's `continue` paths (the frozen-guest path, and the
+         * netplay admit path) -- those never reached the report, so their time
+         * vanished. That produced the contradiction of a 77 ms frame whose two
+         * reported iterations were both a perfect 16.66 ms and whose frame
+         * counter showed no gap: the missing iterations were simply never
+         * measured. Reporting the PREVIOUS iteration's full span at the top of
+         * this one covers every exit path there is.
+         *
+         * The per-phase timers left ~15 ms of every 16.6 ms frame
+         * unattributed, and a 3.1 s stall showed up as `other=3125.15` with
+         * every measured phase near zero. `other` was computed by subtraction,
+         * so it could only ever say "not here" -- it could not say where. With
+         * the iteration bracketed, a gap is either INSIDE the loop body (and
+         * bounded by these two) or between iterations, and the CPU time says
+         * whether the loop was working or waiting. */
+        {
+            const Uint64 top_now = SDL_GetPerformanceCounter();
+            const double top_cpu = game_thread_cpu_ms();
+            if (g_iter_top_prev) {
+                const Uint64 f = SDL_GetPerformanceFrequency();
+                const double span = f
+                    ? (double)(top_now - g_iter_top_prev) * 1000.0 / (double)f
+                    : -1.0;
+                const double cpu = (top_cpu >= 0.0 && g_iter_cpu_prev >= 0.0)
+                    ? top_cpu - g_iter_cpu_prev : -1.0;
+                GwedDiag_NoteIterationMs(span, cpu);
+                /* Report a long iteration HERE, not via the spike autopsy.
+                 *
+                 * An iteration's span is only known at the top of the NEXT
+                 * one, so what the autopsy prints as `iter` is really the
+                 * previous iteration and the one containing the spike is never
+                 * measured. That is why seven ~26 ms frames all showed two
+                 * perfect 16.67 ms iterations: the long one was neither of the
+                 * two being printed. Logging it as it is discovered removes
+                 * the off-by-one entirely -- and it fires whether or not any
+                 * frame crossed the spike threshold. */
+                /* Threshold off the EFFECTIVE period, not the display's.
+                 * Keyed to the raw display period this fired on every single
+                 * frame of a 120 Hz session -- 8.333 + 6 = 14.3 ms against
+                 * 16.6 ms iterations -- and buried the log it was meant to
+                 * clarify under one line per frame. Falls back to the guest
+                 * budget when pacing is off, so the check still works with
+                 * vsync disabled. */
+                {
+                    const double base = (g_pace_period_ms > 0.0)
+                        ? g_pace_period_ms : (1000.0 / GAME_FPS);
+                    if (span > 0.0 && span > base + 6.0)
+                        GwedDiag_NoteLongIteration(span, cpu);
+                }
+            }
+            g_iter_top_prev = top_now;
+            g_iter_cpu_prev = top_cpu;
+        }
 
         /* --exit-at-frame: leave through the normal shutdown path (audio
          * device, guest machine, SDL) with status 0, after the frame that
@@ -2484,7 +3529,18 @@ session_reboot:
             break;
         }
 
+        Uint64 pump_t0 = SDL_GetPerformanceCounter();
         while (SDL_PollEvent(&event)) {
+            /* Window state changes, logged so a spike can be correlated
+             * against them instead of guessed at. The reason this is here and
+             * not left to platform intuition: a stall inside the swap reads as
+             * "the compositor" on X11 and "the driver" on Windows, and neither
+             * is actionable or checkable. If the same event precedes the spike
+             * on both platforms, it is ours. Occlusion and display changes in
+             * particular are invisible to a player who never left the window.
+             * SDL2 spellings throughout — sdl_compat.h defines
+             * SDL_ENABLE_OLD_NAMES for SDL3. */
+            game_diag_note_window_event(&event);
             /* SDL2 spellings: sdl_compat.h defines SDL_ENABLE_OLD_NAMES for
              * SDL3, so these compile against either backend. The SDL3-only
              * names (SDL_EVENT_QUIT, ...) do not. */
@@ -2578,6 +3634,20 @@ session_reboot:
                 game_open_pads();
             }
         }
+        g_last_pump_ms = game_perf_ms_since(pump_t0);
+        /* Everything from here to RtlRunFrame: input reads, the savestate-menu
+         * and rewind gesture checks. Timed because this is where the last
+         * unexplained spikes must be.
+         *
+         * Both loop iterations around such a spike measure a perfect 16.67 ms
+         * while the frame-hook interval stretches to ~26 ms. That is only
+         * possible if work BEFORE the hook grew by ~9.4 ms: the pacer then
+         * sleeps 9.4 ms less to hold the iteration at one display period, so
+         * the iteration total hides the growth and only the frame interval
+         * shows it. The pump is already measured and is tiny, which leaves
+         * this region -- and read_gamepad() talks to a DualSense on
+         * /dev/hidraw, where a read can block. */
+        g_head_t0 = SDL_GetPerformanceCounter();
 
 #if defined(SNES_HAS_LOBBY_CLIENT)
         /* Netplay session: the delay-sync admit pump owns the frame cadence.
@@ -2706,23 +3776,75 @@ session_reboot:
                 fast_forward ? game_fast_forward_frames() : 1;
             int ffi;
 
+            g_last_head_ms = game_perf_ms_since(g_head_t0);
             RtlAudioSetFastForward(fast_forward != 0);
             /* Tell the overlay, so the readout is labelled with why it is
              * reading several hundred rather than sixty. */
             snes_osd_set_turbo(fast_forward != 0);
             for (ffi = 0; ffi < frames_this_iter; ffi++) {
-                RtlRunFrame(inputs);
+                const Uint64 emu_t0 = SDL_GetPerformanceCounter();
+                const double emu_cpu0 = game_thread_cpu_ms();
+                /* Run-ahead owns the whole frame when it is on: it advances
+                 * the guest once and speculates N further, so calling
+                 * RtlRunFrame as well would double-advance. It declines
+                 * (returns 0) during netplay and whenever the machine cannot
+                 * snapshot, which is why this is a fallback rather than a
+                 * branch. Never during fast-forward: speculating about frames
+                 * that are already being skipped costs work for a picture
+                 * nobody is reading. */
+                if (fast_forward || !snes_runahead_run_frame(inputs))
+                    RtlRunFrame(inputs);
+                g_last_emulate_ms += game_perf_ms_since(emu_t0);
+                if (emu_cpu0 >= 0.0) {
+                    const double c1 = game_thread_cpu_ms();
+                    if (c1 >= 0.0) g_last_emulate_cpu_ms += c1 - emu_cpu0;
+                }
                 snes_osd_note_frame();     /* one EMULATED frame */
                 snes_rewind_note_frame();  /* ...which rewind also counts */
             }
         }
         game_present(renderer, &texture, 1);
-        if (!g_vsync)
+        if (!g_vsync) {
+            const Uint64 lim_t0 = SDL_GetPerformanceCounter();
             game_frame_limit();
+            g_last_limit_ms = game_perf_ms_since(lim_t0);
+        } else {
+            const double paced = game_pace_to_display();
+            if (paced >= 0.0) {
+                g_last_limit_ms = paced;   /* reported as `limiter` */
+                GwedDiag_NotePaceMs(g_last_pace_want_ms, g_last_pace_slept_ms);
+            }
+        }
+        /* Every millisecond of the iteration is now attributed: emulate,
+         * upload, the five present phases, and the limiter wait. Whatever the
+         * frame line still has left over is the event pump and loop overhead,
+         * which the autopsy reports as `other`. */
+        GwedDiag_NoteLoopPhases(g_last_emulate_ms, g_last_pump_ms,
+                                g_last_limit_ms);
+        GwedDiag_NoteInputHeadMs(g_last_head_ms);
+        g_last_head_ms = -1.0;
+        GwedDiag_NoteEmulateCpuMs(g_last_emulate_cpu_ms);
+        GwedDiag_NoteUploadCpuMs(g_last_upload_cpu_ms);
+        GwedDiag_NoteTextureLockMs(g_last_lock_ms);
+        GwedDiag_NoteTextureFillUnlockMs(g_last_fill_ms, g_last_unlock_ms);
+        g_last_fill_ms = -1.0;
+        g_last_unlock_ms = -1.0;
+        g_last_upload_cpu_ms = -1.0;
+        g_last_lock_ms = -1.0;
+        g_last_emulate_cpu_ms = 0.0;
+        g_last_emulate_ms = 0.0;
+        g_last_pump_ms = 0.0;
+        g_last_limit_ms = -1.0;
     }
 
     RtlAudioSetFastForward(0);
     game_close_pads();
+    {
+        int i;
+        for (i = 1; i < GAME_TEX_RING; i++)   /* slot 0 is the caller's */
+            if (g_tex_ring[i]) { SDL_DestroyTexture(g_tex_ring[i]);
+                                 g_tex_ring[i] = NULL; }
+    }
     if (g_overlay_tex) {
         SDL_DestroyTexture(g_overlay_tex);
         g_overlay_tex = NULL;
@@ -2768,7 +3890,30 @@ session_reboot:
         int lr;
 
         snes_netplay_shutdown();
-        snes_host_app_begin_soft_return(NULL, 0);
+        /* Answered. Cleared HERE, above the branch, rather than inside one of
+         * the paths below: the request has been honoured either way, and a
+         * branch that forgets it latches "return to the lobby" across the
+         * reboot -- the next session then breaks out of its own frame loop
+         * before drawing anything, which looks like a launch failure and not
+         * like a stale flag. begin_soft_return clears it too; setting zero
+         * twice costs nothing and neither call can be the only one. */
+        snes_netplay_clear_return_to_lobby();
+        /* ...unless the room was AUTOMATCH's, in which case there is no party
+         * to stay together with.
+         *
+         * A hosted room belongs to somebody and outlives the match, so staying
+         * seated is how a rematch happens. An automatch room is created by the
+         * server at both-accept, is not joinable by anyone, and has no host to
+         * rematch against -- holding a seat in it parks the player in a room
+         * that can never fill, and the server then refuses their next ticket
+         * with `already_in_lobby`, which reads as "automatch stopped finding
+         * matches". Leave it, and come back to the lobby LIST. */
+        if (snes_lobby_automatch_room()) {
+            snes_host_lobby_leave();
+            g_netplay_return_to_list = 1;
+        } else {
+            snes_host_app_begin_soft_return(NULL, 0);
+        }
         g_netplay_from_lobby = 0;
         g_netplay_pending = 0;
 

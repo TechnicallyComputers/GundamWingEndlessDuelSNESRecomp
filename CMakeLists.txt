@@ -133,6 +133,7 @@ add_executable(GundamWingEndlessDuelSNESRecomp
     src/gwed_ws_patch.c
     src/translation_mod.c
     src/widescreen_mod.c
+    src/flashguard_mod.c
     src/diagnostics_mod.c
     src/gen_stubs.c
 )

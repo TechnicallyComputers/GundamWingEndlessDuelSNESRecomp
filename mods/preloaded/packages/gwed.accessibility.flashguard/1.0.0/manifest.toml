@@ -1,0 +1,64 @@
+format_version = 1
+id = "gwed.accessibility.flashguard"
+version = "1.0.0"
+name = "Gundam Wing Endless Duel Flash Reduction"
+author = "mstan"
+description = "Dulls the full-screen strobing the game uses for finishers and round ends, for players with photosensitive epilepsy, migraine or vestibular sensitivity. Measured on the end-of-fight flash, the backdrop alternates flat blue and near-white across the whole screen at 15 Hz -- a frame-to-frame swing of 173/255, about 68% of the range, at the frequency where photosensitive risk is highest. This caps how far the presented picture may move in one frame, which takes that swing to 13/255 and the number of flashes crossing the WCAG 2.3.1 threshold from nineteen to none, while a scene cut still cuts rather than fades. It filters the finished frame on its way to the screen and nothing else: no CPU, WRAM, VRAM, OAM, CGRAM, APU or save state, so a session with this on executes the identical guest frames as one without. It is also declared presentation-only, so where a match's host or a matchmaking ruleset lists it as approved, netplay does not require the other player to have it -- turn it on and play. That approval comes from the server or the host, never from this mod's own say-so, because a manifest cannot be allowed to exempt itself from the checks that keep two players simulating the same game."
+license = "MIT"
+resolver = "declarative"
+save_compatibility = "shared"
+
+[[target]]
+game_id = "gwed-jp"
+rom_sha256 = "dd94308d822636c6ddf73c5e2644c84f2eb8fb4d9201150fc5f37d44d6f423f1"
+
+[[feature]]
+id = "flash_guard"
+name = "Reduce flashing"
+description = "Cap how much the picture may change from one frame to the next, so full-screen flashes are dulled instead of strobing. Frames that are already changing slowly -- which is nearly all of ordinary play -- are shown exactly as drawn."
+group = "Accessibility"
+# Opt-in, like every other package here: it changes what the player sees, and
+# that should be a decision someone made. The argument for defaulting it ON is
+# real -- a player who needs this may well have stopped playing before finding
+# the Mods page -- but it is a call for the owner to make, not for this file.
+default_enabled = false
+# Presentation only: this filters the presented framebuffer and touches no
+# guest state whatsoever, so it CAN be excluded from the mod set two netplay
+# peers compare, letting either of them run it alone. That is the whole point
+# -- a photosensitive player does not choose their opponent, and a filter that
+# needed the other side's agreement would be unavailable in exactly the
+# matches it matters for.
+#
+# But this line is only the REQUEST. A cheat author writes manifests too, so
+# the exemption is granted by the match's authority -- the automatch ruleset
+# the server published, or the lobby host -- naming this package on its
+# cosmetic allowlist, ideally pinned to the package's content digest. Where
+# nothing grants it, this feature is treated as an ordinary simulation mod and
+# must match like any other. See Feature::presentation_only and
+# cosmetic_allowed in snesrecomp/runner/src/mod_runtime.cpp.
+presentation_only = true
+
+[[option]]
+feature = "flash_guard"
+id = "strength"
+label = "Strength"
+description = "How far the picture may move in a single frame. A strobe's remaining visible swing is about twice this, so Standard leaves roughly a 9% swing where the raw effect is 68%."
+group = "Accessibility"
+type = "choice"
+default = "standard"
+
+[[option.choice]]
+value = "mild"
+label = "Mild (keeps more punch)"
+
+[[option.choice]]
+value = "standard"
+label = "Standard (within WCAG guidance)"
+
+[[option.choice]]
+value = "maximum"
+label = "Maximum (flattest)"
+
+[[plugin]]
+feature = "flash_guard"
+id = "gwed.flashguard"

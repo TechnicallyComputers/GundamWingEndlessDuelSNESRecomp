@@ -44,4 +44,118 @@ void GwedDiag_NoteVideo(struct SDL_Window *window,
  */
 void GwedDiag_NotePresentMs(double ms);
 
+/*
+ * The breakdown inside that present, in milliseconds.
+ *
+ * `present=` alone was one number covering six operations -- clear, blit,
+ * overlay, rewind filmstrip, OSD chrome, and the swap -- plus the guest
+ * texture upload, which happens BEFORE the present timer starts and so was
+ * being charged to emulation. A 50 ms spike in that number scoped to nothing.
+ *
+ * The split that matters is `swap` (SDL_RenderPresent alone) against
+ * everything else: work in swap belongs to the driver, the display pipeline
+ * or a swapchain rebuild, and work outside it is ours. Reported only on a
+ * spike line and in the per-second summary, so a healthy log does not grow.
+ *
+ * Pass -1 for any phase that did not run this iteration.
+ */
+void GwedDiag_NotePresentPhases(double upload_ms, double clear_ms,
+                                double blit_ms, double overlay_ms,
+                                double osd_ms, double swap_ms);
+
+/*
+ * A host-loop event worth correlating against a spike: a window state change
+ * (resize, pixel-size change, display change, occlusion, focus), a texture or
+ * renderer rebuild, a vsync change.
+ *
+ * The reason this exists rather than a platform guess: a spike that lands
+ * inside the swap looks like "the compositor" on X11 and like "the driver" on
+ * Windows, and neither is actionable. If the same event precedes the spike on
+ * both, it is ours. Text is copied, so callers may pass a stack buffer.
+ * Logged immediately with a timestamp, and the most recent one is echoed on
+ * the next spike line so cause and effect sit together.
+ */
+void GwedDiag_NoteEvent(const char *what);
+
+/*
+ * The rest of the host iteration: emulation, the SDL event pump, and the
+ * frame limiter's wait (-1 when vsync paces instead).
+ *
+ * With this and the present phases, every millisecond of a frame is
+ * attributed. The spike autopsy needs that: a stall that is NOT in the swap
+ * and NOT in our drawing was previously an unexplained remainder, and the two
+ * spikes in the 2026-09-10 report were one of each kind.
+ *
+ * Emulation is a SUM, not a single call -- a fast-forward iteration runs
+ * several guest frames inside one present.
+ */
+void GwedDiag_NoteLoopPhases(double emulate_ms, double pump_ms,
+                             double limit_ms);
+
+/*
+ * Thread CPU time burned inside emulation this iteration, against the wall
+ * time already reported by NoteLoopPhases.
+ *
+ * This is the discriminator a stalled frame actually needs. A 72 ms frame
+ * whose emulation burned 72 ms of CPU is host code doing too much work; a
+ * 72 ms frame that burned 2 ms is BLOCKED -- a page fault, an allocation that
+ * reached the kernel, a lock, a blocking write -- and the two need entirely
+ * different hunts. Measured on Linux with CLOCK_THREAD_CPUTIME_ID and on
+ * Windows with GetThreadTimes, so it reads the same on both platforms the
+ * bug is reported on.
+ */
+void GwedDiag_NoteEmulateCpuMs(double cpu_ms);
+
+/* Same discrimination for the guest->texture upload: a streaming-texture lock
+ * that waits on the GPU burns no CPU, a slow copy burns all of it, and they
+ * need different fixes. */
+void GwedDiag_NoteUploadCpuMs(double cpu_ms);
+
+/* SDL_LockTexture alone. On a GPU backend this is where the frame waits for
+ * the GPU to release the streaming texture it is still reading; the copy that
+ * follows is CPU. Splitting them is what decides between rotating the texture
+ * and making the copy cheaper. */
+void GwedDiag_NoteTextureLockMs(double ms);
+
+/* The two halves of what used to be reported as `copy`: writing the pixels
+ * into the mapped texture, and SDL_UnlockTexture -- which on a GPU backend is
+ * where the staging buffer is handed to the GPU and where a transfer can
+ * block. Measured separately because they have different fixes. */
+void GwedDiag_NoteTextureFillUnlockMs(double fill_ms, double unlock_ms);
+
+/* Wall and thread-CPU for the whole host loop iteration.
+ *
+ * `other` in the autopsy is a subtraction, so it can only say the time was not
+ * in any measured phase. This bounds it: time missing from a frame is either
+ * inside the loop body (iter_ms covers it) or between iterations (it does
+ * not), and iter_cpu says whether the loop was working or waiting. Pass -1
+ * for cpu where thread CPU time is unavailable. */
+void GwedDiag_NoteIterationMs(double iter_ms, double iter_cpu_ms);
+
+/* What the display pacer asked to sleep, and what it actually slept.
+ *
+ * A pacer that overshoots manufactures the hitch it exists to remove, and the
+ * two are only distinguishable if both are recorded. Also lets the spike
+ * verdict stop naming the deliberate wait: once pacing is on, `limiter` is the
+ * largest bucket in almost every frame, so "largest bucket" would say LIMITER
+ * for every spike whatever the real cause. */
+void GwedDiag_NotePaceMs(double want_ms, double slept_ms);
+
+/* Input reads plus the savestate/rewind gesture checks -- everything between
+ * the event pump and RtlRunFrame. The pacer hides growth here inside the
+ * iteration total, so it is only visible as a stretched frame interval. */
+void GwedDiag_NoteInputHeadMs(double head_ms);
+
+/* A host loop iteration that ran well over one display period, reported when
+ * it is discovered rather than through the spike autopsy -- an iteration's
+ * span is only known at the top of the NEXT one, so the autopsy's `iter` is
+ * always the previous iteration and never the guilty one. */
+void GwedDiag_NoteLongIteration(double wall_ms, double cpu_ms);
+
+/* Interval between consecutive presents -- the cadence the display actually
+ * shows, and the honest answer to "what does the player feel". The frame hook
+ * measures guest frame boundaries, which drift inside the host iteration once
+ * the loop is paced; presents do not. */
+void GwedDiag_NotePresentIntervalMs(double gap_ms);
+
 #endif /* GWED_DIAGNOSTICS_MOD_H */

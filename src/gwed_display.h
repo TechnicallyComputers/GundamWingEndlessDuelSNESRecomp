@@ -53,6 +53,10 @@ typedef enum GwedWsScreen {
 
 /* ── Activation (called by the Mods plugin, never by config-file code) ───── */
 void GwedDisplay_SetWidescreenEnabled(bool enabled);
+/* Pin the session margin to a value negotiated over the lobby, in place of
+ * the one this window's aspect would give. -1 clears. See the definition:
+ * it is what lets two peers on different monitors run the same geometry. */
+void GwedDisplay_SetNetplayWsExtra(int extra);
 bool GwedDisplay_IsWidescreenEnabled(void);
 /* Whether the Mods-page selection will turn widescreen on for the NEXT
  * session. Read straight from the mod runtime (src/widescreen_mod.c), so it is
