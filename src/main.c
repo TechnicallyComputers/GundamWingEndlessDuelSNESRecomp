@@ -918,6 +918,31 @@ static RecompFrameBlend *g_blend;
  */
 static uint32_t g_frame_stage[GAME_MAX_WIDTH * GAME_HEIGHT];
 
+/* ── Linear filtering ─────────────────────────────────────────────────────
+ *
+ * Smooth the game image when it is scaled up, or keep hard pixels.
+ *
+ * OFF by default, and it has to be applied EXPLICITLY rather than left to the
+ * backend, because SDL3 creates every texture as SDL_SCALEMODE_LINEAR. SDL2's
+ * hint defaulted to nearest, so a host that never said anything got hard
+ * pixels there and smoothed ones here -- and this one never said anything, so
+ * the Display checkbox drew a state it did not cause. Unchecked meant linear
+ * just the same.
+ *
+ * Every texture carrying guest pixels goes through game_apply_texture_filter,
+ * including the ones rebuilt mid-session on a widescreen width change: a
+ * scale mode set once at boot is lost with the texture it was set on.
+ *
+ * Persisted as [Video] LinearFilter. */
+#define GWED_LINEAR_FILTER_DEFAULT 0
+static int g_linear_filter = GWED_LINEAR_FILTER_DEFAULT;
+
+static void game_apply_texture_filter(SDL_Texture *texture)
+{
+    if (texture)
+        snesrecomp_sdl_set_texture_linear(texture, g_linear_filter != 0);
+}
+
 /* ── Flash reduction (photosensitivity) ───────────────────────────────────
  *
  * GAME POLICY ONLY, on the same split as frame blending above: the filter --
@@ -1845,6 +1870,7 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     int lr;
     int fb_seed;
     int ra_seed;
+    int lf_seed;
     int fs_seed, rend_seed;
     int vs_seed;
 
@@ -1937,6 +1963,12 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
      * checkbox reading it as "on" and writing 1 the next time it is touched.
      * Clamped here as well as in the model, because this seed is also what
      * the untouched-run comparison below is made against. */
+    /* Seeded like the other Display boxes. Without this the checkbox came up
+     * at whatever zero-init gave it, which is also what it reported back --
+     * so a player who turned it off saw it on again next launch. */
+    lf_seed = game_config_int("[Video]", "LinearFilter",
+                              GWED_LINEAR_FILTER_DEFAULT) ? 1 : 0;
+    ls.linear_filter = lf_seed;
     ra_seed = game_config_int("[Emulation]", "RunAhead", 0);
     if (ra_seed < 0) ra_seed = 0;
     if (ra_seed > RECOMP_LAUNCHER_RUN_AHEAD_MAX)
@@ -2051,6 +2083,10 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && ls.frame_blend != fb_seed)
         launcher_ini_kv_write(game_config_path(), "Video", "FrameBlend",
                               ls.frame_blend ? "1" : "0");
+    if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH &&
+        (ls.linear_filter ? 1 : 0) != lf_seed)
+        launcher_ini_kv_write(game_config_path(), "Video", "LinearFilter",
+                              ls.linear_filter ? "1" : "0");
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && ls.run_ahead != ra_seed) {
         char val[16];
         snprintf(val, sizeof(val), "%d", ls.run_ahead);
@@ -2282,8 +2318,12 @@ static SDL_Texture *game_ensure_texture(SDL_Renderer *renderer,
     SDL_DestroyTexture(texture);
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                                 SDL_TEXTUREACCESS_STREAMING, want, GAME_HEIGHT);
-    if (texture)
+    if (texture) {
         SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
+        /* The rebuild path matters as much as the first creation: a width
+         * change destroys the texture, and with it the scale mode. */
+        game_apply_texture_filter(texture);
+    }
     else
         fprintf(stderr, "SDL: %dx%d texture allocation failed: %s\n",
                 want, GAME_HEIGHT, SDL_GetError());
@@ -2482,8 +2522,10 @@ static void game_present(SDL_Renderer *renderer, SDL_Texture **texture_slot,
                 g_tex_ring[i] = SDL_CreateTexture(
                     renderer, SDL_PIXELFORMAT_ARGB8888,
                     SDL_TEXTUREACCESS_STREAMING, w, h);
-                if (g_tex_ring[i])
+                if (g_tex_ring[i]) {
                     SDL_SetTextureBlendMode(g_tex_ring[i], SDL_BLENDMODE_NONE);
+                    game_apply_texture_filter(g_tex_ring[i]);
+                }
             }
         }
         if (!g_tex_ring[i]) {          /* allocation failed: stay on slot 0 */
@@ -2711,6 +2753,10 @@ static void game_draw_rewind(SDL_Renderer *renderer, const SDL_Rect *dst)
         if (!g_rewind_tex)
             return;
         SDL_SetTextureBlendMode(g_rewind_tex, SDL_BLENDMODE_BLEND);
+        /* The filmstrip is guest pixels scaled like any other, so it follows
+         * the same setting -- a rewind preview that smooths while the game
+         * beneath it does not would read as a different game. */
+        game_apply_texture_filter(g_rewind_tex);
     }
     SDL_UpdateTexture(g_rewind_tex, NULL, px, w * 4);
     /* Bottom third of the game rect, so it annotates the frame it belongs to
@@ -3422,11 +3468,18 @@ session_reboot:
         fprintf(stderr, "[video] flash reduction on, step limit %d/255 "
                         "(mod gwed.accessibility.flashguard)\n",
                 g_flash_guard_limit);
+    /* Read before the first texture exists, because the scale mode is set on
+     * a texture and not on the renderer. */
+    g_linear_filter = game_config_int("[Video]", "LinearFilter",
+                                      GWED_LINEAR_FILTER_DEFAULT) != 0;
+    fprintf(stderr, "[video] linear filtering %s (config.ini [Video] "
+                    "LinearFilter)\n", g_linear_filter ? "on" : "off");
     texture = renderer
         ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                             SDL_TEXTUREACCESS_STREAMING,
                             GwedDisplay_GetCurrentFrameWidth(), GAME_HEIGHT)
         : NULL;
+    game_apply_texture_filter(texture);
     if (!window || !renderer || !texture) {
         fprintf(stderr, "SDL setup failed: %s\n", SDL_GetError());
         return 1;
