@@ -108,6 +108,10 @@ static int g_netplay_from_lobby; /* admit pump waits for the lobby peer */
  * Only the P8 sprite-bounds ROM patch consults it — the wide presentation
  * itself needs no agreement (see GwedFillMatchCaps). */
 static int g_netplay_caps_ws_extra = -1;
+/* Reopen the launcher on the netplay LIST rather than the dashboard: set when
+ * a match ended in a room we then left (automatch), where the player's next
+ * action is finding another game and not looking at box art. */
+static int g_netplay_return_to_list;
 /* 1 once snes_netplay_start has succeeded for this session. Distinguishes
  * "a peer is simulating alongside us" from "offline", which is the only
  * thing the P8 patch's agreement gate needs to know. */
@@ -1816,6 +1820,13 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     gi.netplay_supported = 1;
     host_lobby_ensure_init();
     gi.netplay = snes_host_lobby_callbacks();
+    /* Land on Netplay after a match we left. Not seated any more, so the
+     * launcher draws the lobby list rather than a room. Consumed here so a
+     * later ordinary open is unaffected. */
+    if (g_netplay_return_to_list) {
+        gi.resume_netplay_room = 1;
+        g_netplay_return_to_list = 0;
+    }
 #endif
 
     /* Generate & rebuild: the launcher's first-run wizard takes the player's
@@ -3659,7 +3670,30 @@ session_reboot:
         int lr;
 
         snes_netplay_shutdown();
-        snes_host_app_begin_soft_return(NULL, 0);
+        /* Answered. Cleared HERE, above the branch, rather than inside one of
+         * the paths below: the request has been honoured either way, and a
+         * branch that forgets it latches "return to the lobby" across the
+         * reboot -- the next session then breaks out of its own frame loop
+         * before drawing anything, which looks like a launch failure and not
+         * like a stale flag. begin_soft_return clears it too; setting zero
+         * twice costs nothing and neither call can be the only one. */
+        snes_netplay_clear_return_to_lobby();
+        /* ...unless the room was AUTOMATCH's, in which case there is no party
+         * to stay together with.
+         *
+         * A hosted room belongs to somebody and outlives the match, so staying
+         * seated is how a rematch happens. An automatch room is created by the
+         * server at both-accept, is not joinable by anyone, and has no host to
+         * rematch against -- holding a seat in it parks the player in a room
+         * that can never fill, and the server then refuses their next ticket
+         * with `already_in_lobby`, which reads as "automatch stopped finding
+         * matches". Leave it, and come back to the lobby LIST. */
+        if (snes_lobby_automatch_room()) {
+            snes_host_lobby_leave();
+            g_netplay_return_to_list = 1;
+        } else {
+            snes_host_app_begin_soft_return(NULL, 0);
+        }
         g_netplay_from_lobby = 0;
         g_netplay_pending = 0;
 
