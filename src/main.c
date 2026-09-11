@@ -43,6 +43,8 @@
 #include "snes_runahead.h"       /* offline input-latency reduction */
 #include "snes_overlay_draw.h"   /* SNES_PAD_* input word bits */
 #include "recomp_frame_blend.h"   /* shared presentation blend (all titles) */
+#include "recomp_flash_guard.h"   /* shared photosensitivity filter (all titles) */
+#include "flashguard_mod.h"       /* this title's Mods-page switch for it */
 #include <time.h>
 #if defined(_WIN32)
 /* For GetThreadTimes in game_thread_cpu_ms: MinGW defines _WIN32, so that
@@ -253,23 +255,106 @@ static int gwed_mod_set_equal(const char *a, const char *b)
 /* Which package the two sets disagree about, in words a player can act on.
  * Reports the FIRST difference rather than all of them: a queue mismatch is
  * fixed one toggle at a time, and the next attempt names the next one. */
+/* Copy the `package@version/feature` head of a canonical mod-set line.
+ *
+ * Option values are dropped. They are part of what the sets compare, but they
+ * are not what a player acts on: naming a whole line at them ends "...
+ * flash_guard strength=standard is not on this queue's approved list", where
+ * the strength had nothing to do with the refusal. */
+static void gwed_mod_line_copy(const char *line, char *out, size_t cap)
+{
+    const char *nl = strchr(line, '\n');
+    const char *sp = strchr(line, ' ');
+    size_t len = nl ? (size_t)(nl - line) : strlen(line);
+    if (sp && (!nl || sp < nl)) len = (size_t)(sp - line);
+    if (len >= cap) len = cap - 1;
+    memcpy(out, line, len);
+    out[len] = '\0';
+}
+
+/* Is `line`'s package (everything up to the '@') present anywhere in `set`? */
+static int gwed_mod_set_has_package(const char *set, const char *line)
+{
+    char prefix[160];
+    const char *at = strchr(line, '@');
+    size_t len;
+    if (!set || !at) return 0;
+    len = (size_t)(at - line) + 1;          /* keep the '@' so a prefix of a
+                                             * longer id cannot match */
+    if (len >= sizeof(prefix)) return 0;
+    memcpy(prefix, line, len);
+    prefix[len] = '\0';
+    return strstr(set, prefix) != NULL;
+}
+
+/*
+ * Which package the two sets disagree about, in words a player can act on.
+ *
+ * Reports the FIRST difference rather than all of them: a mismatch is fixed
+ * one toggle at a time, and the next attempt names the next one.
+ *
+ * Anything ENABLED HERE that the queue does not run is named by its own
+ * canonical line, whether or not this file has ever heard of it. That matters
+ * for the case this was written for: a package added after this code -- an
+ * accessibility filter, say -- would otherwise fall through to "different mod
+ * settings than yours" and leave the player hunting a Mods page for which of
+ * several toggles the queue objects to. A friendly name is used where one is
+ * known, because "widescreen" reads better than its package id, but never at
+ * the cost of being unable to name something.
+ */
 static void gwed_describe_mod_mismatch(const char *mine, const char *want,
                                        char *why, size_t why_cap)
 {
-    struct { const char *prefix; const char *label; } kNames[] = {
+    static const struct { const char *prefix; const char *label; } kNames[] = {
         { "gwed.enhancement.widescreen@", "widescreen" },
         { "gwed.localization@",           "the English patch" },
     };
+    const char *line;
     size_t i;
-    for (i = 0; i < sizeof(kNames) / sizeof(kNames[0]); ++i) {
-        int have = mine && strstr(mine, kNames[i].prefix) != NULL;
-        int need = want && strstr(want, kNames[i].prefix) != NULL;
-        if (have == need) continue;
-        snprintf(why, why_cap, "This queue needs %s %s",
-                 kNames[i].label, need ? "ON" : "OFF");
-        return;
+
+    /* Enabled here, not run by the queue. The common case, and the only one
+     * the player can fix from their own Mods page. */
+    for (line = mine ? mine : ""; *line; ) {
+        const char *nl = strchr(line, '\n');
+        if (!gwed_mod_set_has_package(want, line)) {
+            char named[160];
+            for (i = 0; i < sizeof(kNames) / sizeof(kNames[0]); ++i) {
+                if (strncmp(line, kNames[i].prefix, strlen(kNames[i].prefix)))
+                    continue;
+                snprintf(why, why_cap, "This queue needs %s OFF", kNames[i].label);
+                return;
+            }
+            gwed_mod_line_copy(line, named, sizeof(named));
+            snprintf(why, why_cap,
+                     "%s is not on this queue's approved list", named);
+            return;
+        }
+        if (!nl) break;
+        line = nl + 1;
     }
-    /* Same packages, different option values -- a language, most likely. */
+
+    /* Run by the queue, missing here. */
+    for (line = want ? want : ""; *line; ) {
+        const char *nl = strchr(line, '\n');
+        if (!gwed_mod_set_has_package(mine, line)) {
+            char named[160];
+            for (i = 0; i < sizeof(kNames) / sizeof(kNames[0]); ++i) {
+                if (strncmp(line, kNames[i].prefix, strlen(kNames[i].prefix)))
+                    continue;
+                snprintf(why, why_cap, "This queue needs %s ON", kNames[i].label);
+                return;
+            }
+            gwed_mod_line_copy(line, named, sizeof(named));
+            snprintf(why, why_cap, "This queue runs %s -- turn it on to join",
+                     named);
+            return;
+        }
+        if (!nl) break;
+        line = nl + 1;
+    }
+
+    /* Same packages on both sides, different option values -- a language,
+     * most likely. */
     snprintf(why, why_cap,
              "This queue runs different mod settings than yours");
 }
@@ -321,15 +406,57 @@ static void GwedSimAffectingModSet(char *out, size_t cap)
  * the assertion exists so a modified client is making a deliberate false
  * statement rather than exploiting an omission.
  */
+#define GWED_FLASHGUARD_PACKAGE "gwed.accessibility.flashguard"
+#define GWED_FLASHGUARD_VERSION "1.0.0"
+
+/*
+ * The cosmetic allowlist THIS GAME publishes when it hosts a lobby.
+ *
+ * One entry: the flash-reduction filter. It caps how far the presented picture
+ * may move between frames and touches no guest state at all, so a player who
+ * needs it runs the identical simulation as one who does not -- which is
+ * precisely why it can be exempt from the set two peers compare.
+ *
+ * Granting it is not a courtesy. A photosensitive player does not get to
+ * choose their opponent, and an accessibility filter that required the other
+ * side's agreement would be unavailable in exactly the matches it exists for.
+ * The alternative to this line is telling that player to pick between the
+ * filter and playing online.
+ *
+ * PINNED TO THE PACKAGE DIGEST wherever the runtime can compute one, as the
+ * manifest asks: unpinned, the entry is keyed on an id the client picks for
+ * itself, and any package that renames itself to this id inherits the
+ * exemption. Unpinned is still not a hole -- the runtime independently refuses
+ * a claim whose plugins this binary did not classify as presentation-only, or
+ * whose package ships anything but a manifest -- but the digest is what makes
+ * the grant name bytes.
+ *
+ * Nothing else is on this list, and nothing should be added to it that has not
+ * been read and shown to leave the guest alone.
+ */
+static const char *GwedCosmeticAllowList(void)
+{
+    static char entry[160];
+    char digest[80];
+    if (entry[0]) return entry;
+    if (snes_mod_runtime_package_digest_c(GWED_FLASHGUARD_PACKAGE,
+                                          GWED_FLASHGUARD_VERSION,
+                                          digest, (uint32_t)sizeof(digest)))
+        snprintf(entry, sizeof(entry), "%s@%s#%s", GWED_FLASHGUARD_PACKAGE,
+                 GWED_FLASHGUARD_VERSION, digest);
+    else
+        snprintf(entry, sizeof(entry), "%s@%s", GWED_FLASHGUARD_PACKAGE,
+                 GWED_FLASHGUARD_VERSION);
+    return entry;
+}
+
 static int GwedAutomatchModsEnabled(void *ctx, const char *ruleset_id,
                                     char *why, size_t why_cap)
 {
     char mine[1024];
-    const char *want = "";
+    SnesLobbyRuleset chosen;
     int i, n, found = 0;
     (void)ctx;
-
-    GwedSimAffectingModSet(mine, sizeof(mine));
 
     n = snes_lobby_automatch_ruleset_count();
     for (i = 0; i < n; ++i) {
@@ -338,7 +465,7 @@ static int GwedAutomatchModsEnabled(void *ctx, const char *ruleset_id,
         /* NULL/"" selects the first ruleset, matching the client's own rule. */
         if (ruleset_id && ruleset_id[0] && strcmp(r.id, ruleset_id) != 0)
             continue;
-        want = r.caps.mod_set;
+        chosen = r;
         found = 1;
         break;
     }
@@ -348,12 +475,29 @@ static int GwedAutomatchModsEnabled(void *ctx, const char *ruleset_id,
         return 1;
     }
 
-    if (gwed_mod_set_equal(mine, want))
+    /*
+     * The queue's cosmetic grant goes in BEFORE the set is measured.
+     *
+     * A presentation-only package the ruleset allowlists is not a divergence
+     * -- that is the whole meaning of the grant -- and the runtime already
+     * leaves an exempt feature out of the effective set. But the grant is
+     * per-match state, and at queue time nothing had applied it yet, so the
+     * measurement ran against an empty allowlist and refused the player for a
+     * filter the queue explicitly permits. The host applies the same list from
+     * the caps at launch; this is the same answer, one step earlier.
+     *
+     * Setting it from the ruleset we are about to queue for is also the
+     * correct scope: it is exactly the authority the match will run under.
+     */
+    snes_mod_runtime_set_cosmetic_allow_c(chosen.caps.mod_cosmetic_allow);
+
+    GwedSimAffectingModSet(mine, sizeof(mine));
+    if (gwed_mod_set_equal(mine, chosen.caps.mod_set))
         return 0;
 
     /* Name the difference. "Your mods do not match" sends a player to a page
      * of toggles with no idea which one to move. */
-    gwed_describe_mod_mismatch(mine, want, why, why_cap);
+    gwed_describe_mod_mismatch(mine, chosen.caps.mod_set, why, why_cap);
     return 1;
 }
 
@@ -374,6 +518,7 @@ static void host_lobby_ensure_init(void)
     opts.rematch_set_ready = 1;
     opts.fill_match_caps = &GwedFillMatchCaps;
     opts.mods_enabled = &GwedAutomatchModsEnabled;
+    opts.cosmetic_allow = GwedCosmeticAllowList();
     /* The ROM this build was recompiled from IS the guest image both peers
      * run, so it is the right fingerprint for the automatch match key. A join
      * tolerates an empty one ("legacy host, no check"); a queue does not, and
@@ -386,9 +531,22 @@ static void host_lobby_ensure_init(void)
          * this player, and copying it out of a log is how a ruleset gets
          * written correctly instead of approximately. */
         char set[1024];
+        /* Measured under THIS BUILD'S OWN grant, so the two lines printed
+         * below are a coherent pair: a ruleset carrying that allowlist wants
+         * exactly this set, with the exempt package in the allowlist rather
+         * than in the set. It is also what fill_match_caps does when this game
+         * hosts. Self-granting is only meaningful offline -- every netplay
+         * path re-applies the authority's list before it compares anything. */
+        snes_mod_runtime_set_cosmetic_allow_c(GwedCosmeticAllowList());
         GwedSimAffectingModSet(set, sizeof(set));
         fprintf(stderr, "netplay: sim-affecting mod set for automatch:\n%s",
                 set[0] ? set : "(none)\n");
+        /* And the grant this build publishes, in the exact form an automatch
+         * ruleset's match_caps.mod_cosmetic_allow has to carry. Printed for
+         * the same reason as the set above: it is copied into a ruleset, and
+         * a digest is not something anyone should be retyping. */
+        fprintf(stderr, "netplay: cosmetic allowlist: %s\n",
+                GwedCosmeticAllowList());
     }
     if (snes_host_lobby_init(&id, &opts) != 0)
         fprintf(stderr, "netplay: snes_host_lobby_init failed\n");
@@ -759,6 +917,29 @@ static RecompFrameBlend *g_blend;
  * change cannot outgrow it.
  */
 static uint32_t g_frame_stage[GAME_MAX_WIDTH * GAME_HEIGHT];
+
+/* ── Flash reduction (photosensitivity) ───────────────────────────────────
+ *
+ * GAME POLICY ONLY, on the same split as frame blending above: the filter --
+ * what a flash is, the WCAG thresholds it is sized against, why it is not a
+ * frame blend, and the same write-combined-memory hazard -- is a shared
+ * recomp-ui capability (recomp_flash_guard.h). What is decided HERE is only
+ * that this title takes its switch from the Mods page rather than config.ini.
+ *
+ * NO [Video] KEY AND NO DISPLAY CHECKBOX, unlike FrameBlend. The package
+ * gwed.accessibility.flashguard is the single authority, which is the same
+ * ruling widescreen operates under (Beads beads-8wg.1.10): one surface, so a
+ * player cannot end up with a config file saying one thing and the Mods page
+ * another. src/flashguard_mod.c resolves the strength; this file only asks.
+ *
+ * OFF by default -- it is opt-in like every package here. Worth recording
+ * that the argument for defaulting it ON is not frivolous: a player who needs
+ * this is quite likely to have put the game down before ever opening the Mods
+ * page. That is the owner's call to make, and it is a one-line change in the
+ * manifest when they do.
+ */
+static RecompFlashGuard *g_flash_guard;
+static int g_flash_guard_limit;   /* 0 = off; else the per-frame step limit */
 
 /* ── Which config.ini ──────────────────────────────────────────────────────
  *
@@ -2342,18 +2523,33 @@ have_texture:;
          * slow" (fix: make the copy cheaper). */
         Uint64 lock_t0 = 0, unlock_t0 = 0;
 
-        if (g_frame_blend) {
-            /* Blended path: draw and mix in ORDINARY MEMORY, then upload once.
+        if (g_frame_blend || g_flash_guard_limit > 0) {
+            /* Staged path: draw and mix in ORDINARY MEMORY, then upload once.
              * The only contact with the texture mapping is the linear,
              * write-only copy at the end, which is the access pattern
              * write-combined memory is actually good at.
+             *
+             * The flash guard takes this path for the same measured reason
+             * the blend does -- both are read-modify-writes, and doing one in
+             * a locked streaming texture is fine on one driver and ruinous on
+             * the next. So enabling the guard alone is enough to stage, even
+             * with blending off.
              *
              * The shared blend keeps the UNBLENDED frame, so the mix never
              * feeds back on itself, and the PPU's own renderBuffer stays pure
              * for thumbnails and captures. */
             int y;
             RtlDrawPpuFrame((uint8 *)g_frame_stage, (size_t)width * 4u, 0);
-            recomp_frame_blend_apply(g_blend, g_frame_stage, width,
+            if (g_frame_blend)
+                recomp_frame_blend_apply(g_blend, g_frame_stage, width,
+                                         GAME_HEIGHT, (size_t)width * 4u);
+            /* AFTER the blend, deliberately. The guard's contract is a cap on
+             * the step the DISPLAY shows, so it has to be the last thing to
+             * touch the frame -- measuring before the blend would cap a step
+             * that is not the one the player's eyes receive. It is also why
+             * it keeps its own copy of the presented frame rather than
+             * reusing the blend's, which holds the unblended one. */
+            recomp_flash_guard_apply(g_flash_guard, g_frame_stage, width,
                                      GAME_HEIGHT, (size_t)width * 4u);
             lock_t0 = SDL_GetPerformanceCounter();
             if (snesrecomp_sdl_lock_texture(texture, NULL, &pixels, &pitch)) {
@@ -3202,6 +3398,30 @@ session_reboot:
     if (g_frame_blend)
         fprintf(stderr,
                 "[video] frame blending on (config.ini [Video] FrameBlend)\n");
+
+    /* Flash reduction. Read AFTER snes_mod_runtime_activate_plugins_c above,
+     * because the strength is resolved by the package's activation plugin;
+     * reading it earlier reports 0 on every launch, which is the mistake the
+     * widescreen lobby caps made and had to be split into a "selected" query
+     * to fix. A rematch re-enters at session_reboot and re-reads it here, so
+     * a player who changed the setting between matches gets the new one. */
+    g_flash_guard_limit = GwedFlashGuard_Limit();
+    if (g_flash_guard_limit > 0 && !g_flash_guard)
+        g_flash_guard = recomp_flash_guard_create();
+    if (g_flash_guard_limit > 0 && !g_flash_guard) {
+        /* Out of memory for one 224-row frame. Say so loudly rather than
+         * leaving a player who switched this on to discover at the end of a
+         * fight that it never ran. */
+        fprintf(stderr, "[video] flash reduction UNAVAILABLE (out of memory) "
+                        "-- the game will strobe\n");
+        g_flash_guard_limit = 0;
+    }
+    recomp_flash_guard_set_limit(g_flash_guard, g_flash_guard_limit);
+    recomp_flash_guard_reset(g_flash_guard);  /* never mix across a reboot */
+    if (g_flash_guard_limit > 0)
+        fprintf(stderr, "[video] flash reduction on, step limit %d/255 "
+                        "(mod gwed.accessibility.flashguard)\n",
+                g_flash_guard_limit);
     texture = renderer
         ? SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                             SDL_TEXTUREACCESS_STREAMING,

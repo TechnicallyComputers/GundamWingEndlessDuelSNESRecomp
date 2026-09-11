@@ -44,3 +44,58 @@ force_input_relay = false
 
 # No `mods` key and no `mod_plan`: v1 is vanilla only, and a `mods` key is
 # refused at load rather than at match time.
+
+# ── Cosmetic allowlist ──────────────────────────────────────────────────────
+#
+# The packages a queued player may run UNILATERALLY, without their opponent
+# having the same thing. Everything else must match, exactly as before.
+#
+# This key is the GRANT. A mod declaring `presentation_only = true` in its own
+# manifest is only the mod ASKING, and a manifest is written by whoever wrote
+# the mod — so a cheat that wants to be exempt from the mod comparison writes
+# that line too. Nothing in the client can tell the two apart. Naming them here
+# is how the server decides, and an unlisted claim is treated as an ordinary
+# simulation-affecting mod: the queue is refused, by name.
+#
+# Omitting this key grants NOTHING, which is the correct default and what every
+# ruleset written before it does. Absence must never read as permission.
+#
+# FORM:  <package_id>@<version>#<sha256>   ← use this one
+#        <package_id>@<version>            ← name only; see the warning below
+# ';'-separated for several.
+#
+# The digest is of the package packed by the mod runtime's own deterministic
+# zip (file order is sorted precisely so the bytes are identical on every
+# machine). Get it from a client with the package installed — it is printed at
+# netplay init:
+#     netplay: cosmetic allowlist published when hosting: <id>@<ver>#<sha256>
+#
+# PIN THE DIGEST. A bare `id@version` entry is keyed on a string the client
+# picks for itself, so anyone wanting the exemption names their mod
+# `gwed.accessibility.flashguard` and takes it. With the digest the entry names
+# specific bytes, and a "flash guard" with something else inside it packs
+# differently and is refused on every machine that installs it.
+#
+# WHAT THIS DOES NOT DO, stated plainly so nobody over-trusts it: the client
+# still reports its own mods, so a player who patches their executable can
+# claim anything. Defending against that needs server-side verification of the
+# simulation, which does not exist here. What the allowlist removes is the
+# OMISSION — getting an unapproved mod into a pool now takes deliberate
+# forgery instead of one line in a manifest nobody checks.
+#
+# The digest below is a PLACEHOLDER. Replace it with the one your shipped
+# package prints, or the entry matches nothing and the filter is refused —
+# which fails safe, but fails.
+mod_cosmetic_allow = "gwed.accessibility.flashguard@1.0.0#0000000000000000000000000000000000000000000000000000000000000000"
+
+# Listed because it is an ACCESSIBILITY feature and its whole purpose is to
+# work against a stranger: a photosensitive player does not choose their
+# opponent, and a filter they had to negotiate for would be unavailable in
+# exactly the matches it exists for. It caps how far the presented frame may
+# move between displayed frames and touches no CPU, WRAM, VRAM, OAM, CGRAM,
+# APU or save state — see docs/FLASH_GUARD.md for the measurements.
+#
+# Nothing else of this game's belongs here. Widescreen patches the cart image
+# for sprite bounds and localization patches ROM text; both are simulation
+# state however cosmetic they look, and listing either would pair players
+# running different ROM images.
