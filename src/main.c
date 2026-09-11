@@ -45,6 +45,7 @@
 #include "recomp_frame_blend.h"   /* shared presentation blend (all titles) */
 #include "recomp_flash_guard.h"   /* shared photosensitivity filter (all titles) */
 #include "flashguard_mod.h"       /* this title's Mods-page switch for it */
+#include <ctype.h>   /* tolower: the RewindGesture spec is case-free */
 #include <time.h>
 #if defined(_WIN32)
 /* For GetThreadTimes in game_thread_cpu_ms: MinGW defines _WIN32, so that
@@ -1689,30 +1690,165 @@ static SDL_Scancode game_turbo_scancode(void)
 }
 
 /*
- * Rewind's controller gesture: SELECT + right bumper, or a right-stick click.
+ * Rewind's controller gesture, from config.ini [Controller] RewindGesture.
  *
- * SELECT+R goes through the 12-bit SNES mask read_gamepad() already builds
- * (bit 9 Select, bit 0 R). R3 cannot: the SNES pad has no stick buttons, so
- * that mask has nowhere to put one and it has to be asked of SDL directly.
- * Two ways in because R3 is one thumb on a modern pad while SELECT+R works on
- * anything with shoulders, including the SNES-shaped pads people use here.
+ * WHAT WENT WRONG HERE, because the shape of it is worth keeping.
+ *
+ * This used to be hardcoded as `(1u << 9) | (1u << 0)`, with a comment saying
+ * that was "Select + R". It is not. In this codebase's pad word -- the one
+ * SNES_PAD_* names, which read_gamepad() builds -- bit 9 is X and bit 0 is B.
+ * The constants had been written from some other layout and never checked
+ * against the names right next to them.
+ *
+ * So the rewind gesture was X+B. A player holding all four face buttons for a
+ * boost dash was pressing it every time, and could not make it stop by
+ * rebinding, because this path never consulted the binding at all. The
+ * savestate menu's gesture two hundred lines up is spelled with the same two
+ * ideas and got them right -- which is the argument for naming the bits
+ * rather than writing numbers.
+ *
+ * There is also no bare-R3 path any more. A stick click on its own is one
+ * thumb landing somewhere in the middle of a fight; a modifier is the whole
+ * reason a gesture is a gesture.
+ *
+ * The vocabulary is the pad's own buttons, joined with '+'. R3/L3 are asked of
+ * SDL directly: the SNES pad has no stick buttons, so the 12-bit word has
+ * nowhere to put them.
  */
+static uint16_t g_rewind_pad_mask;     /* SNES_PAD_* bits, all required */
+static int      g_rewind_need_r3;
+static int      g_rewind_need_l3;
+static int      g_rewind_gesture_ok;   /* 0 = unbound: no pad gesture at all */
+
+static void game_rewind_gesture_configure(void)
+{
+    static const struct { const char *name; uint16_t bit; } kNames[] = {
+        { "b", SNES_PAD_B }, { "y", SNES_PAD_Y }, { "select", SNES_PAD_SELECT },
+        { "start", SNES_PAD_START }, { "up", SNES_PAD_UP },
+        { "down", SNES_PAD_DOWN }, { "left", SNES_PAD_LEFT },
+        { "right", SNES_PAD_RIGHT }, { "a", SNES_PAD_A }, { "x", SNES_PAD_X },
+        { "l", SNES_PAD_L }, { "r", SNES_PAD_R },
+    };
+    char spec[128];
+    const char *p;
+    int bad = 0;
+
+    g_rewind_pad_mask = 0;
+    g_rewind_need_r3 = g_rewind_need_l3 = 0;
+    g_rewind_gesture_ok = 0;
+
+    if (!game_config_str("[Controller]", "RewindGesture", spec, sizeof(spec)) ||
+        !spec[0])
+        snprintf(spec, sizeof(spec), "Select+R3");
+    {
+        char lower[sizeof(spec)];
+        size_t i;
+        for (i = 0; i + 1 < sizeof(lower) && spec[i]; ++i)
+            lower[i] = (char)tolower((unsigned char)spec[i]);
+        lower[i] = '\0';
+        if (!strcmp(lower, "none")) {
+            fprintf(stderr, "[rewind] pad gesture disabled ([Controller] "
+                            "RewindGesture = none)\n");
+            return;
+        }
+    }
+
+    for (p = spec; *p; ) {
+        char tok[24];
+        size_t n = 0;
+        while (*p == ' ' || *p == '+') ++p;
+        while (*p && *p != '+' && *p != ' ' && n + 1 < sizeof(tok))
+            tok[n++] = (char)tolower((unsigned char)*p++);
+        tok[n] = '\0';
+        while (*p && *p != '+') ++p;
+        if (!tok[0]) continue;
+        if (!strcmp(tok, "r3")) { g_rewind_need_r3 = 1; continue; }
+        if (!strcmp(tok, "l3")) { g_rewind_need_l3 = 1; continue; }
+        {
+            size_t i;
+            int hit = 0;
+            for (i = 0; i < sizeof(kNames) / sizeof(kNames[0]); ++i) {
+                if (strcmp(tok, kNames[i].name)) continue;
+                g_rewind_pad_mask |= kNames[i].bit;
+                hit = 1;
+                break;
+            }
+            if (!hit) {
+                fprintf(stderr, "[rewind] unknown button \"%s\" in "
+                                "[Controller] RewindGesture\n", tok);
+                bad = 1;
+            }
+        }
+    }
+    /* A gesture nobody can perform is worse than none: it would sit there
+     * looking bound. A gesture of ONE ordinary button is worse still -- that
+     * is the bug this function exists because of, four face buttons mashed for
+     * a boost dash tripping rewind -- so a lone SNES button with no stick
+     * click is refused exactly as firmly as a misspelling. Two SNES buttons is
+     * a gesture; one plus a stick click is a gesture; one alone is not. */
+    {
+        int held = g_rewind_need_r3 + g_rewind_need_l3;
+        uint16_t bits = g_rewind_pad_mask;
+        while (bits) { held += (int)(bits & 1u); bits >>= 1; }
+        if (bad || held < 2) {
+            fprintf(stderr, "[rewind] \"%s\" is not a usable gesture (%s); "
+                            "using Select+R3 instead\n", spec,
+                    bad ? "unknown button name"
+                        : "a gesture must be two things held at once");
+            g_rewind_pad_mask = SNES_PAD_SELECT;
+            g_rewind_need_r3 = 1;
+            g_rewind_need_l3 = 0;
+        }
+    }
+    g_rewind_gesture_ok = 1;
+    /* Report what is in force, not what was asked for -- after a fallback the
+     * two differ, and this log is what somebody reads when the gesture is not
+     * doing what their config file says it should. */
+    {
+        char shown[96];
+        size_t i, n = 0;
+        shown[0] = '\0';
+        for (i = 0; i < sizeof(kNames) / sizeof(kNames[0]); ++i) {
+            if (!(g_rewind_pad_mask & kNames[i].bit)) continue;
+            n += (size_t)snprintf(shown + n, sizeof(shown) - n, "%s%s",
+                                  n ? "+" : "", kNames[i].name);
+        }
+        if (g_rewind_need_r3)
+            n += (size_t)snprintf(shown + n, sizeof(shown) - n, "%sr3",
+                                  n ? "+" : "");
+        if (g_rewind_need_l3)
+            snprintf(shown + n, sizeof(shown) - n, "%sl3", n ? "+" : "");
+        fprintf(stderr, "[rewind] pad gesture: %s (mask=0x%03x r3=%d l3=%d)\n",
+                shown, g_rewind_pad_mask, g_rewind_need_r3, g_rewind_need_l3);
+    }
+}
+
 static int game_rewind_gesture(void)
 {
-    const uint16_t pad = read_gamepad(0);
-    const uint16_t want = (uint16_t)((1u << 9) | (1u << 0));   /* Select + R */
-    if ((pad & want) == want)
-        return 1;
-    if (g_pads[0]) {
+    uint16_t pad;
+    if (!g_rewind_gesture_ok) return 0;
+    pad = read_gamepad(0);
+    if (g_rewind_pad_mask && (pad & g_rewind_pad_mask) != g_rewind_pad_mask)
+        return 0;
+    if (g_rewind_need_r3 || g_rewind_need_l3) {
+        if (!g_pads[0]) return 0;
 #if SNESRECOMP_SDL3
-        if (SDL_GetGamepadButton(g_pads[0], SDL_GAMEPAD_BUTTON_RIGHT_STICK))
-            return 1;
+        if (g_rewind_need_r3 &&
+            !SDL_GetGamepadButton(g_pads[0], SDL_GAMEPAD_BUTTON_RIGHT_STICK))
+            return 0;
+        if (g_rewind_need_l3 &&
+            !SDL_GetGamepadButton(g_pads[0], SDL_GAMEPAD_BUTTON_LEFT_STICK))
+            return 0;
 #else
-        if (SDL_GameControllerGetButton(g_pads[0], SDL_CONTROLLER_BUTTON_RIGHTSTICK))
-            return 1;
+        if (g_rewind_need_r3 &&
+            !SDL_GameControllerGetButton(g_pads[0], SDL_CONTROLLER_BUTTON_RIGHTSTICK))
+            return 0;
+        if (g_rewind_need_l3 &&
+            !SDL_GameControllerGetButton(g_pads[0], SDL_CONTROLLER_BUTTON_LEFTSTICK))
+            return 0;
 #endif
     }
-    return 0;
+    return 1;
 }
 
 static int game_fast_forward_active(void)
@@ -3470,6 +3606,7 @@ session_reboot:
                 g_flash_guard_limit);
     /* Read before the first texture exists, because the scale mode is set on
      * a texture and not on the renderer. */
+    game_rewind_gesture_configure();
     g_linear_filter = game_config_int("[Video]", "LinearFilter",
                                       GWED_LINEAR_FILTER_DEFAULT) != 0;
     fprintf(stderr, "[video] linear filtering %s (config.ini [Video] "
@@ -3764,9 +3901,13 @@ session_reboot:
         inputs = snes_savestate_menu_filter_guest_input(inputs);
         if (savestate_menu_hotkey && !snes_savestate_menu_is_open())
             (void)snes_savestate_menu_poll_open(GAME_SAVESTATE_MENU_GESTURE);
-        /* Rewind: F8 / [KeyMap] Rewind, or SELECT+R / R3 on a pad. Refused
-         * during netplay by snes_rewind_open() itself -- one machine cannot
-         * move its own clock backwards while a peer is watching. */
+        /* Rewind: F8 / [KeyMap] Rewind on the keyboard, or the pad gesture
+         * from [Controller] RewindGesture -- Select+R3 unless the player says
+         * otherwise, and nothing else. This used to be a hardcoded mask that
+         * read X+B, so mashing the four face buttons for a boost dash opened
+         * rewind mid-fight. Refused during netplay by snes_rewind_open()
+         * itself -- one machine cannot move its own clock backwards while a
+         * peer is watching. */
         if ((rewind_hotkey || game_rewind_gesture()) && !snes_rewind_is_open() &&
             !snes_savestate_menu_is_open()) {
             if (snes_rewind_open())
