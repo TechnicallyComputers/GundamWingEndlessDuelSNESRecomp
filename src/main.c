@@ -42,6 +42,7 @@
 #include "snes_rewind.h"         /* rewind ring + filmstrip */
 #include "snes_runahead.h"       /* offline input-latency reduction */
 #include "snes_overlay_draw.h"   /* SNES_PAD_* input word bits */
+#include "recomp_frame_blend.h"   /* shared presentation blend (all titles) */
 #include <time.h>
 #if defined(_WIN32)
 /* For GetThreadTimes in game_thread_cpu_ms: MinGW defines _WIN32, so that
@@ -187,6 +188,171 @@ static void GwedFillMatchCaps(void *ctx, const void *settings_v,
             out->ignore_aspect);
 }
 
+/*
+ * mods_enabled for an automatch ticket: is a SIM-AFFECTING feature on locally
+ * BEYOND what this ruleset imposes?
+ *
+ * Two of this title's three packages touch the sim:
+ *
+ *   - widescreen, because the P8 sprite-bounds patch writes the cart's ROM
+ *     image (gwed_ws_patch.c). The wide backgrounds and HUD are presentation
+ *     and digest-safe; that one patch is not.
+ *   - localization, because it patches ROM text.
+ *
+ * Widescreen is EXCUSED when the chosen ruleset itself pins a margin: the
+ * server is then instructing both peers to run that patched sim, so it is the
+ * ruleset rather than a divergence. Answering 1 for it would make a widescreen
+ * queue permanently unusable by the very feature it exists to standardize.
+ * A margin the ruleset does NOT ask for is still a divergence, so the check is
+ * ws_extra > 0 and not merely "the ruleset mentions widescreen".
+ *
+ * Localization is never excused: v1 rulesets carry no mod plan, so there is no
+ * way for a ruleset to impose a language, and two peers with different text
+ * patches are running different ROM images.
+ */
+/*
+ * The SIM-AFFECTING part of this build's effective mod set, in the mod
+ * runtime's own canonical form.
+ *
+ * snes_mod_runtime_effective_set_c emits one line per ENABLED feature, sorted,
+ * with resolved option values -- built precisely so two peers can compare
+ * selections byte for byte. But it lists EVERY enabled feature, and not every
+ * feature is simulation state: perf_log writes a log file and touches no guest
+ * memory, so requiring a queue's members to agree about it would refuse
+ * matches over a diagnostic.
+ *
+ * Which of a game's features touch the sim is knowledge only that game has, so
+ * the filter is here rather than in the runtime. This title has exactly two:
+ *
+ *   - gwed.enhancement.widescreen -- the P8 sprite-bounds patch writes the
+ *     cart's ROM image (gwed_ws_patch.c). The wide backgrounds and HUD are
+ *     presentation; that patch is not.
+ *   - gwed.localization -- snes_text_xlate applies ram_patches every frame, so
+ *     the translation is guest memory, not an overlay on top of it.
+ *
+ * A feature added later and left out of this list is a silent desync, which is
+ * why the default is to INCLUDE an unknown package rather than skip it: a new
+ * package blocks queueing until somebody decides it is safe, instead of
+ * pairing players who do not match.
+ */
+/* Compare two canonical mod sets. Both are already sorted, resolved text, so
+ * this is string equality -- with "" and "(none)" treated as the same empty
+ * set, because the runtime writes the latter and a ruleset that simply omits
+ * mod_set gives the former. */
+static int gwed_mod_set_equal(const char *a, const char *b)
+{
+    const char *ea = (!a || !a[0] || !strncmp(a, "(none)", 6)) ? "" : a;
+    const char *eb = (!b || !b[0] || !strncmp(b, "(none)", 6)) ? "" : b;
+    return strcmp(ea, eb) == 0;
+}
+
+/* Which package the two sets disagree about, in words a player can act on.
+ * Reports the FIRST difference rather than all of them: a queue mismatch is
+ * fixed one toggle at a time, and the next attempt names the next one. */
+static void gwed_describe_mod_mismatch(const char *mine, const char *want,
+                                       char *why, size_t why_cap)
+{
+    struct { const char *prefix; const char *label; } kNames[] = {
+        { "gwed.enhancement.widescreen@", "widescreen" },
+        { "gwed.localization@",           "the English patch" },
+    };
+    size_t i;
+    for (i = 0; i < sizeof(kNames) / sizeof(kNames[0]); ++i) {
+        int have = mine && strstr(mine, kNames[i].prefix) != NULL;
+        int need = want && strstr(want, kNames[i].prefix) != NULL;
+        if (have == need) continue;
+        snprintf(why, why_cap, "This queue needs %s %s",
+                 kNames[i].label, need ? "ON" : "OFF");
+        return;
+    }
+    /* Same packages, different option values -- a language, most likely. */
+    snprintf(why, why_cap,
+             "This queue runs different mod settings than yours");
+}
+
+static void GwedSimAffectingModSet(char *out, size_t cap)
+{
+    char all[2048];
+    const char *line = all;
+    size_t used = 0;
+
+    out[0] = '\0';
+    if (snes_mod_runtime_effective_set_c(all, (uint32_t)sizeof(all)) <= 0)
+        return;
+
+    while (*line) {
+        const char *nl = strchr(line, '\n');
+        size_t len = nl ? (size_t)(nl - line) + 1 : strlen(line);
+        /* Diagnostics is the one package deliberately skipped: it observes,
+         * it does not participate. Everything else counts, known or not. */
+        if (strncmp(line, "gwed.diagnostics@", 17) != 0 &&
+            strncmp(line, "(none)", 6) != 0) {
+            if (used + len < cap) {
+                memcpy(out + used, line, len);
+                used += len;
+                out[used] = '\0';
+            }
+        }
+        if (!nl) break;
+        line = nl + 1;
+    }
+}
+
+/*
+ * mods_enabled for an automatch ticket.
+ *
+ * A ruleset may now PRESCRIBE a mod set (match_caps.mod_set), which is what
+ * lets a queue be a widescreen queue, or an English-patch queue, rather than
+ * vanilla-or-nothing. The rule is equality, not permission: this build's
+ * sim-affecting set must be exactly what the ruleset asks for.
+ *
+ * Equality in both directions matters. A player MISSING something the queue
+ * runs desyncs; so does a player running something extra. "At least" would let
+ * the second through.
+ *
+ * A ruleset with no mod_set means vanilla, and then any sim-affecting feature
+ * is a divergence -- which is the v1 behaviour, unchanged.
+ *
+ * The server cannot verify any of this. It takes this client's word (§5), and
+ * the assertion exists so a modified client is making a deliberate false
+ * statement rather than exploiting an omission.
+ */
+static int GwedAutomatchModsEnabled(void *ctx, const char *ruleset_id,
+                                    char *why, size_t why_cap)
+{
+    char mine[1024];
+    const char *want = "";
+    int i, n, found = 0;
+    (void)ctx;
+
+    GwedSimAffectingModSet(mine, sizeof(mine));
+
+    n = snes_lobby_automatch_ruleset_count();
+    for (i = 0; i < n; ++i) {
+        SnesLobbyRuleset r;
+        if (!snes_lobby_automatch_ruleset_get(i, &r)) continue;
+        /* NULL/"" selects the first ruleset, matching the client's own rule. */
+        if (ruleset_id && ruleset_id[0] && strcmp(r.id, ruleset_id) != 0)
+            continue;
+        want = r.caps.mod_set;
+        found = 1;
+        break;
+    }
+    if (!found) {
+        snprintf(why, why_cap, "That queue is no longer offered -- reopen "
+                               "netplay to refresh");
+        return 1;
+    }
+
+    if (gwed_mod_set_equal(mine, want))
+        return 0;
+
+    /* Name the difference. "Your mods do not match" sends a player to a page
+     * of toggles with no idea which one to move. */
+    gwed_describe_mod_mismatch(mine, want, why, why_cap);
+    return 1;
+}
+
 static void host_lobby_ensure_init(void)
 {
     static int once;
@@ -203,6 +369,23 @@ static void host_lobby_ensure_init(void)
     memset(&opts, 0, sizeof(opts));
     opts.rematch_set_ready = 1;
     opts.fill_match_caps = &GwedFillMatchCaps;
+    opts.mods_enabled = &GwedAutomatchModsEnabled;
+    /* The ROM this build was recompiled from IS the guest image both peers
+     * run, so it is the right fingerprint for the automatch match key. A join
+     * tolerates an empty one ("legacy host, no check"); a queue does not, and
+     * would be refused with need_disc_fp. */
+    snes_lobby_set_disc_fp(kGameCodegenIdentity.expected_sha256);
+    {
+        /* Say what this build's sim-affecting selection IS, in the exact
+         * canonical form a ruleset's match_caps.mod_set has to equal. Printed
+         * because it is the one string that decides whether a queue accepts
+         * this player, and copying it out of a log is how a ruleset gets
+         * written correctly instead of approximately. */
+        char set[1024];
+        GwedSimAffectingModSet(set, sizeof(set));
+        fprintf(stderr, "netplay: sim-affecting mod set for automatch:\n%s",
+                set[0] ? set : "(none)\n");
+    }
     if (snes_host_lobby_init(&id, &opts) != 0)
         fprintf(stderr, "netplay: snes_host_lobby_init failed\n");
 }
@@ -543,44 +726,33 @@ static int g_fullscreen_mode;
 
 /* ── Frame blending ───────────────────────────────────────────────────────
  *
- * This game fakes transparency by drawing thrusters, explosions and beam
- * flashes on alternate frames only — a trick that reads as translucency on
- * a CRT's persistence but relies on every guest frame being shown exactly
- * once, whole, in order. A desktop display breaks that both ways: vsync on
- * duplicates a frame every ~10 s (the 60.00 vs 60.0988 beat above), showing
- * the same flicker phase twice; vsync off tears mid-scanout, splitting the
- * on-frame and the off-frame across one visible field.
+ * GAME POLICY ONLY. The blend itself -- what it does, why a desktop display
+ * needs it, and the write-combined-memory hazard that dictates where it runs
+ * -- is a shared capability in recomp-ui (recomp_frame_blend.h), so every
+ * port gets one implementation instead of a copy per game. Read that header
+ * for the mechanism; what is decided HERE is only whether this title turns
+ * it on, and the answer is the single line below.
  *
- * Averaging each presented frame with the previous one makes both phases
- * present in every displayed frame, so the flicker becomes steady 50%
- * translucency and stops caring about pacing at all. Costs half a frame of
- * motion ghosting, so it is a Display-settings checkbox. Persisted as
- * [Video] FrameBlend in config.ini.
+ * The player-facing surface is likewise shared: GameInfo.has_frame_blend
+ * draws the Display checkbox, Settings.frame_blend carries its value. This
+ * host persists that value as [Video] FrameBlend in config.ini.
  *
  * ON by default for this title: Endless Duel leans on 30 Hz flicker for
  * thruster flames, shadows and HUD translucency, so a fresh install without
- * blending shows the artifact the checkbox exists to remove. The default
- * lives in one place so the launcher seed and the boot read cannot drift. */
+ * blending shows the artifact the checkbox exists to remove. That is a
+ * deliberate departure from the doctrine's default-off rule (ENHANCEMENTS.md
+ * Rule 1) and it is a per-game departure: the capability ships inert, and
+ * nothing outside this file makes it a Gundam feature. The default lives in
+ * one place so the launcher seed and the boot read cannot drift. */
 #define GWED_FRAME_BLEND_DEFAULT 1
 static int g_frame_blend = GWED_FRAME_BLEND_DEFAULT;
-static uint32_t g_blend_prev[GAME_MAX_WIDTH * GAME_HEIGHT];
-static int g_blend_prev_valid = 0;
+static RecompFrameBlend *g_blend;
 /*
- * Staging frame for the blended path. Sized like g_blend_prev beside it, so
- * neither can be outgrown by a widescreen width change.
- *
- * It exists because the blend is a read-modify-write, and it used to do that
- * read against the LOCKED TEXTURE. SDL_LockTexture on a streaming texture
- * hands back driver memory that is frequently write-combined and uncached:
- * excellent for sequential writes, pathological to read -- there is no read
- * caching, so each of the 57,344 loads is an uncached fetch. Writes were
- * never the problem; the read-back was.
- *
- * The cost of that is invisible on one machine and severe on another, because
- * whether the mapping is cached system memory or write-combined depends on
- * the backend and the driver -- which is exactly the shape of a bug that is
- * fine for the developer and ruins it for one player. Blending in ordinary
- * cached memory and uploading once removes the variable entirely.
+ * Staging frame for the blended path: the blend must run in ordinary cached
+ * memory rather than in the locked texture (recomp_frame_blend.h explains
+ * why), so the frame is drawn here, blended here, and uploaded with one
+ * linear write-only copy. Sized for the widest widescreen frame so a width
+ * change cannot outgrow it.
  */
 static uint32_t g_frame_stage[GAME_MAX_WIDTH * GAME_HEIGHT];
 
@@ -1487,6 +1659,7 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     char assets_dir[1024];
     int lr;
     int fb_seed;
+    int ra_seed;
     int fs_seed, rend_seed;
     int vs_seed;
 
@@ -1573,6 +1746,17 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
      * the ABI's 1-based encoding (0 would mean "unset" and be reseeded On,
      * silently flipping this title's ships-off default). */
     fb_seed = game_config_int("[Video]", "FrameBlend", GWED_FRAME_BLEND_DEFAULT) ? 1 : 0;
+    /* Run-ahead is an [Emulation] key, not a [Video] one, and it is a DEPTH
+     * rather than a flag: the launcher row cycles Off/1..4 so a player who
+     * put RunAhead=2 in config.ini gets that value back, instead of a
+     * checkbox reading it as "on" and writing 1 the next time it is touched.
+     * Clamped here as well as in the model, because this seed is also what
+     * the untouched-run comparison below is made against. */
+    ra_seed = game_config_int("[Emulation]", "RunAhead", 0);
+    if (ra_seed < 0) ra_seed = 0;
+    if (ra_seed > RECOMP_LAUNCHER_RUN_AHEAD_MAX)
+        ra_seed = RECOMP_LAUNCHER_RUN_AHEAD_MAX;
+    ls.run_ahead = ra_seed;
     fs_seed = game_config_int("[Video]", "Fullscreen", 0);
     if (fs_seed < 0 || fs_seed > 2) fs_seed = 0;
     rend_seed = game_renderer_choice();
@@ -1592,6 +1776,12 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
      * on alternate-frame flicker for its transparency effects (thrusters,
      * beam flashes), which is what the blend exists to steady. */
     gi.has_frame_blend = 1;
+    /* Display → Run-ahead cycle. Offered because this runtime can snapshot
+     * and restore a whole machine in a frame (snes_runahead.c); a host whose
+     * runtime cannot must leave this 0 rather than draw a control that does
+     * nothing. Not a per-profile flag: enabling it in snes_profile.h would
+     * give every SNES port a row it has not wired to anything. */
+    gi.has_run_ahead = 1;
     /* Display → VSync checkbox (the legacy surface draws it as On/Off; this
      * host's renderer flag is boolean, so Adaptive is never offered). */
     gi.has_vsync = 1;
@@ -1669,6 +1859,11 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && ls.frame_blend != fb_seed)
         launcher_ini_kv_write(game_config_path(), "Video", "FrameBlend",
                               ls.frame_blend ? "1" : "0");
+    if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH && ls.run_ahead != ra_seed) {
+        char val[16];
+        snprintf(val, sizeof(val), "%d", ls.run_ahead);
+        launcher_ini_kv_write(game_config_path(), "Emulation", "RunAhead", val);
+    }
     if (lr == RECOMP_LAUNCHER_RESULT_LAUNCH) {
         int vs_new = (ls.vsync != RECOMP_LAUNCHER_VSYNC_OFF) ? 1 : 0;
         if (vs_new != vs_seed)
@@ -2138,30 +2333,17 @@ have_texture:;
 
         if (g_frame_blend) {
             /* Blended path: draw and mix in ORDINARY MEMORY, then upload once.
-             *
-             * The mix is a read-modify-write and it used to read back out of
-             * the locked texture -- see g_frame_stage. Everything here touches
-             * cached memory; the only contact with the mapping is the linear,
+             * The only contact with the texture mapping is the linear,
              * write-only copy at the end, which is the access pattern
              * write-combined memory is actually good at.
              *
-             * g_blend_prev still keeps the UNBLENDED frame, so the mix never
+             * The shared blend keeps the UNBLENDED frame, so the mix never
              * feeds back on itself, and the PPU's own renderBuffer stays pure
-             * for thumbnails and captures. Same arithmetic as before. */
-            int y, x;
+             * for thumbnails and captures. */
+            int y;
             RtlDrawPpuFrame((uint8 *)g_frame_stage, (size_t)width * 4u, 0);
-            for (y = 0; y < GAME_HEIGHT; ++y) {
-                uint32_t *row = g_frame_stage + (size_t)y * width;
-                uint32_t *prev = g_blend_prev + (size_t)y * width;
-                for (x = 0; x < width; ++x) {
-                    uint32_t cur = row[x];
-                    if (g_blend_prev_valid)
-                        row[x] = (cur & prev[x]) +
-                                 (((cur ^ prev[x]) >> 1) & 0x7F7F7F7Fu);
-                    prev[x] = cur;
-                }
-            }
-            g_blend_prev_valid = 1;
+            recomp_frame_blend_apply(g_blend, g_frame_stage, width,
+                                     GAME_HEIGHT, (size_t)width * 4u);
             lock_t0 = SDL_GetPerformanceCounter();
             if (snesrecomp_sdl_lock_texture(texture, NULL, &pixels, &pitch)) {
                 g_last_lock_ms = game_perf_ms_since(lock_t0);
@@ -2766,6 +2948,14 @@ session_reboot:
      * at which the width may change. This also issues the PpuBeginDrawing that
      * points the PPU at g_render_pixels; RtlDrawPpuFrame re-issues it (with
      * the frame's policy) every frame. */
+#if defined(SNES_HAS_LOBBY_CLIENT)
+    /* Before BeginSession, because BeginSession is what decides the width and
+     * everything sized from it. The caps arrived with the launch result, long
+     * before the session itself starts further down. */
+    GwedDisplay_SetNetplayWsExtra(
+        (g_netplay_pending || g_netplay_active_session) ? g_netplay_caps_ws_extra
+                                                        : -1);
+#endif
     GwedDisplay_BeginSession((uint8_t *)g_render_pixels, sizeof(g_render_pixels),
                              kPpuRenderFlags_NewRenderer);
     /* Resolve and announce the execution policy before the first guest frame.
@@ -2961,7 +3151,11 @@ session_reboot:
             g_pace_period_ms = (disp > budget) ? disp : budget;
         }
         if (game_pace_on()) {
-            char msg[96];
+            /* 96 truncated the line: the format alone is 98 characters
+             * before a single number is substituted, so this diagnostic has
+             * been losing its tail -- the "the slower wins" that says which
+             * of the two rates was actually chosen. */
+            char msg[160];
             snprintf(msg, sizeof(msg),
                      "pacing: %.3f ms/frame (display %.3f Hz = %.3f ms, "
                      "guest %.4f Hz = %.3f ms; the slower wins)",
@@ -2986,7 +3180,14 @@ session_reboot:
 
     g_frame_blend = game_config_int("[Video]", "FrameBlend",
                                     GWED_FRAME_BLEND_DEFAULT) != 0;
-    g_blend_prev_valid = 0;   /* never blend across a session reboot */
+    if (g_frame_blend && !g_blend) g_blend = recomp_frame_blend_create();
+    if (g_frame_blend && !g_blend) {
+        /* Out of memory for one 224-row frame. Say so and present unblended
+         * rather than silently leaving a checkbox on that does nothing. */
+        fprintf(stderr, "[video] frame blending unavailable (out of memory)\n");
+        g_frame_blend = 0;
+    }
+    recomp_frame_blend_reset(g_blend);  /* never blend across a session reboot */
     if (g_frame_blend)
         fprintf(stderr,
                 "[video] frame blending on (config.ini [Video] FrameBlend)\n");

@@ -288,6 +288,9 @@ static int ClampEven(int64_t value)
     return (int)value;
 }
 
+/* >=0 pins the session's margin to what the lobby negotiated. */
+static int s_net_ws_extra = -1;
+
 int GwedDisplay_ComputeFrameWidth(bool widescreen)
 {
     int width = widescreen
@@ -298,7 +301,38 @@ int GwedDisplay_ComputeFrameWidth(bool widescreen)
     int override_extra = PpuWsExtraOverride();
     if (override_extra >= 0)
         width = widescreen ? ClampEven(256 + 2 * (int64_t)override_extra) : 256;
+    else if (s_net_ws_extra >= 0)
+        width = widescreen ? ClampEven(256 + 2 * (int64_t)s_net_ws_extra) : 256;
     return width;
+}
+
+/*
+ * Pin the margin a netplay session negotiated, in place of the one this
+ * window's aspect would produce.
+ *
+ * This is what makes widescreen possible in a room the two players did not
+ * arrange between themselves. The margin here is derived from the WINDOW --
+ * SnesDisplayAspect_ComputeWideFrameWidth follows the display -- so two peers
+ * on different monitors compute different widths, their published caps
+ * disagree, and GwedWsPatch declines on both: safe, symmetric, and 4:3 sprite
+ * bounds inside a wide frame. Fine as a fallback between two people who chose
+ * each other's room. Useless for automatch, where the server picks the caps
+ * and neither client would honour them.
+ *
+ * So a negotiated margin OUTRANKS the window. It does not outrank
+ * SNESRECOMP_WS_EXTRA, which stays the geometry authority above: that is what
+ * the P16 gate pins to 0 to force an authentic frame, and a session value
+ * quietly overriding it would break the one lever the probes rely on.
+ *
+ * -1 clears the pin (offline, or a session that negotiated nothing).
+ */
+void GwedDisplay_SetNetplayWsExtra(int extra)
+{
+    s_net_ws_extra = extra >= 0 ? extra : -1;
+    if (s_net_ws_extra >= 0)
+        fprintf(stderr, "[ws] netplay pinned the margin at ws_extra=%d "
+                        "(the window's own aspect is not used this session)\n",
+                s_net_ws_extra);
 }
 
 void GwedDisplay_SetWidescreenEnabled(bool enabled)
