@@ -41,11 +41,14 @@
 #include "snes_osd.h"            /* FPS readout / turbo / slot toasts */
 #include "snes_rewind.h"         /* rewind ring + filmstrip */
 #include "snes_runahead.h"       /* offline input-latency reduction */
+#include "netplay/snes_state_digest.h"  /* SNESRECOMP_STATE_TRACE */
+#include "snes/dma.h"
 #include "snes_overlay_draw.h"   /* SNES_PAD_* input word bits */
 #include "recomp_frame_blend.h"   /* shared presentation blend (all titles) */
 #include "recomp_flash_guard.h"   /* shared photosensitivity filter (all titles) */
 #include "flashguard_mod.h"       /* this title's Mods-page switch for it */
-#include <ctype.h>   /* tolower: the RewindGesture spec is case-free */
+#include <ctype.h>
+#include <stddef.h>   /* tolower: the RewindGesture spec is case-free */
 #include <time.h>
 #if defined(_WIN32)
 /* For GetThreadTimes in game_thread_cpu_ms: MinGW defines _WIN32, so that
@@ -3995,6 +3998,29 @@ session_reboot:
                 }
                 snes_osd_note_frame();     /* one EMULATED frame */
                 snes_rewind_note_frame();  /* ...which rewind also counts */
+                /* SNESRECOMP_STATE_TRACE=<path>: one line per DISPLAYED frame
+                 * with the partitioned simulation digest. Run-ahead must leave
+                 * the simulation on exactly the trajectory it would have had
+                 * without it -- only the picture is allowed to come from the
+                 * future -- so two traces taken with and without it are
+                 * directly comparable, and the first differing line names the
+                 * subsystem that leaked. */
+                {
+                    static FILE *tf; static int tried;
+                    if (!tried) {
+                        const char *p = getenv("SNESRECOMP_STATE_TRACE");
+                        tried = 1;
+                        if (p && *p) tf = fopen(p, "w");
+                    }
+                    if (tf) {
+                        SnesStateDigestParts d;
+                        snes_state_digest_parts(&d);
+                        fprintf(tf, "%d %08x cpu=%08x wram=%08x apu=%08x "
+                                    "ppu=%08x dma=%08x cart=%08x\n",
+                                snes_frame_counter, d.master, d.cpu, d.wram,
+                                d.apu, d.ppu, d.dma, d.cart);
+                    }
+                }
             }
         }
         game_present(renderer, &texture, 1);

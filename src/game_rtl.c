@@ -631,17 +631,43 @@ const RtlGameInfo kGameInfo = {
  * screen while the host kept simulating" report. MetalWarriorsSNESRecomp
  * carries the same chunk for the same reason (mw_rtl.c MwStateSaveExtra).
  *
- * Not included: the scanout latch (presentation, not simulation — rendering
- * is disabled during resim) and g_q22_at_nmi (a diagnostic ring).
+ * The scanout latch IS included, as of chunk version 1. It was left out on
+ * the grounds that it is "presentation, not simulation — rendering is
+ * disabled during resim", and that premise was false in both halves:
+ *
+ *   - Snes.disableRender, the flag resim sets to disable rendering, has no
+ *     reader anywhere in the runner. Nothing was ever suppressed.
+ *   - Run-ahead does not even claim to suppress it. Its whole purpose is to
+ *     render a SPECULATIVE frame and then rewind the simulation under it.
+ *
+ * So a speculative frame overwrote the latch with the NEXT field's OAM and
+ * CGRAM, the rollback (which never carried it) left that in place, and the
+ * frame the player actually saw drew its sprites and palette one field ahead
+ * of its own background. Measured as exactly the reported symptom: character
+ * glitches with run-ahead on, and nothing wrong with run-ahead off. It is the
+ * same OAM/VRAM field-pairing fault the scanout latch was introduced to fix,
+ * reintroduced one layer up.
+ *
+ * Still not included: g_q22_at_nmi (a diagnostic ring).
  */
 #define GAME_LLE_CHUNK_MAGIC 0x4C4C4757u  /* 'GWLL' */
+/* Bumping this is backward compatible in both directions that matter: a v0
+ * file simply carries no latch and the next frame re-latches from live OAM. */
+#define GAME_LLE_CHUNK_VERSION 1u
 
 typedef struct {
     uint32_t magic;
     uint32_t resume_pc;
     uint32_t booted;
-    uint32_t reserved;
+    uint32_t version;          /* was `reserved`; 0 = no scanout latch follows */
 } GameLleChunk;
+
+typedef struct {
+    uint16_t oam[0x100];
+    uint8_t  high_oam[0x20];
+    uint16_t cgram[0x100];
+    uint32_t valid;
+} GameScanoutChunk;
 
 static void GameStateSaveExtra(SaveLoadInfo *sli)
 {
@@ -650,7 +676,17 @@ static void GameStateSaveExtra(SaveLoadInfo *sli)
     c.magic     = GAME_LLE_CHUNK_MAGIC;
     c.resume_pc = g_resume_pc;
     c.booted    = (uint32_t)(g_booted ? 1 : 0);
+    c.version   = GAME_LLE_CHUNK_VERSION;
     sli->func(sli, &c, sizeof(c));
+    {
+        GameScanoutChunk sc;
+        memset(&sc, 0, sizeof(sc));
+        memcpy(sc.oam, s_scanout_oam, sizeof(sc.oam));
+        memcpy(sc.high_oam, s_scanout_high_oam, sizeof(sc.high_oam));
+        memcpy(sc.cgram, s_scanout_cgram, sizeof(sc.cgram));
+        sc.valid = (uint32_t)(s_scanout_valid ? 1 : 0);
+        sli->func(sli, &sc, sizeof(sc));
+    }
 }
 
 static void GameStateLoadExtra(SaveLoadInfo *sli, uint32_t version)
@@ -675,6 +711,20 @@ static void GameStateLoadExtra(SaveLoadInfo *sli, uint32_t version)
     }
     g_resume_pc = c.resume_pc;
     g_booted    = c.booted ? 1 : 0;
+    if (c.version >= 1u) {
+        GameScanoutChunk sc;
+        memset(&sc, 0, sizeof(sc));
+        sli->func(sli, &sc, sizeof(sc));
+        memcpy(s_scanout_oam, sc.oam, sizeof(s_scanout_oam));
+        memcpy(s_scanout_high_oam, sc.high_oam, sizeof(s_scanout_high_oam));
+        memcpy(s_scanout_cgram, sc.cgram, sizeof(s_scanout_cgram));
+        s_scanout_valid = sc.valid ? 1 : 0;
+    } else {
+        /* A pre-v1 state carries no latch. Dropping it is the safe direction:
+         * the next frame re-latches from live OAM, where presenting a stale
+         * one would show the wrong sprite table over a restored guest. */
+        s_scanout_valid = 0;
+    }
 }
 
 void GameSessionReset(void)
