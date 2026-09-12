@@ -38,6 +38,7 @@
 #include "debug_server.h"
 #include "framedump.h"       /* --framedump: per-frame WRAM + crc32 sidecars */
 #include "snes_savestate_menu.h" /* Select+R / [KeyMap] save-state overlay */
+#include "keybinds.h"            /* per-player keyboard bindings (keybinds.ini) */
 #include "snes_osd.h"            /* FPS readout / turbo / slot toasts */
 #include "snes_rewind.h"         /* rewind ring + filmstrip */
 #include "snes_runahead.h"       /* offline input-latency reduction */
@@ -1381,28 +1382,59 @@ static uint16_t read_gamepad(int slot)
     return pad;
 }
 
+/*
+ * Which device drives each seat: [Controller] SourceP1/SourceP2 as the
+ * launcher writes it -- 0 none, 1 keyboard, 2 gamepad (snesrecomp
+ * runner/src/desktop/config.h). P1 defaults to keyboard so a config without
+ * the section behaves as it always did; P2 defaults to none, because a second
+ * keyboard player sharing one keyboard has to be asked for.
+ *
+ * Read once. A source change is a launcher action and the launcher restarts
+ * the game, so re-reading the file every frame would buy nothing.
+ */
+static int game_player_src(int slot)
+{
+    static int cached[2] = { -1, -1 };
+    if (slot < 0 || slot > 1)
+        return 0;
+    if (cached[slot] < 0) {
+        char key[32];
+        snprintf(key, sizeof(key), "SourceP%d", slot + 1);
+        cached[slot] = game_config_int("[Controller]", key, slot == 0 ? 1 : 0);
+    }
+    return cached[slot];
+}
+
 /* Runner input word: 12 button bits per seat.
- * B, Y, Select, Start, Up, Down, Left, Right, A, X, L, R. */
-static uint16_t read_keyboard(void)
+ * B, Y, Select, Start, Up, Down, Left, Right, A, X, L, R.
+ *
+ * `player` is 1 or 2 and selects that player's bindings from keybinds.ini.
+ * This used to be a single keyboard read with the scancodes hard-coded here,
+ * which had two consequences: keybinds.ini was written by the launcher and
+ * then ignored by the game, and there was no way at all for the keyboard to
+ * reach seat 1 -- seat 1 was gamepad-only, so assigning the keyboard to
+ * player 2 in the launcher silently did nothing. */
+static uint16_t read_keyboard_player(int player)
 {
     const uint8_t *keys = snesrecomp_sdl_get_keyboard_state();
-    uint16_t pad = 0;
     if (!keys)
         return 0;
-    if (keys[SDL_SCANCODE_Z])      pad |= 1u << 0;   /* B */
-    if (keys[SDL_SCANCODE_A])      pad |= 1u << 1;   /* Y */
-    if (keys[SDL_SCANCODE_RSHIFT]) pad |= 1u << 2;   /* Select */
-    if (keys[SDL_SCANCODE_RETURN]) pad |= 1u << 3;   /* Start */
-    if (keys[SDL_SCANCODE_UP])     pad |= 1u << 4;
-    if (keys[SDL_SCANCODE_DOWN])   pad |= 1u << 5;
-    if (keys[SDL_SCANCODE_LEFT])   pad |= 1u << 6;
-    if (keys[SDL_SCANCODE_RIGHT])  pad |= 1u << 7;
-    if (keys[SDL_SCANCODE_X])      pad |= 1u << 8;   /* A */
-    if (keys[SDL_SCANCODE_S])      pad |= 1u << 9;   /* X */
-    if (keys[SDL_SCANCODE_C])      pad |= 1u << 10;  /* L */
-    if (keys[SDL_SCANCODE_V])      pad |= 1u << 11;  /* R */
-    return pad;
+    /* _runner, NOT keybinds_read_player(): that one returns a keyboard-local
+     * layout which is the exact mirror of this runner's seat word, so it
+     * swaps every direction and scrambles the face buttons. See keybinds.h. */
+    return (uint16_t)(keybinds_read_player_runner(keys, player) & 0x0fffu);
 }
+
+
+/* The keyboard as a UI device rather than a seat: whatever any keyboard
+ * player has bound, regardless of source. Menus, the save-state overlay and
+ * the netplay local capture use this, because a player who cannot reach the
+ * menu has no way to fix a mis-assigned source. */
+static uint16_t read_keyboard(void)
+{
+    return (uint16_t)(read_keyboard_player(1) | read_keyboard_player(2));
+}
+
 
 #define GAME_FAST_FORWARD_DEFAULT_FRAMES 6
 #define GAME_FAST_FORWARD_MAX_FRAMES 30
@@ -3447,6 +3479,13 @@ session_reboot:
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
         return 1;
     }
+    /* Keyboard bindings, from <exe_dir>/keybinds.ini (a default file is
+     * written if it is missing). This host never called it, so the launcher
+     * wrote that file and the game read hard-coded scancodes instead -- a
+     * rebind in the Hotkeys panel had no effect, and player 2 had no bindings
+     * at all. */
+    keybinds_init(NULL);
+
     /* Presentation aspect. There is no launcher control for it on this title
      * (recomp-ui's ignore-aspect/integer-scale settings are not drawn for
      * SNES, and gi.widescreen_supported is 0 above), so config.ini is the
@@ -3893,10 +3932,17 @@ session_reboot:
         /* Seat 0 in the low 12 bits, seat 1 in the next 12. Seats 2..7 (with
          * a multitap) go through RtlSetPadState — see
          * snesrecomp/docs/MULTITAP.md. */
-        /* Keyboard and pad are OR'd, not exclusive: either drives seat 0, so
-         * plugging a controller never takes the keyboard away. Seat 1 goes in
-         * the next 12 bits. */
-        inputs = read_keyboard() | read_gamepad(0);
+        /* Only a seat whose SOURCE is the keyboard reads the keyboard, and it
+         * reads ITS OWN bindings.
+         *
+         * Previously the keyboard was OR'd into seat 0 unconditionally and
+         * seat 1 was gamepad-only, so "Player 2: Keyboard" in the launcher did
+         * nothing at all -- the keys still moved player 1. The framework's own
+         * host has gated this on the source for a while
+         * (snesrecomp/runner/src/desktop/mmx23_host_main.inc); this host is a
+         * per-game copy that never inherited it. */
+        inputs = ((game_player_src(0) == 1) ? read_keyboard_player(1) : 0)
+               | read_gamepad(0);
         /* Mask anything still held from the last time the menu closed, then
          * test the Select+R gesture on what is left. Both take the seat-0
          * word before the seat-1 shift, because the overlay is a player-1
@@ -3948,7 +3994,8 @@ session_reboot:
                 inputs |= (uint32)want;
             }
         }
-        inputs |= (uint32)read_gamepad(1) << 12;
+        inputs |= (uint32)(((game_player_src(1) == 1) ? read_keyboard_player(2) : 0)
+                           | read_gamepad(1)) << 12;
         /* TCP-injected pads (debug_server's "set_controller"). The reference
          * host merges this word; this host never did, so every scripted
          * harness that thought it was pressing Start was actually watching
