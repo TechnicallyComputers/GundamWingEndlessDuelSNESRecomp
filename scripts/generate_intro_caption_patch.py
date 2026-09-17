@@ -81,7 +81,7 @@ def load_toml(path: Path) -> dict:
 
 
 # --------------------------------------------------------------------------
-# runtime semantics (mirrors snesrecomp/runner/src/snes_text_xlate.cpp)
+# runtime semantics (mirrors snesrecomp/runner/src/mods/snes_text_xlate.cpp)
 # --------------------------------------------------------------------------
 
 def language_chain(table: dict, lang: str) -> list[str]:

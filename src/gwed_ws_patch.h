@@ -17,7 +17,7 @@
  * .py approach (patching generated C) would match nothing here.
  *
  * This is the same idiom as the localization mod's
- * `snesrecomp/runner/src/snes_text_xlate.cpp apply_rom_patch`: verify the
+ * `snesrecomp/runner/src/mods/snes_text_xlate.cpp apply_rom_patch`: verify the
  * bytes you expect are actually there, then write. It is not the same memory
  * as the file on disk — `snes_loadRom` mallocs and memcpys a private image per
  * session, so nothing here can ever modify the player's ROM, and every

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Offline replay of the runtime localization table into per-language ROM images.
 
-This mirrors the engine semantics in ``snesrecomp/runner/src/snes_text_xlate.cpp``
+This mirrors the engine semantics in ``snesrecomp/runner/src/mods/snes_text_xlate.cpp``
 so generators and decoders can reason about the patched cart image without the
 reference IPS files (see docs/LOCALIZATION_PLAYBOOK.md section 2):
 

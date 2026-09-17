@@ -12,7 +12,7 @@
  * feature is declared presentation_only in the manifest, so it is left out of
  * the mod set netplay peers compare and a player may run it against an
  * opponent who does not. See Feature::presentation_only in
- * snesrecomp/runner/src/mod_runtime.cpp.
+ * snesrecomp/runner/src/mods/mod_runtime.cpp.
  */
 
 #include <string.h>

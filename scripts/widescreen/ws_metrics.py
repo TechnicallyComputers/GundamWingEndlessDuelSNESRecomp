@@ -534,7 +534,7 @@ def read_bmp_rgb(path: str):
     """(width, height, rows) with rows[logical_y] = bytes of RGB triples.
 
     Handles both producers: the debug server's `screenshot` (24-bit) and
-    `runner/src/widescreen.c`'s SNESRECOMP_FRAME_BMP dumps (32-bit top-down).
+    `runner/src/desktop/widescreen.c`'s SNESRECOMP_FRAME_BMP dumps (32-bit top-down).
     Logical Y is always top-down even when BMP storage is bottom-up.
     """
     with open(path, "rb") as fh:

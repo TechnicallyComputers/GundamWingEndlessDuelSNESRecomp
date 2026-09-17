@@ -2351,7 +2351,7 @@ static int run_gui_launcher(const char *initial_rom, char *out, size_t cap)
  *
  * Select + R opens the framework's slot browser. Everything about the menu —
  * which slot is selected, what the panel looks like, and the RtlSaveLoad call
- * itself — lives in snesrecomp/runner/src/snes_savestate_menu.c. The host
+ * itself — lives in snesrecomp/runner/src/desktop/snes_savestate_menu.c. The host
  * supplies only the two things a framework module cannot: SDL events, and
  * pixels on the screen.
  *

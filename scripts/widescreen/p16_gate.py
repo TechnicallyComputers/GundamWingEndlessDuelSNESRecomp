@@ -16,7 +16,7 @@ Three checks, in descending order of authority:
                         candidate renders 342 px wide, and it catches guest-side
                         divergence (a widescreen patch that leaked into WRAM)
                         that pixels can miss.
-  frame_pixels_identical  BMP frames from runner/src/widescreen.c's
+  frame_pixels_identical  BMP frames from runner/src/desktop/widescreen.c's
                         SNESRECOMP_FRAME_BMP_DIR dumper. Equal widths compare
                         byte-for-byte; a wider candidate must match inside the
                         centred native 256 columns AND show one uniform colour

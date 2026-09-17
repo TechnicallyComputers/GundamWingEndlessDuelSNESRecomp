@@ -13,7 +13,7 @@
  * stay digest-equal whichever of them is running it. The manifest declares
  * the feature presentation_only, which is what keeps it out of the mod set
  * peers compare -- see Feature::presentation_only in
- * snesrecomp/runner/src/mod_runtime.cpp.
+ * snesrecomp/runner/src/mods/mod_runtime.cpp.
  */
 
 /* The package id, shared because src/main.c names it too -- in the cosmetic

@@ -71,7 +71,7 @@ def capture_side(args, gate, name: str, ws_extra: int, count: int,
                  start_frame: int, want_backdrop: bool = False) -> dict:
     """One process: enter the scene and dump `count` consecutive frames.
 
-    Frames come from `runner/src/widescreen.c`'s SNESRECOMP_FRAME_BMP_DIR
+    Frames come from `runner/src/desktop/widescreen.c`'s SNESRECOMP_FRAME_BMP_DIR
     dumper rather than from the debug server's `screenshot`, because only the
     dumper is FRAME-EXACT: it writes from inside the present path and names
     each file after the guest frame it presented.  `screenshot` copies
