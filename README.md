@@ -23,10 +23,7 @@ It is the year After Colony 195, and war between the Space Colonies and Earth ha
 
 ## Status
 
-Scaffolded on 2026-08-26 — **not yet a working port.** The layout, build,
-regeneration pipeline, CI, and packaging are wired up; the game does not run
-until the host work in `src/game_rtl.c` is done. See
-[Porting from here](#porting-from-here).
+The original Japanese game boots and runs through assisted story matches. Widescreen and localization remain optional mod packages. See the coverage survey below for the tested scenes and current validation limits.
 
 ## ROM identity
 
@@ -166,3 +163,7 @@ is not distributed here.
   <a href="https://discord.gg/Ad9BwSzctP"><img src=".github/raid-discord.png" alt="Join the Retro AI Development (R.A.I.D.) Discord" width="200"></a>
 </p>
 <!-- /retcomm-readme-raid -->
+
+## Coverage survey and regeneration
+
+Game-owned generation policy is in `recomp/generate.toml`; the shared framework runs the same hooks for `tools/regen.sh` and launcher rebuilds. See the [2026-10-18 coverage survey](docs/COVERAGE_2026-10-18.md) for verified ROM identity, observed scenes, corrections, and remaining validation limits.
