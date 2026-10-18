@@ -1,0 +1,8 @@
+display_name = Gundam Wing Endless Duel
+rom_file = Shin Kidou Senki Gundam W - Endless Duel (Japan).sfc
+expected_crc32 = C0AECDCA
+expected_sha256 = dd94308d822636c6ddf73c5e2644c84f2eb8fb4d9201150fc5f37d44d6f423f1
+rom_size = 2097152
+mapping = LoROM
+region = Japan
+game_id = gwed-jp
