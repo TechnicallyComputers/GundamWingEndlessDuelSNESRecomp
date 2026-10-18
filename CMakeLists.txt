@@ -25,7 +25,7 @@ string(STRIP "${_GAME_VER_RAW}" GAME_RELEASE_VERSION)
 # commit says", which is the part a reader needs.
 set(SNESRECOMP_DEV_VERSION "dev")
 find_package(Git QUIET)
-if(GIT_FOUND)
+if(GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
     execute_process(
         COMMAND "${GIT_EXECUTABLE}" rev-parse --short=8 HEAD
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -180,11 +180,23 @@ snesrecomp_target_mmx_config(GundamWingEndlessDuelSNESRecomp)
 # the same source produces different bytes on Linux and Windows, which would
 # report a mismatch on every cross-platform match -- the case this exists to
 # serve.
-execute_process(
-  COMMAND git -C "${CMAKE_CURRENT_SOURCE_DIR}" describe --always --dirty --abbrev=12
-  OUTPUT_VARIABLE GWED_BUILD_ID
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  ERROR_QUIET)
+set(GWED_BUILD_ID "")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+  execute_process(
+    COMMAND git -C "${CMAKE_CURRENT_SOURCE_DIR}" describe --always --dirty --abbrev=12
+    OUTPUT_VARIABLE GWED_BUILD_ID
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET)
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/SOURCE_REVISIONS")
+  # Exported setup sources have no .git. Do not pick up an unrelated parent
+  # repository or collapse every released setup build to the same unknown ID.
+  file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/SOURCE_REVISIONS" _source_revisions
+       REGEX "^game=[0-9a-fA-F]+$")
+  foreach(_revision IN LISTS _source_revisions)
+    string(REPLACE "game=" "" GWED_BUILD_ID "${_revision}")
+    break()
+  endforeach()
+endif()
 if(NOT GWED_BUILD_ID)
   set(GWED_BUILD_ID "unknown")
 endif()
@@ -201,7 +213,7 @@ message(STATUS "Build identity: ${GWED_BUILD_ID}")
 # envelope's 31-character limit. This is a rejection gate, not a claim that
 # different builds or platforms have qualified simulation compatibility.
 string(SHA256 _gwed_state_hash
-    "${GWED_BUILD_ID};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_PROCESSOR};${CMAKE_SIZEOF_VOID_P};${CMAKE_C_COMPILER_ID};${CMAKE_C_COMPILER_VERSION};${CMAKE_C_FLAGS};${CMAKE_BUILD_TYPE};${SNESRECOMP_ENABLE_TRACE}")
+    "${GAME_RELEASE_VERSION};${GWED_BUILD_ID};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_PROCESSOR};${CMAKE_SIZEOF_VOID_P};${CMAKE_C_COMPILER_ID};${CMAKE_C_COMPILER_VERSION};${CMAKE_C_FLAGS};${CMAKE_BUILD_TYPE};${SNESRECOMP_ENABLE_TRACE}")
 string(SUBSTRING "${_gwed_state_hash}" 0 16 GWED_STATE_ID)
 
 target_compile_definitions(GundamWingEndlessDuelSNESRecomp PRIVATE
