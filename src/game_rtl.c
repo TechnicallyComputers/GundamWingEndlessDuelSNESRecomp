@@ -607,6 +607,17 @@ void GameDrawPpuFrame(void)
 
 static void GameStateSaveExtra(SaveLoadInfo *sli);
 static void GameStateLoadExtra(SaveLoadInfo *sli, uint32_t version);
+static void GameOnStateLoaded(uint32_t version);
+static bool s_execution_loaded;
+
+static const char *GameSnapshotIdentity(void)
+{
+#ifdef GWED_STATE_ID
+    return "gwed-v2-" GWED_STATE_ID;
+#else
+    return "gwed-v2-unversioned";
+#endif
+}
 
 const RtlGameInfo kGameInfo = {
     .title = "gundamwingendlessduel",
@@ -616,6 +627,8 @@ const RtlGameInfo kGameInfo = {
     .draw_ppu_frame = &GameDrawPpuFrame,
     .state_save_extra = &GameStateSaveExtra,
     .state_load_extra = &GameStateLoadExtra,
+    .on_state_loaded = &GameOnStateLoaded,
+    .snapshot_guard_identity = &GameSnapshotIdentity,
     .save_name_prefix = "save",
 };
 
@@ -651,9 +664,10 @@ const RtlGameInfo kGameInfo = {
  * Still not included: g_q22_at_nmi (a diagnostic ring).
  */
 #define GAME_LLE_CHUNK_MAGIC 0x4C4C4757u  /* 'GWLL' */
-/* Bumping this is backward compatible in both directions that matter: a v0
- * file simply carries no latch and the next frame re-latches from live OAM. */
-#define GAME_LLE_CHUNK_VERSION 1u
+/* v2 also carries the shared CPU/bridge/APU/scheduler execution state. Older
+ * file saves omitted it and cannot safely resume; the integrity envelope's
+ * title/build identity rejects those files before touching the machine. */
+#define GAME_LLE_CHUNK_VERSION 2u
 
 typedef struct {
     uint32_t magic;
@@ -687,12 +701,14 @@ static void GameStateSaveExtra(SaveLoadInfo *sli)
         sc.valid = (uint32_t)(s_scanout_valid ? 1 : 0);
         sli->func(sli, &sc, sizeof(sc));
     }
+    RtlSaveExecutionState(sli);
 }
 
 static void GameStateLoadExtra(SaveLoadInfo *sli, uint32_t version)
 {
     GameLleChunk c;
     (void)version;
+    s_execution_loaded = false;
     memset(&c, 0, sizeof(c));
     sli->func(sli, &c, sizeof(c));
     if (c.magic != GAME_LLE_CHUNK_MAGIC) {
@@ -725,6 +741,17 @@ static void GameStateLoadExtra(SaveLoadInfo *sli, uint32_t version)
          * one would show the wrong sprite table over a restored guest. */
         s_scanout_valid = 0;
     }
+    if (c.version >= 2u)
+        s_execution_loaded = RtlLoadExecutionState(sli);
+}
+
+static void GameOnStateLoaded(uint32_t version)
+{
+    (void)version;
+    if (s_execution_loaded)
+        RtlApplyExecutionState();
+    s_execution_loaded = false;
+    g_last_good_resume_pc = g_resume_pc;
 }
 
 void GameSessionReset(void)
@@ -736,6 +763,7 @@ void GameSessionReset(void)
     g_resume_pc = 0;
     g_booted = 0;
     g_last_good_resume_pc = 0;
+    s_execution_loaded = false;
     /* Cold-boot the CPU from RESET rather than resuming stale registers or a
      * stale WAI: g_cpu survives a session teardown, so a rematch that skipped
      * this would start frame 1 mid-flight. Re-points g_cpu.ram too. */

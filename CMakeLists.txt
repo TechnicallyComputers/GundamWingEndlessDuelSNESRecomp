@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(GundamWingEndlessDuelSNESRecomp C CXX)
 
+option(GWED_STATE_TESTS "Build real-ROM state continuity checks" OFF)
+
 set(CMAKE_C_STANDARD 11)
 
 # Release pin for lobby matching. Release builds stamp the VERSION file so two
@@ -194,8 +196,17 @@ if(_git_dirty_tag)
 endif()
 message(STATUS "Build identity: ${GWED_BUILD_ID}")
 
+# File snapshots contain native-layout execution data. Keep their identity
+# distinct from the source-level netplay build identity, and within the shared
+# envelope's 31-character limit. This is a rejection gate, not a claim that
+# different builds or platforms have qualified simulation compatibility.
+string(SHA256 _gwed_state_hash
+    "${GWED_BUILD_ID};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_PROCESSOR};${CMAKE_SIZEOF_VOID_P};${CMAKE_C_COMPILER_ID};${CMAKE_C_COMPILER_VERSION};${CMAKE_C_FLAGS};${CMAKE_BUILD_TYPE};${SNESRECOMP_ENABLE_TRACE}")
+string(SUBSTRING "${_gwed_state_hash}" 0 16 GWED_STATE_ID)
+
 target_compile_definitions(GundamWingEndlessDuelSNESRecomp PRIVATE
     GWED_BUILD_ID="${GWED_BUILD_ID}"
+    GWED_STATE_ID="${GWED_STATE_ID}"
     SNES_GAME_VERSION="${SNESRECOMP_BUILD_VERSION}"
     SNES_GAME_TITLE="Gundam Wing Endless Duel"
 )
@@ -274,3 +285,15 @@ if(COMMAND snesrecomp_enable_rollback)
     snesrecomp_enable_rollback(GundamWingEndlessDuelSNESRecomp)
 endif()
 # No multitap: two seats, one controller per port.
+
+if(GWED_STATE_TESTS)
+    get_target_property(_state_sources GundamWingEndlessDuelSNESRecomp SOURCES)
+    list(REMOVE_ITEM _state_sources src/main.c)
+    add_executable(gwed_state_tests tests/gwed_state_runtime.c ${_state_sources})
+    foreach(_property INCLUDE_DIRECTORIES COMPILE_DEFINITIONS COMPILE_OPTIONS LINK_LIBRARIES LINK_OPTIONS)
+        get_target_property(_value GundamWingEndlessDuelSNESRecomp ${_property})
+        if(_value)
+            set_property(TARGET gwed_state_tests PROPERTY ${_property} "${_value}")
+        endif()
+    endforeach()
+endif()
