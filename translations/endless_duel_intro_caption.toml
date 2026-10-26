@@ -199,7 +199,19 @@ en = "121c97ce7ea47dbc999c4d37f7cef30ad2d4dd76ee9f4bfe5adcd1b0b8c7e3d2"
 # Spanish rendered English. generate_dialogue_patch.py now emits an explicit
 # es_hex; those three rows are the only bytes that changed, and they now
 # match the decoded Spanish reference exactly. en is unchanged.
-es = "600b7eec097a7e25eb5452c9a5fe57df99fef8bc02293bde7d1245f53847f6bd"
+#
+# 2026-09: the es digest moved a second time, also deliberately, and again
+# nothing else did - en is byte-identical, as are fr/it/pt/tl/id/zh/ko/th and
+# off. generate_dialogue_patch.py now repairs ten Spanish reference rows: seven
+# the Max1323 patch left in ENGLISH (0x017900, 0x026d00, 0x026d80, 0x027100,
+# 0x027180, 0x02c900, 0x02d900) and three whose top and bottom halves encoded
+# different text, drawing split glyphs mid-line (0x017e00 "guera"/"guerra",
+# 0x027580 "Quieres"/"Quirees", 0x02cf80 "Soy"/"soy"). The generator now owns
+# those rows outright - the imported fragments are split around them exactly
+# as they are around the caption rectangles here - and 344 bytes changed, all
+# of them inside those ten rows. See scripts/generate_dialogue_patch.py
+# (split_reference_fragments, verify_replay) for the proof it runs on --check.
+es = "00d7c31b555d7d823f1d1463d414e38aa46e7a747e11c83b7825d85aadd03e25"
 
 # --- preview -------------------------------------------------------------
 # OBJ palette 7 as captured live at the caption moment, used only by

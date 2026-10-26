@@ -80,6 +80,38 @@
 # Do not "fix" a missing hyphen by allocating a cell for it: the reduplication
 # reads acceptably with a space, and the free cells are spent on fr/it/pt
 # diacritics.
+#
+# Spanish is NOT an authored language here: it ships the imported Max1323
+# reference tilemaps, decoded row-for-row into endless_duel_dialogue.toml and
+# passed through as bytes. An `es` key in this file is therefore an OVERRIDE of
+# one reference row, and every one carries the reason it exists plus the
+# `es_reference_hex` it replaces.
+#
+# Two defect classes are repaired here:
+#   * rows the reference left in ENGLISH (its bytes equal the English row), and
+#   * rows whose TOP and BOTTOM halves encode different text, which draws the
+#     top 8px of one letter over the bottom 8px of another from the first
+#     divergent column on. scripts/decode_reference_tilemaps.py reports these
+#     as bottom-row validation failures; there were exactly three in 162 rows.
+# Re-encoding from one authored string fixes a desync permanently, because
+# encode_line derives the bottom tile as `top + 0x10`.
+#
+# An override is NOT delivered by the generated dialogue patch alone. That
+# patch's guard fires on source_hex (the English row) or on a payload it
+# carries, so the moment its es_hex stops being the reference bytes it no
+# longer recognises what the earlier fragments wrote and is skipped silently.
+# The generator therefore also splices the repaired bytes into the es payload
+# of every imported fragment covering the row (playbook section 2), which is
+# also what keeps `off` restoring Japanese - the fragments are the only
+# patches that know the original bytes. `--check` proves the replay is
+# unchanged for every other language and for every language switch.
+#
+# Spanish allocates no accent cells in endless_duel_dialogue_accents.toml and
+# needs none: the inverted marks are reference font cells (tiles 0x06e/0x06f)
+# shipped as es-only glyph art, so the base charmap renders them. There is no
+# accented-letter cell, so es text is written unaccented throughout - that is
+# the reference corpus's own convention, not an omission.
+#
 
 schema = 1
 
@@ -205,6 +237,11 @@ id = "saling bertarung!"
 
 [[line]]
 address = 0x017900
+# Untranslated in the reference: the row still holds the ENGLISH
+# "Sorry...". Wufei to Nataku, after "No deberiamos luchar / entre
+# nosotros!".
+es = "Lo siento..."
+es_reference_hex = "0008000824044a044d044d04650467046704670400080008000800080008000800080008000800080008000800080008000800080008000800080008000800080008000834045a045d045d0475047704770477040008000800080008000800080008000800080008000800080008000800080008000800080008000800080008"
 fr = "Désolé..."
 it = "Scusa..."
 pt = "Desculpe..."
@@ -269,6 +306,12 @@ id = "Aku takkan membuat salah!"
 
 [[line]]
 address = 0x017e00
+# Reference repair: the top half reads "Esta guera parece" (one r) and
+# the bottom half "Esta guerra parece" (two), so cols 11 and 13-18 draw
+# the top of one letter over the bottom of another. "guerra" is the
+# correct spelling, so the typo is in the top half.
+es = "Esta guerra parece"
+es_reference_hex = "0008000806044e044f042c0460044204610440044d042c0460044b042c044d0440042e04400460046004600400080008000800080008000800080008000800080008000816045e045f043c0460045204710450045d045d043c0460045b043c045d0450043e045004600460040008000800080008000800080008000800080008"
 fr = "Cette guerre semble"
 it = "Questa guerra sembra"
 pt = "Esta guerra parece"
@@ -317,6 +360,10 @@ id = "......"
 
 [[line]]
 address = 0x026d00
+# Untranslated in the reference (English "We're all incredible").
+# Duo, continued on 0x026d80.
+es = "Todos somos unos"
+es_reference_hex = "000800082804400469044d04400460042c04470447046004440449042e044d0440042f0444042d04470440040008000800080008000800080008000800080008000800083804500479045d04500460043c04570457046004540459043e045d0450043f0454043d04570450040008000800080008000800080008000800080008"
 fr = "Nous sommes tous des"
 it = "Siamo tutti degli"
 pt = "Somos todos uns"
@@ -325,6 +372,12 @@ id = "Kita semua memang"
 
 [[line]]
 address = 0x026d80
+# Untranslated in the reference (English "fools..."). Second line of
+# 0x026d00. Unaccented "increibles" matches the reference corpus, which
+# writes "Cumplire", "mision", "deberiamos" - es allocates no accent
+# cells, so the acute is unrenderable, not forgotten.
+es = "tontos increibles..."
+es_reference_hex = "0008000841044a044a0447044e0467046704670400080008000800080008000800080008000800080008000800080008000800080008000800080008000800080008000851045a045a0457045e047704770477040008000800080008000800080008000800080008000800080008000800080008000800080008000800080008"
 fr = "idiots incroyables..."
 it = "sciocchi incredibili..."
 pt = "grandes tolos..."
@@ -373,6 +426,10 @@ id = "terbaik darimu."
 
 [[line]]
 address = 0x027100
+# Untranslated in the reference (English "Sorry, but I don't have").
+# Continued on 0x027180.
+es = "Lo siento, pero no tengo"
+es_reference_hex = "0008000824044a044d044d046504680460042d0461044f0460040a0460042f044a04490469044f04600443042c046204400400080008000800080008000800080008000834045a045d045d047504780460043d0471045f0460041a0460043f045a04590479045f04600453043c04720450040008000800080008000800080008"
 fr = "Désolé, mais je n'ai pas"
 it = "Scusa, ma non ho"
 pt = "Desculpe, mas não tenho"
@@ -381,6 +438,9 @@ id = "Maaf, aku tak punya"
 
 [[line]]
 address = 0x027180
+# Untranslated in the reference (English "the time for this.").
+es = "tiempo para esto."
+es_reference_hex = "000800084f044304400460044f04440448044004600441044a044d0460044f04430444044e046704000800080008000800080008000800080008000800080008000800085f045304500460045f04540458045004600451045a045d0460045f04530454045e047704000800080008000800080008000800080008000800080008"
 fr = "de temps pour cela."
 it = "tempo per questo."
 pt = "tempo para isso."
@@ -429,6 +489,10 @@ id = "Hei, itu menyenangkan!"
 
 [[line]]
 address = 0x027580
+# Reference repair: the bottom half transposes cols 6-7, reading
+# "Quirees" under the top half's "Quieres".
+es = "¿Quieres otra?"
+es_reference_hex = "000800086e0422046104440440044d0440044e0460044a044f044d042c046c046004600460046004000800080008000800080008000800080008000800080008000800087e043204710454045d04500450045e0460045a045f045d043c047c046004600460046004000800080008000800080008000800080008000800080008"
 fr = "Tu veux recommencer?"
 it = "Vuoi rifarlo?"
 pt = "Quer outra vez?"
@@ -1067,6 +1131,9 @@ id = "permainan!?"
 
 [[line]]
 address = 0x02c900
+# Untranslated in the reference (English "On your feet!").
+es = "¡En pie!"
+es_reference_hex = "0008000820044904600465044a0461044d0460044104400440044f046d04000800080008000800080008000800080008000800080008000800080008000800080008000830045904600475045a0471045d0460045104500450045f047d0400080008000800080008000800080008000800080008000800080008000800080008"
 fr = "Debout!"
 it = "In piedi!"
 pt = "De pé!"
@@ -1155,6 +1222,12 @@ id = "Kau hebat, tapi pada"
 
 [[line]]
 address = 0x02cf80
+# Reference repair: col 9 is capital S on top and lowercase s beneath.
+# The top half's capital is kept - it opens the clause after "¡" - and
+# the text is otherwise verbatim, missing space after the comma
+# included: this override repairs corruption, it does not retranslate.
+es = "final,¡Soy el vencedor!"
+es_reference_hex = "000800084104440449042c04470468046f0424044a04650460044004470460046204400449042e0440042f044a044d046d040008000800080008000800080008000800085104540459043c04570478047f045e045a04750460045004570460047204500459043e0450043f045a045d047d040008000800080008000800080008"
 fr = "fin, c'est moi le vainqueur!"
 it = "alla fine vinco io!"
 pt = "quem vence sou eu!"
@@ -1299,6 +1372,9 @@ id = "dan kau tak akan terluka..."
 
 [[line]]
 address = 0x02d900
+# Untranslated in the reference (English "I fight for Duke Treize!").
+es = "¡Lucho por el Duque Treize!"
+es_reference_hex = "000800080a04600441044404420443044f04600441044a044d0460040504610446044004600425044d0440044404660440046d04000800080008000800080008000800081a04600451045404520453045f04600451045a045d0460041504710456045004600435045d0450045404760450047d04000800080008000800080008"
 fr = "Je me bats pour Treize!"
 it = "Combatto per Treize!"
 pt = "Luto pelo Duque Treize!"

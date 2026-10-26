@@ -82,8 +82,41 @@ of a group appear:
 py -3 tools\validation_states\stagehunt.py <port> <seconds>
 ```
 
-The states it banks are named `pre_stage_<group>.state`. `pre_quote` is not
-affected: it is mid-fight, so the quote block is staged *after* the load.
+The states it banks are named `pre_stage_<group>.state`.
+
+`battle_dialogue_0` stages too — this README claimed otherwise until 2026-09-03.
+The victory quotes are copied to `$7f:0000` + row*0x80 (the same 0x80 row stride
+the cart uses, so the block is a verbatim run of rows) and the box then types out
+of WRAM. `pre_quote` is still a valid state for it, and for the reason the old
+note gave — it is mid-fight, so the copy happens *after* the load, in the loading
+language. What is not true is that the surface reads the cart at draw time. If a
+`pre_quote` capture ever comes out in the wrong language, dump WRAM at `0x10000`
+before concluding anything about the patch table.
+
+## Never capture a typewriter scene at a fixed offset
+
+`validate_from_state.ps1` takes one screenshot at `-WaitSeconds`. On a dialogue
+box that is a coin flip, and it produced a false bug report: a `pre_quote` capture
+in `es` showed line 1 complete and line 2 blank, which read as "the Spanish second
+line is missing" and was investigated as a data defect for hours. It was the
+inter-line pause. Polling the same scene with no input shows the real sequence:
+
+```
+t+1.6  L1 |Cumplire mi mision |   L2 |                |
+t+2.4  L1 |Cumplire mi mision |   L2 |so              |
+t+3.2  L1 |Cumplire mi mision |   L2 |solo si debo!   |
+```
+
+Line 1 finishes at ~1.6 s and line 2 starts at ~2.4 s, so there is a ~0.8 s window
+where the box looks exactly like a dropped line. Spanish is *more* exposed than
+English here, because its rows are shorter and finish earlier — which is precisely
+what makes the artifact look language-specific and therefore like a real bug.
+
+Two rules. Poll until the box stops changing rather than guessing an offset; the
+`catch_*_dialogue_page.py` scripts already do, and their WRAM/VRAM needle hit is
+the assertion. And do not press A while sampling — the taps advance the page, so a
+probe that taps and dumps in the same loop dismisses the text it is trying to
+observe, and reports a blank box as evidence.
 
 ## Don't guess -Advance on a typewriter scene — poll
 
