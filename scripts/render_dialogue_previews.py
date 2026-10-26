@@ -17,7 +17,7 @@ from generate_dialogue_accent_patch import (
     load_source as load_accent_source,
     per_language_charmap,
 )
-from generate_dialogue_patch import TARGET_LANGS, encode_line, load_targets
+from generate_dialogue_patch import AUTHORED_LANGS, encode_line, load_targets
 
 
 ROW_WORDS = 32
@@ -147,7 +147,9 @@ def main() -> int:
         default=str(root / "translations" / "endless_duel_dialogue_accents.toml"),
         help="per-language accented glyph cell allocation table",
     )
-    parser.add_argument("--langs", default=",".join(TARGET_LANGS))
+    # es is included: its only authored rows are the reference repairs, so the
+    # preview doubles as the review sheet for exactly those rows.
+    parser.add_argument("--langs", default=",".join(AUTHORED_LANGS))
     args = parser.parse_args()
 
     accents = load_accent_source(Path(args.accents))
@@ -157,7 +159,7 @@ def main() -> int:
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     requested = [lang.strip() for lang in args.langs.split(",") if lang.strip()]
-    bad = [lang for lang in requested if lang not in TARGET_LANGS]
+    bad = [lang for lang in requested if lang not in AUTHORED_LANGS]
     if bad:
         raise ValueError(f"unsupported preview language(s): {', '.join(bad)}")
 

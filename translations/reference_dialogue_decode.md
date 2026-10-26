@@ -48,7 +48,7 @@ language-specific tilemap bytes with the same tile table.
 | `0x017780` | can do now!? | hacer ahora!? |
 | `0x017800` | We shouldn't be fighting | No deberiamos luchar |
 | `0x017880` | each other! | entre nosotros! |
-| `0x017900` | Sorry... | Sorry... |
+| `0x017900` | Sorry... | Lo siento... |
 | `0x017a00` | Let's protect the colony | Protejamos la colonia |
 | `0x017a80` | together! | juntos! |
 | `0x017b00` | This is terrible! I'll call | Esto es terrible! Llamare |
@@ -56,7 +56,7 @@ language-specific tilemap bytes with the same tile table.
 | `0x017c00` | You should have | Deberias haberte |
 | `0x017c80` | surrendered... | rendido... |
 | `0x017d00` | I won't make any mistakes! | &#x00a1;No cometere ningun error! |
-| `0x017e00` | This war seems as if | Esta guera parece (WARNING: top/bottom glyph mismatch) |
+| `0x017e00` | This war seems as if | Esta guerra parece |
 | `0x017e80` | it will never end... | que no terminara... |
 | `0x017f00` | Alright! That was easier | Bien! Eso fue mas facil |
 | `0x017f80` | than I thought it'd be! | de lo que pense! |
@@ -67,21 +67,21 @@ language-specific tilemap bytes with the same tile table.
 | --- | --- | --- |
 | `0x026b00` | This is meaningless. | No tiene sentido. |
 | `0x026c00` | ...... | ...... |
-| `0x026d00` | We're all incredible | We're all incredible |
-| `0x026d80` | fools... | fools... |
+| `0x026d00` | We're all incredible | Todos somos unos |
+| `0x026d80` | fools... | tontos increibles... |
 | `0x026e00` | Your impatience is a | Tu impaciencia es un |
 | `0x026e80` | most noticable flaw... | defecto muy notable... |
 | `0x026f00` | even for me...cult, | Uno no debe rendirse. |
 | `0x027000` | I suppose that's the | Supongo que es lo |
 | `0x027080` | best you can do. | mejor que sabes hacer. |
-| `0x027100` | Sorry, but I don't have | Sorry, but I don't have |
-| `0x027180` | the time for this. | the time for this. |
+| `0x027100` | Sorry, but I don't have | Lo siento, pero no tengo |
+| `0x027180` | the time for this. | tiempo para esto. |
 | `0x027200` | Time and time again, | Una y otra vez, |
 | `0x027280` | it's always the same. | siempre es lo mismo. |
 | `0x027300` | Yeah! Alright! | Si! Muy bien! |
 | `0x027400` | Hey, I'm not done yet! | Oye,&#x00a1;Aun no he terminado! |
 | `0x027500` | Hey, that was fun! | Oye,&#x00a1;fue divertido! |
-| `0x027580` | Wanna do it again? | &#x00bf;Quieres otra? (WARNING: top/bottom glyph mismatch) |
+| `0x027580` | Wanna do it again? | &#x00bf;Quieres otra? |
 | `0x027600` | Cower in fear! | &#x00a1;Encogete de miedo! |
 | `0x027700` | Slice, chop, killkillkill! | &#x00a1;Rebana, pica, matamata! |
 | `0x027800` | All who see me must die! | &#x00a1;Los que me ven mueren! |
@@ -94,7 +94,7 @@ language-specific tilemap bytes with the same tile table.
 
 | Address | English | Spanish |
 | --- | --- | --- |
-| `0x02c900` | On your feet! | On your feet! |
+| `0x02c900` | On your feet! | &#x00a1;En pie! |
 | `0x02ca00` | You did quite well. | Lo hiciste bien. |
 | `0x02cb00` | What's wrong? | &#x00bf;Que paso? |
 | `0x02cb80` | Having a bad day? | &#x00bf;Tuviste un mal dia? |
@@ -105,7 +105,7 @@ language-specific tilemap bytes with the same tile table.
 | `0x02ce00` | I'm sorry... but this | Lo siento... esto es |
 | `0x02ce80` | is war. | la guerra. |
 | `0x02cf00` | Well fought, but in the | Bien peleado, pero al |
-| `0x02cf80` | end, I am the victor! | final,&#x00a1;Soy el vencedor! (WARNING: top/bottom glyph mismatch) |
+| `0x02cf80` | end, I am the victor! | final,&#x00a1;Soy el vencedor! |
 | `0x02d000` | Did you learn anything | &#x00bf;Aprendiste algo |
 | `0x02d080` | from the battle? | de la batalla? |
 | `0x02d100` | It seems you need more | &#x00a1;Necesitas mas |
@@ -123,7 +123,7 @@ language-specific tilemap bytes with the same tile table.
 | `0x02d780` | take it, huh? | soportarlo,&#x00bf;huh? |
 | `0x02d800` | Raise a white flag and | Iza una bandera blanca |
 | `0x02d880` | you won't be harmed... | y no te lastimare... |
-| `0x02d900` | I fight for Duke Treize! | I fight for Duke Treize! |
+| `0x02d900` | I fight for Duke Treize! | &#x00a1;Lucho por el Duque Treize! |
 | `0x02da00` | Hmm? Something the matter? | &#x00bf;Hmm?&#x00bf;Pasa algo? |
 | `0x02db00` | Howl like the dog you are!! | &#x00a1;&#x00a1;Aullas como un perro!! |
 | `0x02dc00` | Look, is it alright if I | Mira,&#x00bf;esta bien si |
